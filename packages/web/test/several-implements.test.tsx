@@ -132,6 +132,7 @@ describe("several implements: cards (spec 8.3)", () => {
 
 describe("several implements: priority order (spec 8.3)", () => {
   function stackCards() {
+    vi.spyOn(window, "scrollBy").mockImplementation(() => {});
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
       const slots = [...(this.parentElement?.children ?? [])];
       const top = this.tagName === "LI" ? slots.indexOf(this) * 100 : 0;

@@ -1,17 +1,14 @@
 import { useId, useState } from "react";
 import { ListScreen } from "./ListScreen";
 import { LoadScreen, type LoadChoice } from "./LoadScreen";
-import { newCard, type Card } from "./plan";
+import { cardLabel, newCard, type Card } from "./plan";
 import { ReverseScreen } from "./ReverseScreen";
 import { useSettings } from "./settings";
 
-const implementTabs = [
-  { id: "barbell", label: "Barbell" },
-  { id: "dumbbell", label: "Dumbbells" },
-  { id: "kettlebell", label: "Kettlebell" },
-  { id: "leg", label: "Leg attachment" },
-  { id: "vest", label: "Vest" },
-];
+const implementTabs = ["barbell", "dumbbell", "kettlebell", "leg", "vest"].map((id) => ({
+  id,
+  label: cardLabel({ implement: id, dumbbells: "pair" }),
+}));
 
 type View = "load" | "list" | "reverse";
 
