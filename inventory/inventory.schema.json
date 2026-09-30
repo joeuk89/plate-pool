@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joeuk89/plate-pool/inventory/inventory.schema.json",
+  "title": "plate-pool inventory",
+  "description": "Every plate, piece of locking hardware and implement in the plate pool. Equipment only: no order numbers, prices, dates or addresses.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["plateTypes", "plates", "hardware", "implements"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "plateTypes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/plateType" }
+    },
+    "plates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/plate" }
+    },
+    "hardware": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/hardware" }
+    },
+    "implements": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/implement" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]*$"
+    },
+    "unit": {
+      "enum": ["lb", "kg"]
+    },
+    "status": {
+      "description": "verified: the manufacturer or distributor states it. owner: the owner confirmed it on the equipment. unverified: no reliable source or measurement confirms it.",
+      "enum": ["verified", "owner", "unverified"]
+    },
+    "value": {
+      "description": "A listed value, an optional measured value that overrides it, and a status.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["listed", "status"],
+      "properties": {
+        "listed": { "type": "number", "minimum": 0 },
+        "measured": { "type": "number", "minimum": 0 },
+        "status": { "$ref": "#/$defs/status" },
+        "note": { "type": "string" }
+      }
+    },
+    "plateType": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "unit"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "unit": { "$ref": "#/$defs/unit" }
+      }
+    },
+    "plate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "type", "count", "weight", "shape"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "type": { "$ref": "#/$defs/id" },
+        "count": { "type": "integer", "minimum": 0 },
+        "countStatus": { "$ref": "#/$defs/status" },
+        "weight": { "$ref": "#/$defs/value" },
+        "stackLengthIn": { "$ref": "#/$defs/value" },
+        "shape": { "enum": ["square", "round", "block"] }
+      }
+    },
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "kind", "count", "unit", "weight"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "kind": { "enum": ["screw", "collar"] },
+        "count": { "type": "integer", "minimum": 0 },
+        "unit": { "$ref": "#/$defs/unit" },
+        "weight": { "$ref": "#/$defs/value" },
+        "capacityIn": {
+          "description": "Stack length of plates a locking screw holds.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minStackIn": {
+          "description": "Shortest stack of plates the locking screw locks on.",
+          "$ref": "#/$defs/value"
+        },
+        "widthIn": {
+          "description": "Length a collar takes up on a position.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "implement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "count", "unit", "base", "positions", "accepts"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "count": { "type": "integer", "minimum": 1 },
+        "unit": { "$ref": "#/$defs/unit" },
+        "base": {
+          "description": "Weight of the implement with no plates and no locking hardware.",
+          "$ref": "#/$defs/value"
+        },
+        "positions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "symmetric": {
+          "description": "Every position carries the same plates in the same order.",
+          "type": "boolean"
+        },
+        "accepts": {
+          "description": "The plate types this implement takes.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "hardware": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["options", "perPosition"],
+          "properties": {
+            "options": {
+              "description": "Hardware ids this implement takes, or \"none\".",
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/id" }
+            },
+            "default": { "$ref": "#/$defs/id" },
+            "perPosition": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "maxPlateWeight": {
+          "description": "Most plate weight the implement takes, in its unit.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maxTotal": {
+          "description": "Heaviest total the implement reaches, in its unit.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "positionLengthIn": {
+          "description": "Length of one position, for plates and locking hardware together.",
+          "$ref": "#/$defs/value"
+        }
+      }
+    }
+  }
+}

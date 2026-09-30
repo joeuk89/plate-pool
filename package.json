@@ -1,0 +1,26 @@
+{
+  "name": "plate-pool-workspace",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "packages/core",
+    "packages/cli",
+    "packages/web"
+  ],
+  "scripts": {
+    "verify": "npm install && npm run build && npm test",
+    "validate-inventory": "tsx scripts/validate-inventory.ts",
+    "build": "npm run validate-inventory && npm run build --workspaces",
+    "test": "tsc -p tsconfig.json && vitest run && npm test --workspaces"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "ajv": "^8.20.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}
