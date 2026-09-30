@@ -168,6 +168,75 @@ describe("plate-pool load", () => {
   });
 });
 
+describe("plate-pool load vest=", () => {
+  it.each(["12kg", "30lb", "35"])("prints the same JSON as the library's result for vest=%s", (target) => {
+    const result = runWith(["load", `vest=${target}`, "--json"]);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual(load(inventory, { targets: [{ implement: "vest", target }] }));
+  });
+
+  it("prints kilograms first and the blocks on the front and back", () => {
+    expect(runWith(["load", "vest=12kg"]).stdout).toBe(
+      [
+        "Vest  target 12 kg (26.46 lb)  exact",
+        "",
+        "  exact  12 kg (26.46 lb)",
+        "         front: 6 blocks",
+        "         back: 6 blocks",
+        "",
+        "Unverified: empty vest weight, vest block count",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("converts a target in pounds, and recommends the nearer number of blocks", () => {
+    expect(runWith(["load", "vest=30lb"]).stdout).toBe(
+      [
+        "Vest  target 13.6 kg (30 lb)  no exact loading",
+        "",
+        "  below  13 kg (28.66 lb)",
+        "         front: 6 blocks",
+        "         back: 7 blocks",
+        "* above  14 kg (30.86 lb)",
+        "         front: 7 blocks",
+        "         back: 7 blocks",
+        "",
+        "Unverified: empty vest weight, vest block count",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("reads a bare number as kilograms", () => {
+    expect(runWith(["load", "vest=12"]).stdout).toContain("Vest  target 12 kg (26.46 lb)  exact");
+  });
+
+  it("states the 30 block limit and the heaviest allowed loading for a refused target", () => {
+    const result = runWith(["load", "vest=35"]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe(
+      [
+        "Vest  target 35 kg (77.16 lb)  refused",
+        "",
+        "* below  30 kg (66.14 lb)",
+        "         front: 15 blocks",
+        "         back: 15 blocks",
+        "",
+        "Refused: over the 30 block limit. Heaviest allowed: 30 kg (66.14 lb).",
+        "Unverified: empty vest weight, vest block count",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("names one block in the singular and an empty position as no blocks", () => {
+    const text = runWith(["load", "vest=1"]).stdout;
+    expect(text).toContain("front: no blocks\n");
+    expect(text).toContain("back: 1 block\n");
+  });
+});
+
 describe("plate-pool inventory", () => {
   it("prints the same JSON as the library's result (spec 12.3)", () => {
     const result = runWith(["inventory", "--json"]);

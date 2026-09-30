@@ -48,17 +48,27 @@ function positionLines(implement: string, loading: Loading): string[] {
   const [first] = loading.positions;
   const plates = (list: number[]) => (list.length === 0 ? "no plates" : list.join(" "));
   if (implement === "barbell" && first) return [`each side: ${plates(first.plates)} | ${hardware}`];
+  if (implement === "vest") return loading.positions.map((position) => `${position.name}: ${blocks(position.plates.length)}`);
   return [...loading.positions.map((position) => `${position.name}: ${plates(position.plates)}`), hardware];
+}
+
+function blocks(count: number): string {
+  if (count === 0) return "no blocks";
+  return count === 1 ? "1 block" : `${count} blocks`;
 }
 
 function unverifiedLabels(keys: string[], inventory: Inventory): string[] {
   const label = (key: string) => {
     const [id, field] = [key.slice(0, key.lastIndexOf(".")), key.slice(key.lastIndexOf(".") + 1)];
-    if (field === "base") return id === "barbell" ? "bar weight" : `${(implementLabels[id] ?? id).toLowerCase()} weight`;
+    if (field === "base") {
+      if (id === "barbell") return "bar weight";
+      return id === "vest" ? "empty vest weight" : `${(implementLabels[id] ?? id).toLowerCase()} weight`;
+    }
     const hardware = inventory.hardware.find((item) => item.id === id);
     if (hardware?.kind === "collar") return "collar weight";
     if (hardware) return `${hardware.name.toLowerCase()} weight`;
     const plate = inventory.plates.find((item) => item.id === id);
+    if (plate && field === "count") return `${plate.name.toLowerCase()} count`;
     return plate ? `${plate.name} plate weight` : key;
   };
   return [...new Set(keys.map(label))];
