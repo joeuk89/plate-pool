@@ -1,5 +1,6 @@
-import { useId, useState } from "react";
+import { useId } from "react";
 import { LoadScreen } from "./LoadScreen";
+import { useSettings } from "./settings";
 
 const implementTabs = [
   { id: "barbell", label: "Barbell" },
@@ -10,7 +11,8 @@ const implementTabs = [
 ];
 
 export function App() {
-  const [selected, setSelected] = useState("barbell");
+  const [settings, updateSettings] = useSettings();
+  const selected = settings.implement;
   const tabIds = useId();
   const tabId = (implement: string) => `${tabIds}-${implement}`;
 
@@ -28,14 +30,21 @@ export function App() {
             role="tab"
             aria-selected={id === selected}
             className="tab"
-            onClick={() => setSelected(id)}
+            onClick={() => updateSettings({ implement: id })}
           >
             {label}
           </button>
         ))}
       </nav>
       <div role="tabpanel" aria-labelledby={tabId(selected)}>
-        <LoadScreen key={selected} implement={selected} />
+        <LoadScreen
+          key={selected}
+          implement={selected}
+          collars={settings.collars}
+          onCollarsChange={(collars) => updateSettings({ collars })}
+          uneven={settings.uneven}
+          onUnevenChange={(uneven) => updateSettings({ uneven })}
+        />
       </div>
     </main>
   );

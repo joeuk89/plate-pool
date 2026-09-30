@@ -13,6 +13,7 @@ import { useId, useState } from "react";
 import { BarbellPicture } from "./BarbellPicture";
 import { OtherWays } from "./OtherWays";
 import { Segmented } from "./Segmented";
+import { Switch } from "./Switch";
 import { blockList, endLabel, hardwareList, plateList, unevenNote, unverifiedList } from "./describe";
 import { inventory } from "./inventory";
 
@@ -36,12 +37,18 @@ const unitOptions: { value: Unit; label: string }[] = [
 
 type Outcome = { result: LoadResult } | { error: string } | undefined;
 
-function calculate(implement: string, target: string, unit: Unit, collars: CollarChoice, dumbbells: DumbbellChoice): Outcome {
+interface Options {
+  collars: CollarChoice;
+  uneven: boolean;
+  dumbbells: DumbbellChoice;
+}
+
+function calculate(implement: string, target: string, unit: Unit, { collars, uneven, dumbbells }: Options): Outcome {
   if (target.trim() === "") return undefined;
   const withUnit = /[a-z]/i.test(target) ? target : `${target.trim()}${unit}`;
   const request: LoadRequest =
     implement === "dumbbell"
-      ? { targets: [{ implement, target: withUnit, pair: dumbbells === "pair" }] }
+      ? { targets: [{ implement, target: withUnit, pair: dumbbells === "pair" }], uneven }
       : { targets: [{ implement, target: withUnit }], collars };
   try {
     const [result] = load(inventory, request).results;
@@ -56,14 +63,21 @@ function unitOf(implement: string): Unit {
   return inventory.implements.find((item) => item.id === implement)?.unit ?? "lb";
 }
 
-export function LoadScreen({ implement }: { implement: string }) {
+interface LoadScreenProps {
+  implement: string;
+  collars: CollarChoice;
+  onCollarsChange: (collars: CollarChoice) => void;
+  uneven: boolean;
+  onUnevenChange: (uneven: boolean) => void;
+}
+
+export function LoadScreen({ implement, collars, onCollarsChange, uneven, onUnevenChange }: LoadScreenProps) {
   const [target, setTarget] = useState("");
   const [unit, setUnit] = useState<Unit>(unitOf(implement));
-  const [collars, setCollars] = useState<CollarChoice>("clamp");
   const [dumbbells, setDumbbells] = useState<DumbbellChoice>("pair");
   const targetId = useId();
 
-  const outcome = calculate(implement, target, unit, collars, dumbbells);
+  const outcome = calculate(implement, target, unit, { collars, uneven, dumbbells });
 
   return (
     <div className="load">
@@ -85,9 +99,12 @@ export function LoadScreen({ implement }: { implement: string }) {
           />
           <Segmented label="Unit" showLabel={false} options={unitOptions} value={unit} onChange={setUnit} className="unit" />
         </div>
-        {implement === "barbell" && <Segmented label="Collars" options={collarOptions} value={collars} onChange={setCollars} />}
+        {implement === "barbell" && <Segmented label="Collars" options={collarOptions} value={collars} onChange={onCollarsChange} />}
         {implement === "dumbbell" && (
-          <Segmented label="Dumbbells" options={dumbbellOptions} value={dumbbells} onChange={setDumbbells} />
+          <>
+            <Segmented label="Dumbbells" options={dumbbellOptions} value={dumbbells} onChange={setDumbbells} />
+            <Switch label="Uneven loading" checked={uneven} onChange={onUnevenChange} />
+          </>
         )}
       </div>
       <section aria-label="Result" aria-live="polite" className="result">
