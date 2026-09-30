@@ -36,13 +36,13 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
   const pair = request.pair ?? true;
   const dumbbells = pair ? 2 : 1;
   const unit = implement.unit;
-  const lb = (amount: number) => convert(thousandths(amount), "lb", unit);
+  const fromLb = (amount: number) => convert(thousandths(amount), "lb", unit);
   const target = parseWeight(request.target, unit);
   const targetMilli = convert(thousandths(target.amount), target.unit, unit);
 
   const options = plateOptions(inventory, implement);
-  const smallPlateFree = options.some((option) => option.weight <= lb(SMALL_PLATE_LB) && option.plate.count >= dumbbells);
-  const maxDifference = !unevenAllowed ? 0 : lb(smallPlateFree ? UNEVEN_LB : UNEVEN_WITHOUT_SMALL_PLATES_LB);
+  const smallPlateFree = options.some((option) => option.weight <= fromLb(SMALL_PLATE_LB) && option.plate.count >= dumbbells);
+  const maxDifference = !unevenAllowed ? 0 : fromLb(smallPlateFree ? UNEVEN_LB : UNEVEN_WITHOUT_SMALL_PLATES_LB);
   const maxTotal = implement.maxTotal === undefined ? Infinity : thousandths(implement.maxTotal);
 
   const screws = (implement.hardware?.options ?? [])
@@ -50,7 +50,7 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
     .filter((item): item is Hardware => item?.kind === "screw");
   const screwsPerDumbbell = (implement.hardware?.perPosition ?? 1) * implement.positions.length;
   const screwFor = (total: number) => {
-    const id = total <= lb(STANDARD_SCREW_MAX_TOTAL_LB) ? STANDARD_SCREW : LONG_SCREW;
+    const id = total <= fromLb(STANDARD_SCREW_MAX_TOTAL_LB) ? STANDARD_SCREW : LONG_SCREW;
     return screws.find((screw) => screw.id === id);
   };
 
@@ -103,7 +103,7 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
   }
 
   const shown = [exact, below, above].filter((candidate) => candidate !== undefined);
-  if (shown.some((candidate) => candidate.heavier.weight - candidate.lighter.weight > lb(UNEVEN_LB))) {
+  if (shown.some((candidate) => candidate.heavier.weight - candidate.lighter.weight > fromLb(UNEVEN_LB))) {
     warnings.push(`The ends differ by ${UNEVEN_WITHOUT_SMALL_PLATES_LB} lb because no ${SMALL_PLATE_LB} lb or micro plate is free.`);
   }
 
@@ -113,11 +113,11 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
     ...[...shownScrews].filter((screw) => screw.weight.status === "unverified").map((screw) => `${screw.id}.weight`),
     ...[...shownScrews].filter((screw) => screw.minStackIn?.status === "unverified").map((screw) => `${screw.id}.minStackIn`),
     ...options
-      .filter((option) => option.plate.weight.status === "unverified")
-      .filter((option) => {
-        const index = options.indexOf(option);
-        return shown.some((candidate) => candidate.heavier.counts[index]! + candidate.lighter.counts[index]! > 0);
-      })
+      .filter(
+        (option, i) =>
+          option.plate.weight.status === "unverified" &&
+          shown.some((candidate) => candidate.heavier.counts[i]! + candidate.lighter.counts[i]! > 0),
+      )
       .map((option) => `${option.plate.id}.weight`),
   ];
 
