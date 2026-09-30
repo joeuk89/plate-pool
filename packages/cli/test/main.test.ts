@@ -237,6 +237,52 @@ describe("plate-pool load vest=", () => {
   });
 });
 
+describe("plate-pool load kettlebell= and leg=", () => {
+  it.each(["kettlebell", "leg"])("prints the same JSON as the library's result for %s", (implement) => {
+    const result = runWith(["load", `${implement}=80`, "--json"]);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual(load(inventory, { targets: [{ implement, target: "80" }] }));
+  });
+
+  it("prints the kettlebell's stack and locking screw", () => {
+    expect(runWith(["load", "kettlebell=80"]).stdout).toBe(
+      [
+        "Kettlebell  target 80 lb (36.3 kg)  exact",
+        "",
+        "  exact  80 lb (36.3 kg)",
+        "         stack: 22.5 5 5 5 5 5 5 2.5 | long screw",
+        "",
+      ].join("\n"),
+    );
+    expect(runWith(["load", "kettlebell=40"]).stdout).toContain("stack: 5 5 5 | standard screw");
+  });
+
+  it("prints the bare kettlebell handle as no plates and no screw", () => {
+    expect(runWith(["load", "kettlebell=22.5"]).stdout).toContain("stack: no plates | no screw");
+  });
+
+  it("refuses a kettlebell target over the 80 lb limit, and exits 0", () => {
+    const result = runWith(["load", "kettlebell=85"]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("Kettlebell  target 85 lb (38.6 kg)  refused");
+    expect(result.stdout).toContain("Refused: over the 80 lb limit. Heaviest allowed: 80 lb (36.3 kg).");
+  });
+
+  it("prints the leg attachment's stack with its fixed note", () => {
+    expect(runWith(["load", "leg=50"]).stdout).toBe(
+      [
+        "Leg attachment  target 50 lb (22.7 kg)  exact",
+        "",
+        "  exact  50 lb (22.7 kg)",
+        "         stack: 22.5 22.5 5",
+        "",
+        "Plate weight only. The lever changes the resistance you feel.",
+        "",
+      ].join("\n"),
+    );
+  });
+});
+
 describe("plate-pool inventory", () => {
   it("prints the same JSON as the library's result (spec 12.3)", () => {
     const result = runWith(["inventory", "--json"]);

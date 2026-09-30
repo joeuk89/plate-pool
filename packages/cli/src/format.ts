@@ -11,6 +11,8 @@ const implementLabels: Record<string, string> = {
 const hardwareLabels: Record<string, string> = {
   "collar-clamp": "clamp collar",
   "collar-spinlock": "spin-lock collar",
+  "screw-standard": "standard screw",
+  "screw-long": "long screw",
 };
 
 export function loadText(response: LoadResponse, inventory: Inventory): string {
@@ -49,6 +51,11 @@ function positionLines(implement: string, loading: Loading): string[] {
   const plates = (list: number[]) => (list.length === 0 ? "no plates" : list.join(" "));
   if (implement === "barbell" && first) return [`each side: ${plates(first.plates)} | ${hardware}`];
   if (implement === "vest") return loading.positions.map((position) => `${position.name}: ${blocks(position.plates.length)}`);
+  if (implement === "kettlebell" && first) {
+    const screw = loading.hardware.length === 0 ? "no screw" : hardware;
+    return [`${first.name}: ${plates(first.plates)} | ${screw}`];
+  }
+  if (implement === "leg" && first) return [`${first.name}: ${plates(first.plates)}`];
   return [...loading.positions.map((position) => `${position.name}: ${plates(position.plates)}`), hardware];
 }
 
