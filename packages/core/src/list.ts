@@ -1,5 +1,6 @@
 import type { Inventory, Unit } from "./inventory.js";
-import { load, type CollarChoice, type Loading, type LoadResult } from "./load.js";
+import type { CollarChoice, Loading, LoadResult } from "./load.js";
+import { load } from "./request.js";
 import { RequestError } from "./request-error.js";
 import { convert, parseWeight, thousandths, used, type Display } from "./weight.js";
 

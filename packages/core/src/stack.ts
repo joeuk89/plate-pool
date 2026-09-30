@@ -1,5 +1,5 @@
 import type { Hardware, Implement, Inventory } from "./inventory.js";
-import { best, candidatesFor, closest, otherWays, platesInOrder, type Candidate, type Chosen, type Loading, type LoadResult } from "./load.js";
+import { candidatesFor, choose, otherWays, platesInOrder, ranked, sidesFor, type Candidate, type Loading, type LoadResult, type Outcome } from "./load.js";
 import { convert, describeWeight, display, parseWeight, thousandths, used } from "./weight.js";
 
 export const STANDARD_SCREW_MAX_TOTAL_LB = 57.5;
@@ -17,7 +17,7 @@ interface StackOption {
   sticksOut?: boolean;
 }
 
-export function loadKettlebell(inventory: Inventory, implement: Implement, targetText: string): Chosen {
+export function loadKettlebell(inventory: Inventory, implement: Implement, targetText: string): Outcome {
   const screw = (id: string) => inventory.hardware.find((item) => item.id === id && implement.hardware?.options.includes(id));
   const standard = screw("screw-standard");
   const long = screw("screw-long");
@@ -43,7 +43,7 @@ export function loadKettlebell(inventory: Inventory, implement: Implement, targe
   return stackResult(inventory, implement, targetText, options, warnings);
 }
 
-export function loadLeg(inventory: Inventory, implement: Implement, targetText: string): Chosen {
+export function loadLeg(inventory: Inventory, implement: Implement, targetText: string): Outcome {
   const options = candidatesFor(inventory, implement, undefined, thousandths(used(implement.base))).map((candidate) => ({ candidate }));
   return stackResult(inventory, implement, targetText, options, [LEG_NOTE]);
 }
@@ -54,7 +54,7 @@ function stackResult(
   targetText: string,
   options: StackOption[],
   notes: string[],
-): Chosen {
+): Outcome {
   const target = parseWeight(targetText, implement.unit);
   const targetMilli = convert(thousandths(target.amount), target.unit, implement.unit);
   const candidates = options.map((option) => option.candidate);
@@ -70,54 +70,61 @@ function stackResult(
     };
   };
 
-  const exactCandidates = candidates.filter((candidate) => candidate.total === targetMilli);
-  const exact = best(exactCandidates);
-  const below = exact ? undefined : closest(candidates.filter((candidate) => candidate.total < targetMilli), targetMilli);
-  const above = exact ? undefined : closest(candidates.filter((candidate) => candidate.total > targetMilli), targetMilli);
-  const recommended =
-    exact ?? (below && (!above || targetMilli - below.total <= above.total - targetMilli) ? below : above);
-  const others = exact ? otherWays(exactCandidates, exact) : [];
-  const shown = [exact, below, above, ...others].filter((candidate) => candidate !== undefined);
-
-  const warnings: string[] = [];
+  const choice = choose(candidates, targetMilli, ranked);
   const limit = limitOf(implement);
   const refused = limit && targetMilli > limit.total ? { limit: display(limit.amount, implement.unit) } : undefined;
-  if (limit && refused) {
-    const heaviest = below ? ` Heaviest allowed: ${describeWeight(toLoading(below).total, implement.unit)}.` : "";
-    warnings.push(`Refused: over the ${refused.limit[implement.unit]} ${implement.unit} ${limit.label}.${heaviest}`);
-  }
-  if (shown.some((candidate) => optionOf(candidate).sticksOut)) warnings.push(STICKS_OUT_WARNING);
-  warnings.push(...notes);
 
-  const shownScrews = new Set(shown.map((candidate) => optionOf(candidate).screw).filter((screw) => screw !== undefined));
-  const unverified = [
-    ...(implement.base.status === "unverified" ? [`${implement.id}.base`] : []),
-    ...[...shownScrews].filter((screw) => screw.weight.status === "unverified").map((screw) => `${screw.id}.weight`),
-    ...inventory.plates
-      .filter((plate) => plate.weight.status === "unverified")
-      .filter((plate) => shown.some((candidate) => candidate.plates.some(({ option }) => option.plate === plate)))
-      .map((plate) => `${plate.id}.weight`),
-  ];
+  const result = (pick: number): LoadResult => {
+    const { exact, below, above } = sidesFor(choice, choice.picks[pick]);
+    const others = exact ? otherWays(choice.picks, exact) : [];
+    const shown = [exact, below, above, ...others].filter((candidate) => candidate !== undefined);
 
-  const result: LoadResult = {
-    implement: implement.id,
-    target: display(targetMilli, implement.unit),
-    exact: exact !== undefined,
-    ...(refused ? { refused } : {}),
-    ...(!exact && recommended ? { recommended: recommended === below ? ("below" as const) : ("above" as const) } : {}),
-    ...(exact ? { loading: toLoading(exact) } : {}),
-    ...(below ? { below: toLoading(below) } : {}),
-    ...(above ? { above: toLoading(above) } : {}),
-    alternatives: others.map(toLoading),
-    warnings,
-    unverified,
+    const warnings: string[] = [];
+    if (limit && refused) {
+      const heaviest = below ? ` Heaviest allowed: ${describeWeight(toLoading(below).total, implement.unit)}.` : "";
+      warnings.push(`Refused: over the ${refused.limit[implement.unit]} ${implement.unit} ${limit.label}.${heaviest}`);
+    }
+    if (shown.some((candidate) => optionOf(candidate).sticksOut)) warnings.push(STICKS_OUT_WARNING);
+    warnings.push(...notes);
+
+    const shownScrews = new Set(shown.map((candidate) => optionOf(candidate).screw).filter((screw) => screw !== undefined));
+    const unverified = [
+      ...(implement.base.status === "unverified" ? [`${implement.id}.base`] : []),
+      ...[...shownScrews].filter((screw) => screw.weight.status === "unverified").map((screw) => `${screw.id}.weight`),
+      ...inventory.plates
+        .filter((plate) => plate.weight.status === "unverified")
+        .filter((plate) => shown.some((candidate) => candidate.plates.some(({ option }) => option.plate === plate)))
+        .map((plate) => `${plate.id}.weight`),
+    ];
+
+    return {
+      implement: implement.id,
+      target: display(targetMilli, implement.unit),
+      exact: choice.exact,
+      ...(refused ? { refused } : {}),
+      ...(choice.recommended ? { recommended: choice.recommended } : {}),
+      ...(exact ? { loading: toLoading(exact) } : {}),
+      ...(below ? { below: toLoading(below) } : {}),
+      ...(above ? { above: toLoading(above) } : {}),
+      alternatives: others.map(toLoading),
+      warnings,
+      unverified,
+    };
   };
 
-  const screw = recommended && optionOf(recommended).screw;
   return {
+    target: targetMilli,
+    ...(choice.picks[0] ? { total: choice.picks[0].total } : {}),
+    picks: choice.picks.map((candidate) => {
+      const { screw } = optionOf(candidate);
+      return {
+        plates: new Map(candidate.plates.map(({ option, perPosition }) => [option.plate.id, perPosition])),
+        hardware: new Map(screw ? [[screw.id, 1]] : []),
+        plateCount: candidate.plateCount,
+        uneven: 0,
+      };
+    }),
     result,
-    plates: new Map(recommended?.plates.map(({ option, perPosition }) => [option.plate.id, perPosition])),
-    hardware: new Map(screw ? [[screw.id, 1]] : []),
   };
 }
 

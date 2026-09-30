@@ -1,9 +1,9 @@
 import type { Implement, Inventory } from "./inventory.js";
-import type { Chosen, Loading, LoadResult } from "./load.js";
+import type { Loading, LoadResult, Outcome } from "./load.js";
 import { RequestError } from "./request-error.js";
 import { convert, describeWeight, display, parseWeight, thousandths, used } from "./weight.js";
 
-export function loadVest(inventory: Inventory, implement: Implement, targetText: string): Chosen {
+export function loadVest(inventory: Inventory, implement: Implement, targetText: string): Outcome {
   const block = inventory.plates.find((plate) => implement.accepts.includes(plate.type));
   if (!block) throw new RequestError(`The plate pool holds no plates for the ${implement.name.toLowerCase()}.`);
   const blockUnit = inventory.plateTypes.find((type) => type.id === block.type)?.unit ?? implement.unit;
@@ -73,8 +73,12 @@ export function loadVest(inventory: Inventory, implement: Implement, targetText:
   };
 
   return {
-    result,
-    plates: new Map(recommended !== undefined ? [[block.id, recommended]] : []),
-    hardware: new Map(),
+    target: targetMilli,
+    ...(recommended !== undefined ? { total: totalFor(recommended) } : {}),
+    picks:
+      recommended !== undefined
+        ? [{ plates: new Map([[block.id, recommended]]), hardware: new Map(), plateCount: recommended, uneven: 0 }]
+        : [],
+    result: () => ({ ...result, warnings: [...result.warnings] }),
   };
 }
