@@ -1,4 +1,4 @@
-import type { Hardware, Inventory, Plate, Value } from "@plate-pool/core";
+import type { Hardware, Inventory, Loading, Plate, Value } from "@plate-pool/core";
 import { plateColour } from "./plate-colours";
 
 export interface Label {
@@ -27,13 +27,16 @@ export interface PlateDrawing {
   leader?: Line;
 }
 
-export interface HardwareDrawing {
+export interface Callout {
+  label: Omit<Label, "inside">;
+  leaders: Line[];
+}
+
+export interface HardwareDrawing extends Callout {
   name: string;
   x: number;
   width: number;
   height: number;
-  label: Omit<Label, "inside">;
-  leaders: Line[];
 }
 
 // Sizes in inches. Only the Quick-Lock plate size comes from the spec; the rest are drawing-only values.
@@ -140,6 +143,20 @@ function plateFor(inventory: Inventory, weight: number): Plate | undefined {
 
 export function hardwareFor(id: string | undefined, inventory: Inventory): Hardware | undefined {
   return inventory.hardware.find((item) => item.id === id);
+}
+
+/** A locking screw's head, seen side on: the 4 in disc diameter comes from Ironmaster, the thickness is drawing-only. */
+export const SCREW = { width: 0.5, height: 4 };
+
+export function screwFor(loading: Loading, inventory: Inventory): Hardware | undefined {
+  const hardware = hardwareFor(loading.hardware[0]?.id, inventory);
+  return hardware?.kind === "screw" ? hardware : undefined;
+}
+
+/** The longest stack any locking screw the implement takes can hold. */
+export function screwCapacity(implement: string, inventory: Inventory): number {
+  const options = inventory.implements.find((item) => item.id === implement)?.hardware?.options ?? [];
+  return Math.max(0, ...options.map((id) => hardwareFor(id, inventory)?.capacityIn ?? 0));
 }
 
 export function used(value: Value): number {

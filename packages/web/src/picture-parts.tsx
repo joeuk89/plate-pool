@@ -1,4 +1,4 @@
-import type { HardwareDrawing, Line, PlateDrawing } from "./plate-stack";
+import type { Callout, HardwareDrawing, Line, PlateDrawing } from "./plate-stack";
 import { FONT_SIZE, HARDWARE_FONT_SIZE } from "./plate-stack";
 
 const PLATE_GAP = 0.05;
@@ -46,19 +46,19 @@ export function HardwarePart({ hardware, className, radius }: { hardware: Hardwa
         height={hardware.height}
         rx={radius}
       />
-      <HardwareLabel hardware={hardware} />
+      <CalloutLabel callout={hardware} />
     </g>
   );
 }
 
-export function HardwareLabel({ hardware }: { hardware: HardwareDrawing }) {
+export function CalloutLabel({ callout }: { callout: Callout }) {
   return (
     <>
-      {hardware.leaders.map((line, index) => (
+      {callout.leaders.map((line, index) => (
         <Leader key={index} line={line} />
       ))}
-      <text x={hardware.label.x} y={hardware.label.y} className="hardware-label" fontSize={HARDWARE_FONT_SIZE}>
-        {hardware.label.text}
+      <text x={callout.label.x} y={callout.label.y} className="hardware-label" fontSize={HARDWARE_FONT_SIZE}>
+        {callout.label.text}
       </text>
     </>
   );

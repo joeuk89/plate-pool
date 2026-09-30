@@ -67,12 +67,13 @@ describe("barbell picture on the Load screen: other implements", () => {
     ["Vest", "12"],
     ["Kettlebell", "80"],
     ["Dumbbells", "40"],
-  ])("draws no barbell picture for the %s", (tab, target) => {
+  ])("draws its own picture, not the barbell picture, for the %s", (tab, target) => {
     render(<App />);
     fireEvent.click(screen.getByRole("tab", { name: tab }));
     typeTarget(target);
     const result = screen.getByRole("region", { name: "Result" });
-    expect(within(result).getByRole("article", { name: /Exact/ })).toBeTruthy();
-    expect(within(result).queryByRole("img")).toBeNull();
+    const picture = within(within(result).getByRole("article", { name: /Exact/ })).getByRole("img");
+    expect(picture.getAttribute("aria-label")).not.toMatch(/^Each side/);
+    expect(picture.textContent).not.toContain("collar");
   });
 });

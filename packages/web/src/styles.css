@@ -700,6 +700,39 @@ ul {
   stroke-linecap: round;
 }
 
+.picture .handle {
+  fill: none;
+  stroke: var(--steel);
+}
+
+.picture .vest-panel {
+  fill: none;
+  stroke: var(--steel);
+  stroke-width: 0.12;
+}
+
+.picture .vest-slot {
+  fill: none;
+  stroke: var(--rule);
+  stroke-width: 0.06;
+  stroke-dasharray: 0.15 0.12;
+}
+
+.picture .vest-caption {
+  fill: var(--ink);
+}
+
+.picture .heavier-mark text {
+  fill: var(--ink);
+  font-weight: 700;
+}
+
+.picture .heavier-mark line {
+  stroke: var(--ink);
+  stroke-width: 0.1;
+  stroke-linecap: round;
+}
+
 @media (max-width: 26rem) {
   .choices .total .amount {
     font-size: 2.5rem;

@@ -12,8 +12,8 @@ import {
   type Unit,
 } from "@plate-pool/core";
 import { useId, useState } from "react";
-import { BarbellPicture } from "./BarbellPicture";
 import { OtherWays } from "./OtherWays";
+import { Picture } from "./Picture";
 import { Segmented } from "./Segmented";
 import { Switch } from "./Switch";
 import { blockList, endLabel, hardwareList, plateList, unevenNote, unverifiedList } from "./describe";
@@ -244,9 +244,7 @@ function LoadingView({ heading, result, loading, unit, recommended = false, side
         {recommended && <span className="badge">Recommended</span>}
       </header>
       <Total weight={loading.total} unit={unit} />
-      {result.implement === "barbell" && (
-        <BarbellPicture loading={loading} inventory={inventory} {...(sideBySide ? { sideBySide } : {})} />
-      )}
+      <Picture implement={result.implement} loading={loading} inventory={inventory} {...(sideBySide ? { sideBySide } : {})} />
       <dl className="details">
         {result.implement === "dumbbell" ? (
           <DumbbellDetails pair={result.pair !== false} loading={loading} />
