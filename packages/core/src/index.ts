@@ -1,7 +1,7 @@
 export type * from "./inventory.js";
 export { list, step } from "./list.js";
 export type { ListOptions, ListRequest, ListResponse, ListRow, StepRequest } from "./list.js";
-export { load } from "./load.js";
+export { load } from "./request.js";
 export type { CollarChoice, Leftover, Loading, LoadRequest, LoadResponse, LoadResult, TargetRequest } from "./load.js";
 export { InventoryError, readInventory } from "./read-inventory.js";
 export { RequestError } from "./request-error.js";

@@ -1,5 +1,5 @@
 import type { Hardware, Implement, Inventory, Plate } from "./inventory.js";
-import type { Chosen, Loading, LoadResult, TargetRequest } from "./load.js";
+import { choose, sidesFor, type Loading, type LoadResult, type Outcome, type TargetRequest } from "./load.js";
 import { convert, describeWeight, display, parseWeight, thousandths, used } from "./weight.js";
 
 const MICRO_PLATE = "ql-micro";
@@ -33,7 +33,7 @@ interface Candidate {
   uneven: boolean;
 }
 
-export function loadDumbbells(inventory: Inventory, implement: Implement, request: TargetRequest, unevenAllowed: boolean): Chosen {
+export function loadDumbbells(inventory: Inventory, implement: Implement, request: TargetRequest, unevenAllowed: boolean): Outcome {
   const pair = request.pair ?? true;
   const dumbbells = pair ? 2 : 1;
   const unit = implement.unit;
@@ -90,64 +90,64 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
     ...(candidate.uneven ? { heavier: implement.positions[0] } : {}),
   });
 
-  const exactCandidates = candidates.filter((candidate) => candidate.total === targetMilli);
-  const exact = best(exactCandidates, options);
-  const below = exact ? undefined : closest(candidates.filter((candidate) => candidate.total < targetMilli), targetMilli, options);
-  const above = exact ? undefined : closest(candidates.filter((candidate) => candidate.total > targetMilli), targetMilli, options);
-  const recommended =
-    exact ?? (below && (!above || targetMilli - below.total <= above.total - targetMilli) ? below : above);
-
-  const warnings: string[] = [];
+  const choice = choose(candidates, targetMilli, (list) => ranked(list, options));
   const refused = targetMilli > maxTotal ? { limit: display(maxTotal, unit) } : undefined;
-  if (refused) {
-    const heaviest = below ? ` Heaviest allowed: ${describeWeight(display(below.total, unit), unit)}.` : "";
-    warnings.push(`Refused: over the ${refused.limit[unit]} ${unit} limit per dumbbell.${heaviest}`);
-  }
 
-  const shown = [exact, below, above].filter((candidate) => candidate !== undefined);
-  if (shown.some((candidate) => candidate.heavier.weight - candidate.lighter.weight > fromLb(UNEVEN_LB))) {
-    warnings.push(`The ends differ by ${UNEVEN_WITHOUT_SMALL_PLATES_LB} lb because no ${SMALL_PLATE_LB} lb or micro plate is free.`);
-  }
+  const result = (pick: number): LoadResult => {
+    const { exact, below, above } = sidesFor(choice, choice.picks[pick]);
+    const warnings: string[] = [];
+    if (refused) {
+      const heaviest = below ? ` Heaviest allowed: ${describeWeight(display(below.total, unit), unit)}.` : "";
+      warnings.push(`Refused: over the ${refused.limit[unit]} ${unit} limit per dumbbell.${heaviest}`);
+    }
 
-  const others = exact ? otherWays(exactCandidates, exact, options) : [];
-  const listed = [...shown, ...others];
-  const listedScrews = new Set(listed.map((candidate) => candidate.screw).filter((screw) => screw !== undefined));
-  const unverified = [
-    ...(implement.base.status === "unverified" ? [`${implement.id}.base`] : []),
-    ...[...listedScrews].filter((screw) => screw.weight.status === "unverified").map((screw) => `${screw.id}.weight`),
-    ...[...listedScrews].filter((screw) => screw.minStackIn?.status === "unverified").map((screw) => `${screw.id}.minStackIn`),
-    ...options
-      .filter(
-        (option, i) =>
-          option.plate.weight.status === "unverified" &&
-          listed.some((candidate) => candidate.heavier.counts[i]! + candidate.lighter.counts[i]! > 0),
-      )
-      .map((option) => `${option.plate.id}.weight`),
-  ];
+    const shown = [exact, below, above].filter((candidate) => candidate !== undefined);
+    if (shown.some((candidate) => candidate.heavier.weight - candidate.lighter.weight > fromLb(UNEVEN_LB))) {
+      warnings.push(`The ends differ by ${UNEVEN_WITHOUT_SMALL_PLATES_LB} lb because no ${SMALL_PLATE_LB} lb or micro plate is free.`);
+    }
 
-  const result: LoadResult = {
-    implement: implement.id,
-    pair,
-    target: display(targetMilli, unit),
-    exact: exact !== undefined,
-    ...(refused ? { refused } : {}),
-    ...(!exact && recommended ? { recommended: recommended === below ? ("below" as const) : ("above" as const) } : {}),
-    ...(exact ? { loading: toLoading(exact) } : {}),
-    ...(below ? { below: toLoading(below) } : {}),
-    ...(above ? { above: toLoading(above) } : {}),
-    alternatives: others.map(toLoading),
-    warnings,
-    unverified,
+    const others = exact ? otherWays(choice.picks, exact, options) : [];
+    const listed = [...shown, ...others];
+    const listedScrews = new Set(listed.map((candidate) => candidate.screw).filter((screw) => screw !== undefined));
+    const unverified = [
+      ...(implement.base.status === "unverified" ? [`${implement.id}.base`] : []),
+      ...[...listedScrews].filter((screw) => screw.weight.status === "unverified").map((screw) => `${screw.id}.weight`),
+      ...[...listedScrews].filter((screw) => screw.minStackIn?.status === "unverified").map((screw) => `${screw.id}.minStackIn`),
+      ...options
+        .filter(
+          (option, i) =>
+            option.plate.weight.status === "unverified" &&
+            listed.some((candidate) => candidate.heavier.counts[i]! + candidate.lighter.counts[i]! > 0),
+        )
+        .map((option) => `${option.plate.id}.weight`),
+    ];
+
+    return {
+      implement: implement.id,
+      pair,
+      target: display(targetMilli, unit),
+      exact: choice.exact,
+      ...(refused ? { refused } : {}),
+      ...(choice.recommended ? { recommended: choice.recommended } : {}),
+      ...(exact ? { loading: toLoading(exact) } : {}),
+      ...(below ? { below: toLoading(below) } : {}),
+      ...(above ? { above: toLoading(above) } : {}),
+      alternatives: others.map(toLoading),
+      warnings,
+      unverified,
+    };
   };
 
   return {
+    target: targetMilli,
+    ...(choice.picks[0] ? { total: choice.picks[0].total } : {}),
+    picks: choice.picks.map((candidate) => ({
+      plates: new Map(options.map((option, i) => [option.plate.id, dumbbells * (candidate.heavier.counts[i]! + candidate.lighter.counts[i]!)])),
+      hardware: new Map(candidate.screw ? [[candidate.screw.id, screwsPerDumbbell * dumbbells]] : []),
+      plateCount: dumbbells * candidate.plateCount,
+      uneven: candidate.uneven ? dumbbells : 0,
+    })),
     result,
-    plates: new Map(
-      recommended
-        ? options.map((option, i) => [option.plate.id, dumbbells * (recommended.heavier.counts[i]! + recommended.lighter.counts[i]!)])
-        : [],
-    ),
-    hardware: new Map(recommended?.screw ? [[recommended.screw.id, screwsPerDumbbell * dumbbells]] : []),
   };
 }
 
@@ -195,18 +195,6 @@ function endsFor(options: PlateOption[], capacity: number): End[] {
 function fitsScrew(screw: Hardware, end: End): boolean {
   if (end.length > thousandths(screw.capacityIn ?? Infinity)) return false;
   return screw.minStackIn === undefined || end.length >= thousandths(used(screw.minStackIn));
-}
-
-function closest(candidates: Candidate[], target: number, options: PlateOption[]): Candidate | undefined {
-  const distance = Math.min(...candidates.map((candidate) => Math.abs(candidate.total - target)));
-  return best(
-    candidates.filter((candidate) => Math.abs(candidate.total - target) === distance),
-    options,
-  );
-}
-
-function best(candidates: Candidate[], options: PlateOption[]): Candidate | undefined {
-  return ranked(candidates, options)[0];
 }
 
 function otherWays(candidates: Candidate[], chosen: Candidate, options: PlateOption[]): Candidate[] {

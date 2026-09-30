@@ -1,8 +1,5 @@
 import type { Hardware, Implement, Inventory, Plate } from "./inventory.js";
-import { loadDumbbells } from "./dumbbells.js";
 import { RequestError } from "./request-error.js";
-import { loadKettlebell, loadLeg } from "./stack.js";
-import { loadVest } from "./vest.js";
 import { convert, describeWeight, display, parseWeight, thousandths, used, type Display } from "./weight.js";
 
 export type CollarChoice = "clamp" | "spinlock" | "none";
@@ -68,44 +65,55 @@ export interface Candidate {
   plateCount: number;
 }
 
-export interface Chosen {
-  result: LoadResult;
+export interface Usage {
   plates: Map<string, number>;
   hardware: Map<string, number>;
+  plateCount: number;
+  uneven: number;
 }
 
-export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
-  if (request.targets.length !== 1) {
-    throw new RequestError("A request holds exactly one target for now.");
-  }
-  const [targetRequest] = request.targets as [TargetRequest];
-  const { implement: implementId, target } = targetRequest;
-  const implement = inventory.implements.find((candidate) => candidate.id === implementId);
-  if (!implement) throw new RequestError(`Unknown implement "${implementId}".`);
-  let chosen: Chosen;
-  switch (implement.id) {
-    case "barbell":
-      chosen = loadBarbell(inventory, implement, target, request.collars);
-      break;
-    case "dumbbell":
-      chosen = loadDumbbells(inventory, implement, targetRequest, request.uneven ?? true);
-      break;
-    case "kettlebell":
-      chosen = loadKettlebell(inventory, implement, target);
-      break;
-    case "leg":
-      chosen = loadLeg(inventory, implement, target);
-      break;
-    case "vest":
-      chosen = loadVest(inventory, implement, target);
-      break;
-    default:
-      throw new RequestError(`Load for the ${implement.name.toLowerCase()} is not built yet.`);
-  }
-  return { results: [chosen.result], leftover: leftover(inventory, [implement], chosen) };
+export interface Outcome {
+  target: number;
+  total?: number;
+  picks: Usage[];
+  result(pick: number): LoadResult;
 }
 
-function loadBarbell(inventory: Inventory, implement: Implement, targetText: string, collars: CollarChoice | undefined): Chosen {
+export interface Choice<C> {
+  exact: boolean;
+  picks: C[];
+  below?: C;
+  above?: C;
+  recommended?: "below" | "above";
+}
+
+export function choose<C extends { total: number }>(candidates: C[], target: number, rank: (list: C[]) => C[]): Choice<C> {
+  const at = (total: number) => rank(candidates.filter((candidate) => candidate.total === total));
+  const exact = at(target);
+  if (exact.length > 0) return { exact: true, picks: exact };
+  const lower = Math.max(...candidates.map((candidate) => candidate.total).filter((total) => total < target));
+  const higher = Math.min(...candidates.map((candidate) => candidate.total).filter((total) => total > target));
+  const below = Number.isFinite(lower) ? at(lower) : [];
+  const above = Number.isFinite(higher) ? at(higher) : [];
+  const recommended =
+    below.length > 0 && (above.length === 0 || target - lower <= higher - target) ? "below" : above.length > 0 ? "above" : undefined;
+  return {
+    exact: false,
+    picks: recommended === "below" ? below : recommended === "above" ? above : [],
+    ...(below[0] ? { below: below[0] } : {}),
+    ...(above[0] ? { above: above[0] } : {}),
+    ...(recommended ? { recommended } : {}),
+  };
+}
+
+export function sidesFor<C>(choice: Choice<C>, pick: C | undefined): { exact?: C; below?: C; above?: C } {
+  const exact = choice.exact ? pick : undefined;
+  const below = choice.recommended === "below" ? pick : choice.below;
+  const above = choice.recommended === "above" ? pick : choice.above;
+  return { ...(exact ? { exact } : {}), ...(below ? { below } : {}), ...(above ? { above } : {}) };
+}
+
+export function loadBarbell(inventory: Inventory, implement: Implement, targetText: string, collars: CollarChoice | undefined): Outcome {
   const target = parseWeight(targetText, implement.unit);
   const targetMilli = convert(thousandths(target.amount), target.unit, implement.unit);
   const collar = collarFor(inventory, implement, collars);
@@ -114,10 +122,10 @@ function loadBarbell(inventory: Inventory, implement: Implement, targetText: str
     thousandths(used(implement.base)) +
     (collar ? collarsNeeded * convert(thousandths(used(collar.weight)), collar.unit, implement.unit) : 0);
 
-  const warnings: string[] = [];
+  const collarWarnings: string[] = [];
   const enoughCollars = !collar || collar.count >= collarsNeeded;
   if (collar && !enoughCollars) {
-    warnings.push(`The plate pool holds ${collar.count} ${collar.name}. The ${implement.name.toLowerCase()} needs ${collarsNeeded}.`);
+    collarWarnings.push(`The plate pool holds ${collar.count} ${collar.name}. The ${implement.name.toLowerCase()} needs ${collarsNeeded}.`);
   }
   const candidates = enoughCollars ? candidatesFor(inventory, implement, collar, baseMilli) : [];
 
@@ -128,66 +136,57 @@ function loadBarbell(inventory: Inventory, implement: Implement, targetText: str
     uneven: false,
   });
 
-  const exactCandidates = candidates.filter((candidate) => candidate.total === targetMilli);
-  const exact = best(exactCandidates);
-  const below = exact ? undefined : closest(candidates.filter((candidate) => candidate.total < targetMilli), targetMilli);
-  const above = exact ? undefined : closest(candidates.filter((candidate) => candidate.total > targetMilli), targetMilli);
-  const recommended =
-    exact ?? (below && (!above || targetMilli - below.total <= above.total - targetMilli) ? below : above);
-
+  const choice = choose(candidates, targetMilli, ranked);
   const refused =
     implement.maxPlateWeight !== undefined && targetMilli - baseMilli > thousandths(implement.maxPlateWeight)
       ? { limit: display(thousandths(implement.maxPlateWeight), implement.unit) }
       : undefined;
-  if (refused) {
-    const heaviest = below ? ` Heaviest allowed: ${describeWeight(toLoading(below).total, implement.unit)}.` : "";
-    warnings.push(`Refused: over the ${refused.limit[implement.unit]} ${implement.unit} plate limit.${heaviest}`);
-  }
 
-  const others = exact ? otherWays(exactCandidates, exact) : [];
-  const shown = [exact, below, above, ...others].filter((candidate) => candidate !== undefined);
-  const unverified = [
-    ...(implement.base.status === "unverified" ? [`${implement.id}.base`] : []),
-    ...(collar?.weight.status === "unverified" ? [`${collar.id}.weight`] : []),
-    ...inventory.plates
-      .filter((plate) => plate.weight.status === "unverified")
-      .filter((plate) => shown.some((candidate) => candidate.plates.some(({ option }) => option.plate === plate)))
-      .map((plate) => `${plate.id}.weight`),
-  ];
+  const result = (pick: number): LoadResult => {
+    const { exact, below, above } = sidesFor(choice, choice.picks[pick]);
+    const warnings = [...collarWarnings];
+    if (refused) {
+      const heaviest = below ? ` Heaviest allowed: ${describeWeight(toLoading(below).total, implement.unit)}.` : "";
+      warnings.push(`Refused: over the ${refused.limit[implement.unit]} ${implement.unit} plate limit.${heaviest}`);
+    }
 
-  const result: LoadResult = {
-    implement: implement.id,
-    target: display(targetMilli, implement.unit),
-    exact: exact !== undefined,
-    ...(refused ? { refused } : {}),
-    ...(!exact && recommended ? { recommended: recommended === below ? ("below" as const) : ("above" as const) } : {}),
-    ...(exact ? { loading: toLoading(exact) } : {}),
-    ...(below ? { below: toLoading(below) } : {}),
-    ...(above ? { above: toLoading(above) } : {}),
-    alternatives: others.map(toLoading),
-    warnings,
-    unverified,
+    const others = exact ? otherWays(choice.picks, exact) : [];
+    const shown = [exact, below, above, ...others].filter((candidate) => candidate !== undefined);
+    const unverified = [
+      ...(implement.base.status === "unverified" ? [`${implement.id}.base`] : []),
+      ...(collar?.weight.status === "unverified" ? [`${collar.id}.weight`] : []),
+      ...inventory.plates
+        .filter((plate) => plate.weight.status === "unverified")
+        .filter((plate) => shown.some((candidate) => candidate.plates.some(({ option }) => option.plate === plate)))
+        .map((plate) => `${plate.id}.weight`),
+    ];
+
+    return {
+      implement: implement.id,
+      target: display(targetMilli, implement.unit),
+      exact: choice.exact,
+      ...(refused ? { refused } : {}),
+      ...(choice.recommended ? { recommended: choice.recommended } : {}),
+      ...(exact ? { loading: toLoading(exact) } : {}),
+      ...(below ? { below: toLoading(below) } : {}),
+      ...(above ? { above: toLoading(above) } : {}),
+      alternatives: others.map(toLoading),
+      warnings,
+      unverified,
+    };
   };
 
   const positions = implement.positions.length;
   return {
+    target: targetMilli,
+    ...(choice.picks[0] ? { total: choice.picks[0].total } : {}),
+    picks: choice.picks.map((candidate) => ({
+      plates: new Map(candidate.plates.map(({ option, perPosition }) => [option.plate.id, perPosition * positions])),
+      hardware: new Map(collar ? [[collar.id, collarsNeeded]] : []),
+      plateCount: candidate.plateCount,
+      uneven: 0,
+    })),
     result,
-    plates: new Map(recommended?.plates.map(({ option, perPosition }) => [option.plate.id, perPosition * positions])),
-    hardware: new Map(collar && recommended ? [[collar.id, collarsNeeded]] : []),
-  };
-}
-
-function leftover(inventory: Inventory, implementsUsed: Implement[], chosen: Chosen): Leftover {
-  const plateTypes = new Set(implementsUsed.flatMap((implement) => implement.accepts));
-  return {
-    plates: Object.fromEntries(
-      inventory.plates
-        .filter((plate) => plateTypes.has(plate.type))
-        .map((plate) => [plate.id, plate.count - (chosen.plates.get(plate.id) ?? 0)]),
-    ),
-    hardware: Object.fromEntries(
-      inventory.hardware.map((item) => [item.id, item.count - (chosen.hardware.get(item.id) ?? 0)]),
-    ),
   };
 }
 
@@ -240,22 +239,13 @@ export function candidatesFor(inventory: Inventory, implement: Implement, collar
   return candidates;
 }
 
-export function closest(candidates: Candidate[], target: number): Candidate | undefined {
-  const distance = Math.min(...candidates.map((candidate) => Math.abs(candidate.total - target)));
-  return best(candidates.filter((candidate) => Math.abs(candidate.total - target) === distance));
-}
-
-export function best(candidates: Candidate[]): Candidate | undefined {
-  return ranked(candidates)[0];
-}
-
 export function otherWays(candidates: Candidate[], chosen: Candidate): Candidate[] {
   return ranked(candidates)
     .filter((candidate) => candidate !== chosen)
     .slice(0, MAX_ALTERNATIVES);
 }
 
-function ranked(candidates: Candidate[]): Candidate[] {
+export function ranked(candidates: Candidate[]): Candidate[] {
   return [...candidates].sort((a, b) => a.plateCount - b.plateCount || heavierFirst(a, b));
 }
 

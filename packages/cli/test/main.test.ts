@@ -349,6 +349,79 @@ describe("plate-pool load kettlebell= and leg=", () => {
   });
 });
 
+describe("plate-pool load with several targets", () => {
+  it("prints the same JSON as the library's result, leftover included (spec 12.3)", () => {
+    const result = runWith(["load", "barbell=173", "dumbbells=40", "--json"]);
+    expect(result.code).toBe(0);
+    const expected = load(inventory, {
+      targets: [
+        { implement: "barbell", target: "173" },
+        { implement: "dumbbell", target: "40" },
+      ],
+    });
+    expect(JSON.parse(result.stdout)).toEqual(expected);
+    expect(expected.leftover).toEqual({
+      plates: { "ql-22.5": 1, "ql-5": 0, "ql-2.5": 2, "ql-micro": 4 },
+      hardware: { "screw-standard": 0, "screw-long": 5, "collar-spinlock": 2, "collar-clamp": 2 },
+    });
+  });
+
+  it("reads argument order as priority order", () => {
+    const first = JSON.parse(runWith(["load", "dumbbells=120", "kettlebell=40", "--json"]).stdout);
+    const second = JSON.parse(runWith(["load", "kettlebell=40", "dumbbells=120", "--json"]).stdout);
+    expect(first.results.map((result: { implement: string; exact: boolean }) => [result.implement, result.exact])).toEqual([
+      ["dumbbell", true],
+      ["kettlebell", false],
+    ]);
+    expect(second.results.map((result: { implement: string; exact: boolean }) => [result.implement, result.exact])).toEqual([
+      ["kettlebell", true],
+      ["dumbbell", false],
+    ]);
+  });
+
+  it("prints each result in order, then what is left over", () => {
+    expect(runWith(["load", "barbell=173", "dumbbells=40"]).stdout).toBe(
+      [
+        "Barbell  target 173 lb (78.5 kg)  exact",
+        "",
+        "  exact  173 lb (78.5 kg)",
+        "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
+        "",
+        "Unverified: bar weight, collar weight",
+        "",
+        "Dumbbells (pair)  target 40 lb (18.1 kg) each  exact",
+        "",
+        "  exact  40 lb (18.1 kg)",
+        "         each end: 5 5 5 | standard screws",
+        "",
+        "Left over",
+        "  plates: 1 × 22.5, 2 × 2.5, 4 × 1.25",
+        "  locking hardware: 5 long screws, 2 spin-lock collars, 2 clamp collars",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("prints the warning for a later implement that misses its target", () => {
+    const result = runWith(["load", "dumbbells=120", "kettlebell=40"]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("Not exact because the dumbbells use the 5 lb plates the kettlebell needs to reach 40 lb.");
+  });
+
+  it("counts vest blocks left over", () => {
+    expect(runWith(["load", "vest=12", "leg=50"]).stdout).toContain(
+      ["Left over", "  plates: 3 × 22.5, 23 × 5, 4 × 2.5, 4 × 1.25, 18 vest blocks", ""].join("\n"),
+    );
+  });
+
+  it("exits 1 when the request needs more of an implement than the inventory holds", () => {
+    const result = runWith(["load", "barbell=100", "barbell=120"]);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("The request needs 2 × barbell. The inventory holds 1.\n");
+  });
+});
+
 describe("plate-pool reverse", () => {
   it("prints the same JSON as the library's result (spec 12.3)", () => {
     const result = runWith(["reverse", "barbell", "--side", "22.5,22.5,5,5", "--json"]);
