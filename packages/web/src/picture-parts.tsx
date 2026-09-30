@@ -1,15 +1,48 @@
+import type { KeyboardEvent } from "react";
 import type { Callout, HardwareDrawing, Line, PlateDrawing } from "./plate-stack";
 import { FONT_SIZE, HARDWARE_FONT_SIZE } from "./plate-stack";
 
 const PLATE_GAP = 0.05;
 
-export function Plates({ plates }: { plates: PlateDrawing[] }) {
+export interface Editing {
+  remove: (position: string, index: number) => void;
+  removeLabel: (position: string, weight: number) => string;
+}
+
+export function pictureRole(description: string, editing: Editing | undefined) {
+  return { role: editing ? "group" : "img", "aria-label": description };
+}
+
+export function removable(editing: Editing | undefined, position: string | undefined, index: number, weight: number) {
+  if (!editing || position === undefined) return {};
+  const remove = () => editing.remove(position, index);
+  return {
+    role: "button",
+    tabIndex: 0,
+    className: "removable",
+    "aria-label": editing.removeLabel(position, weight),
+    onClick: remove,
+    onKeyDown: (event: KeyboardEvent) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      remove();
+    },
+  };
+}
+
+interface PlatesProps {
+  plates: PlateDrawing[];
+  position?: string | undefined;
+  editing?: Editing | undefined;
+}
+
+export function Plates({ plates, position, editing }: PlatesProps) {
   return (
     <>
       {plates.map((plate, index) => {
         const width = plate.width - PLATE_GAP;
         return (
-          <g key={index}>
+          <g key={index} {...removable(editing, position, index, plate.weight)}>
             <rect
               x={plate.x + PLATE_GAP / 2}
               y={-plate.height / 2}

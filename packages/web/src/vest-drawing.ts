@@ -8,7 +8,7 @@ export interface Slot {
   y: number;
   width: number;
   height: number;
-  block?: { label: string; fill: string; ink: string };
+  block?: { weight: number; label: string; fill: string; ink: string };
 }
 
 export interface Panel {
@@ -56,7 +56,7 @@ export function drawVest(loading: Loading, inventory: Inventory): VestDrawing {
         x: x + PANEL_PADDING + (slot % COLUMNS) * (BLOCK.width + BLOCK_GAP),
         y: y + PANEL_PADDING + Math.floor(slot / COLUMNS) * (BLOCK.height + BLOCK_GAP),
         ...BLOCK,
-        ...(weight === undefined ? {} : { block: { label: String(weight), ...plateColour(weight, "kg") } }),
+        ...(weight === undefined ? {} : { block: { weight, label: String(weight), ...plateColour(weight, "kg") } }),
       };
     });
     const caption = { x: x + panelWidth / 2, y: y + panelHeight + CAPTION_GAP + FONT_SIZE * 0.75 };

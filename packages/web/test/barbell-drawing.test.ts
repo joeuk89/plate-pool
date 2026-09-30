@@ -132,4 +132,15 @@ describe("barbell drawing: collars", () => {
     expect(plates).toEqual([]);
     expect(collar?.x).toBe(sleeve.x);
   });
+
+  it("widens the picture to fit plates that run past the end of the sleeve, as a Reverse loading can", () => {
+    const tooLong: Loading = {
+      total: { lb: 243, kg: 110.2 },
+      hardware: [{ id: "collar-clamp", count: 2 }],
+      positions: ["left", "right"].map((name) => ({ name, plates: [22.5, 22.5, 22.5, 22.5, 22.5, 22.5] })),
+      uneven: false,
+    };
+    const { collar, width } = drawBarbell(tooLong, inventory);
+    expect(collar!.x + collar!.width).toBeLessThanOrEqual(width);
+  });
 });
