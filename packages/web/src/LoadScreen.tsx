@@ -10,6 +10,7 @@ import {
   type Unit,
 } from "@plate-pool/core";
 import { useId, useState } from "react";
+import { BarbellPicture } from "./BarbellPicture";
 import { OtherWays } from "./OtherWays";
 import { Segmented } from "./Segmented";
 import { blockList, endLabel, hardwareList, plateList, unevenNote, unverifiedList } from "./describe";
@@ -126,15 +127,17 @@ function Loadings({ result }: { result: LoadResult }) {
       </>
     );
   }
+  const sideBySide = result.below && result.above ? [result.below, result.above] : undefined;
+  const pair = sideBySide ? { sideBySide } : {};
   return (
     <>
       <p className="status">{`No exact loading for ${describeWeight(result.target, unit)}`}</p>
-      <div className={result.below && result.above ? "choices" : "choices single"}>
+      <div className={sideBySide ? "choices" : "choices single"}>
         {result.below && (
-          <LoadingView heading="Below" result={result} loading={result.below} unit={unit} recommended={result.recommended === "below"} />
+          <LoadingView heading="Below" result={result} loading={result.below} unit={unit} recommended={result.recommended === "below"} {...pair} />
         )}
         {result.above && (
-          <LoadingView heading="Above" result={result} loading={result.above} unit={unit} recommended={result.recommended === "above"} />
+          <LoadingView heading="Above" result={result} loading={result.above} unit={unit} recommended={result.recommended === "above"} {...pair} />
         )}
       </div>
     </>
@@ -152,9 +155,10 @@ interface LoadingViewProps {
   loading: Loading;
   unit: Unit;
   recommended?: boolean;
+  sideBySide?: Loading[];
 }
 
-function LoadingView({ heading, result, loading, unit, recommended = false }: LoadingViewProps) {
+function LoadingView({ heading, result, loading, unit, recommended = false, sideBySide }: LoadingViewProps) {
   const headingId = useId();
   return (
     <article aria-labelledby={headingId} className={recommended ? "loading recommended" : "loading"}>
@@ -163,6 +167,9 @@ function LoadingView({ heading, result, loading, unit, recommended = false }: Lo
         {recommended && <span className="badge">Recommended</span>}
       </header>
       <Total weight={loading.total} unit={unit} />
+      {result.implement === "barbell" && (
+        <BarbellPicture loading={loading} inventory={inventory} {...(sideBySide ? { sideBySide } : {})} />
+      )}
       <dl className="details">
         {result.implement === "dumbbell" ? (
           <DumbbellDetails pair={result.pair !== false} loading={loading} />

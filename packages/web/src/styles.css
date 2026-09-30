@@ -7,6 +7,7 @@
   --signal: #ffc72c;
   --on-signal: #16191d;
   --error: #b3261e;
+  --steel: #8b949d;
 
   --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   --body: "Barlow", system-ui, sans-serif;
@@ -22,6 +23,7 @@
     --muted: #a3acb6;
     --rule: #3a3f46;
     --error: #ff8a80;
+    --steel: #6c757e;
   }
 }
 
@@ -236,7 +238,9 @@ ul {
   background: var(--signal);
   border-color: var(--signal);
   color: var(--on-signal);
+  --ink: var(--on-signal);
   --muted: #3d3a2e;
+  --steel: #6f6a55;
 }
 
 .loading-head {
@@ -387,6 +391,52 @@ ul {
   font-weight: 500;
 }
 
+.picture {
+  display: block;
+  width: 100%;
+  max-width: 30rem;
+  height: auto;
+  overflow: visible;
+}
+
+.picture .bar {
+  fill: var(--steel);
+}
+
+.picture .bar-fade-start {
+  stop-color: var(--steel);
+  stop-opacity: 0;
+}
+
+.picture .bar-fade-end {
+  stop-color: var(--steel);
+}
+
+.picture .collar {
+  fill: var(--ink);
+}
+
+.picture text {
+  font-family: var(--display);
+  font-weight: 600;
+  text-anchor: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.picture .outside {
+  fill: var(--ink);
+}
+
+.picture .collar-label {
+  fill: var(--muted);
+}
+
+.picture .leader {
+  stroke: var(--muted);
+  stroke-width: 0.05;
+  stroke-linecap: round;
+}
+
 @media (max-width: 26rem) {
   .choices .total .amount {
     font-size: 2.5rem;
@@ -398,5 +448,10 @@ ul {
 
   .single .details {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .choices:not(.single) .picture {
+    width: calc(100% + 1.5rem);
+    margin-inline: -0.75rem;
   }
 }
