@@ -52,7 +52,7 @@ export interface LoadResponse {
   leftover: Leftover;
 }
 
-const MICRO_PLATE = "ql-micro";
+export const MICRO_PLATE = "ql-micro";
 const MAX_ALTERNATIVES = 5;
 
 interface PlateOption {
@@ -191,7 +191,7 @@ function leftover(inventory: Inventory, implementsUsed: Implement[], chosen: Cho
   };
 }
 
-function collarFor(inventory: Inventory, implement: Implement, choice: CollarChoice | undefined): Hardware | undefined {
+export function collarFor(inventory: Inventory, implement: Implement, choice: CollarChoice | undefined): Hardware | undefined {
   const id = choice === undefined ? implement.hardware?.default : choice === "none" ? "none" : `collar-${choice}`;
   if (id === undefined || id === "none") return undefined;
   const collar = inventory.hardware.find((item) => item.id === id);

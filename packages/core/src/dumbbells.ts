@@ -5,10 +5,10 @@ import { convert, describeWeight, display, parseWeight, thousandths, used } from
 const MICRO_PLATE = "ql-micro";
 const STANDARD_SCREW = "screw-standard";
 const LONG_SCREW = "screw-long";
-const STANDARD_SCREW_MAX_TOTAL_LB = 75;
-const SMALL_PLATE_LB = 2.5;
-const UNEVEN_LB = 2.5;
-const UNEVEN_WITHOUT_SMALL_PLATES_LB = 5;
+export const STANDARD_SCREW_MAX_TOTAL_LB = 75;
+export const SMALL_PLATE_LB = 2.5;
+export const UNEVEN_LB = 2.5;
+export const UNEVEN_WITHOUT_SMALL_PLATES_LB = 5;
 const MAX_ALTERNATIVES = 5;
 
 interface PlateOption {

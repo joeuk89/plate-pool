@@ -4,3 +4,5 @@ export type { CollarChoice, Leftover, Loading, LoadRequest, LoadResponse, LoadRe
 export { InventoryError, readInventory } from "./read-inventory.js";
 export { RequestError } from "./request-error.js";
 export { describeWeight, type Display } from "./weight.js";
+export { reverse } from "./reverse.js";
+export type { ReverseRequest, ReverseResult, ScrewChoice } from "./reverse.js";
