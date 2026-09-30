@@ -8,9 +8,10 @@
     "types": ["vite/client", "node"],
     "resolveJsonModule": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "paths": {
       "@plate-pool/core": ["../core/src/index.ts"]
     }
   },
-  "include": ["src", "test", "vite.config.ts"]
+  "include": ["src", "test", "vite.config.ts", "sw/plugin.ts"]
 }

@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.json && vite build",
+    "build": "tsc -p tsconfig.json && tsc -p sw/tsconfig.json && vite build",
     "preview": "vite preview",
-    "test": "tsc -p tsconfig.json && vitest run"
+    "test": "tsc -p tsconfig.json && tsc -p sw/tsconfig.json && vitest run"
   },
   "dependencies": {
     "@fontsource/barlow": "^5.3.0",
