@@ -674,7 +674,8 @@ ul {
   stop-color: var(--steel);
 }
 
-.picture .collar {
+.picture .collar,
+.picture .screw {
   fill: var(--ink);
 }
 
@@ -689,7 +690,7 @@ ul {
   fill: var(--ink);
 }
 
-.picture .collar-label {
+.picture .hardware-label {
   fill: var(--muted);
 }
 
