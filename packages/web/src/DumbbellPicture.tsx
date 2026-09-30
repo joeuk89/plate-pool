@@ -1,19 +1,20 @@
 import type { Inventory, Loading } from "@plate-pool/core";
 import { drawDumbbell, heavierTicks } from "./dumbbell-drawing";
-import { CalloutLabel, Plates } from "./picture-parts";
+import { CalloutLabel, pictureRole, Plates, type Editing } from "./picture-parts";
 import { HARDWARE_FONT_SIZE, type DrawOptions } from "./plate-stack";
 
 interface Props extends DrawOptions {
   loading: Loading;
   inventory: Inventory;
+  editing?: Editing | undefined;
 }
 
-export function DumbbellPicture({ loading, inventory, ...options }: Props) {
+export function DumbbellPicture({ loading, inventory, editing, ...options }: Props) {
   const drawing = drawDumbbell(loading, inventory, options);
   const { handle, heavier, screwLabel } = drawing;
 
   return (
-    <svg role="img" aria-label={drawing.description} className="picture" viewBox={`0 ${drawing.top} ${drawing.width} ${drawing.height}`}>
+    <svg {...pictureRole(drawing.description, editing)} className="picture" viewBox={`0 ${drawing.top} ${drawing.width} ${drawing.height}`}>
       {heavier && (
         <g className="heavier-mark">
           <text x={heavier.x} y={heavier.y} fontSize={HARDWARE_FONT_SIZE}>
@@ -31,7 +32,7 @@ export function DumbbellPicture({ loading, inventory, ...options }: Props) {
       ))}
       {drawing.ends.map((end) => (
         <g key={end.name}>
-          <Plates plates={end.plates} />
+          <Plates plates={end.plates} position={end.name} editing={editing} />
           {end.screw && (
             <rect className="screw" x={end.screw.x + 0.025} y={-end.screw.height / 2} width={end.screw.width - 0.05} height={end.screw.height} rx={0.15} />
           )}

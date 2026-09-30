@@ -53,7 +53,7 @@ export function drawBarbell(loading: Loading, inventory: Inventory, options: Dra
   const sleeve = { x: stop.x + stop.width, length: barbell?.positionLengthIn ? used(barbell.positionLengthIn) : 11.5 };
   const width = options.sideBySide
     ? Math.max(height, sleeve.x + Math.max(...options.sideBySide.map((shown) => loadedLength(shown, inventory))) + SLEEVE_BEYOND_COLLAR)
-    : sleeve.x + sleeve.length + END_MARGIN;
+    : sleeve.x + Math.max(sleeve.length, loadedLength(loading, inventory)) + END_MARGIN;
 
   const weights = loading.positions[0]?.plates ?? [];
   const plates = stackPlates(weights, inventory, sleeve.x);

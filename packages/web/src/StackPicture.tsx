@@ -1,5 +1,5 @@
 import type { Inventory, Loading } from "@plate-pool/core";
-import { HardwarePart, Plates } from "./picture-parts";
+import { HardwarePart, pictureRole, Plates, type Editing } from "./picture-parts";
 import type { DrawOptions } from "./plate-stack";
 import { drawStack } from "./stack-drawing";
 
@@ -7,14 +7,15 @@ interface Props extends DrawOptions {
   implement: string;
   loading: Loading;
   inventory: Inventory;
+  editing?: Editing | undefined;
 }
 
-export function StackPicture({ implement, loading, inventory, ...options }: Props) {
+export function StackPicture({ implement, loading, inventory, editing, ...options }: Props) {
   const drawing = drawStack(implement, loading, inventory, options);
   const { base, loop, lever, holder, screw } = drawing;
 
   return (
-    <svg role="img" aria-label={drawing.description} className="picture" viewBox={`0 ${drawing.top} ${drawing.width} ${drawing.height}`}>
+    <svg {...pictureRole(drawing.description, editing)} className="picture" viewBox={`0 ${drawing.top} ${drawing.width} ${drawing.height}`}>
       {loop && (
         <path
           className="handle"
@@ -27,7 +28,7 @@ export function StackPicture({ implement, loading, inventory, ...options }: Prop
         <rect className="bar" x={holder.x} y={-holder.diameter / 2} width={holder.length} height={holder.diameter} rx={0.08} />
       )}
       <rect className="bar" x={base.x} y={-base.height / 2} width={base.width} height={base.height} rx={0.12} />
-      <Plates plates={drawing.plates} />
+      <Plates plates={drawing.plates} position={loading.positions[0]?.name} editing={editing} />
       {screw && <HardwarePart hardware={screw} className="screw" radius={0.15} />}
     </svg>
   );
