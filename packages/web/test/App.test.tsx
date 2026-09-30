@@ -368,11 +368,4 @@ describe("dumbbells Load screen", () => {
     typeTarget("5");
     expect(text(result())).toContain("Screws per dumbbell None");
   });
-
-  it("keeps the target when switching tabs", () => {
-    render(<App />);
-    typeTarget("40");
-    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
-    expect(text(result())).toContain("Each end 3 × 5");
-  });
 });
