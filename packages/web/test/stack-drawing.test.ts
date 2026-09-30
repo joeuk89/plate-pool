@@ -64,4 +64,12 @@ describe("stack drawing: side by side", () => {
     const pair = [below, above].map((loading) => drawStack("kettlebell", loading, inventory, { sideBySide: [below, above] }));
     expect(pair[0]!.width).toBe(pair[1]!.width);
   });
+
+  it("shares one scale between a bare kettlebell handle and one with a locking screw", () => {
+    const shown = [loadingFor("kettlebell", "24lb", "below"), loadingFor("kettlebell", "24lb", "above")];
+    expect(shown.map((loading) => loading.hardware.length)).toEqual([0, 1]);
+    const pair = shown.map((loading) => drawStack("kettlebell", loading, inventory, { sideBySide: shown }));
+    expect(pair[0]!.width).toBe(pair[1]!.width);
+    expect(pair[0]!.height).toBe(pair[1]!.height);
+  });
 });

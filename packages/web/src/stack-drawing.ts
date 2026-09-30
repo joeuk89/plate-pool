@@ -1,12 +1,8 @@
-import type { Hardware, Inventory, Loading } from "@plate-pool/core";
-import type { DrawOptions } from "./barbell-drawing";
+import type { Inventory, Loading } from "@plate-pool/core";
 import {
-  clampLabel,
-  HARDWARE_FONT_SIZE,
+  drawHardware,
   HARDWARE_LABEL_BOTTOM,
-  HARDWARE_LABEL_Y,
   LABELS_TOP,
-  LEADER_LENGTH,
   MARGIN,
   placeOutsideLabels,
   plateSequence,
@@ -16,6 +12,7 @@ import {
   screwFor,
   stackLength,
   stackPlates,
+  type DrawOptions,
   type HardwareDrawing,
   type PlateDrawing,
 } from "./plate-stack";
@@ -47,7 +44,8 @@ export function drawStack(implement: string, loading: Loading, inventory: Invent
   const kettlebell = implement === "kettlebell";
   const screwHardware = screwFor(loading, inventory);
   const top = LABELS_TOP;
-  const bottom = screwHardware ? HARDWARE_LABEL_BOTTOM : QUICK_LOCK_PLATE / 2 + MARGIN;
+  const shown = options.sideBySide ?? [loading];
+  const bottom = shown.some((each) => screwFor(each, inventory)) ? HARDWARE_LABEL_BOTTOM : QUICK_LOCK_PLATE / 2 + MARGIN;
   const height = bottom - top;
 
   const loop = kettlebell
@@ -57,9 +55,9 @@ export function drawStack(implement: string, loading: Loading, inventory: Invent
   const base = loop ? { x: loop.right, ...KETTLEBELL_BASE } : { x: MARGIN + LEVER.width, ...LEG_STOP };
   const start = base.x + base.width;
 
-  const extent = (shown: Loading) => stackLength(shown.positions[0]?.plates ?? [], inventory) + (screwFor(shown, inventory) ? SCREW.width : 0);
+  const extent = (each: Loading) => stackLength(each.positions[0]?.plates ?? [], inventory) + (screwFor(each, inventory) ? SCREW.width : 0);
   const fullReach = kettlebell ? screwCapacity(implement, inventory) + SCREW.width : HOLDER.shortest;
-  const reach = Math.max(...(options.sideBySide ?? [loading]).map(extent), options.sideBySide ? 0 : fullReach);
+  const reach = Math.max(...shown.map(extent), options.sideBySide ? 0 : fullReach);
   const holderLength = kettlebell ? 0 : Math.max(reach + HOLDER.beyond, options.sideBySide ? 0 : HOLDER.shortest);
   const drawn = start + (kettlebell ? reach : holderLength) + MARGIN;
   const width = options.sideBySide ? Math.max(drawn, height) : drawn;
@@ -67,7 +65,7 @@ export function drawStack(implement: string, loading: Loading, inventory: Invent
   const weights = loading.positions[0]?.plates ?? [];
   const plates = stackPlates(weights, inventory, start);
   placeOutsideLabels(plates, 0, width);
-  const screw = screwHardware && drawScrew(screwHardware, start + stackLength(weights, inventory), width);
+  const screw = screwHardware && drawHardware(screwHardware.name, start + stackLength(weights, inventory), SCREW, width);
 
   const then = screwHardware ? `, then the ${screwHardware.name.toLowerCase()}` : "";
   return {
@@ -84,13 +82,3 @@ export function drawStack(implement: string, loading: Loading, inventory: Invent
   };
 }
 
-function drawScrew(hardware: Hardware, x: number, pictureWidth: number): HardwareDrawing {
-  const centre = x + SCREW.width / 2;
-  return {
-    name: hardware.name,
-    x,
-    ...SCREW,
-    label: { text: hardware.name, x: clampLabel(hardware.name, centre, HARDWARE_FONT_SIZE, 0, pictureWidth), y: HARDWARE_LABEL_Y },
-    leaders: [{ x1: centre, y1: SCREW.height / 2, x2: centre, y2: QUICK_LOCK_PLATE / 2 + LEADER_LENGTH - 0.1 }],
-  };
-}

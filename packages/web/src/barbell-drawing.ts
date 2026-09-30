@@ -1,19 +1,16 @@
 import type { Hardware, Inventory, Loading } from "@plate-pool/core";
 import {
-  clampLabel,
+  drawHardware,
   FONT_SIZE,
-  HARDWARE_FONT_SIZE,
   HARDWARE_LABEL_BOTTOM,
-  HARDWARE_LABEL_Y,
   hardwareFor,
   LABELS_TOP,
-  LEADER_LENGTH,
   placeOutsideLabels,
   plateSequence,
-  QUICK_LOCK_PLATE,
   stackLength,
   stackPlates,
   used,
+  type DrawOptions,
   type HardwareDrawing,
   type PlateDrawing,
 } from "./plate-stack";
@@ -24,7 +21,6 @@ export interface BarbellDrawing {
   top: number;
   height: number;
   fontSize: number;
-  hardwareFontSize: number;
   handle: { x: number; length: number };
   stop: { x: number; width: number; height: number };
   sleeve: { x: number; length: number };
@@ -45,11 +41,6 @@ const collarShapes: Record<string, { name: string; height: number; width: number
   "collar-clamp": { name: "Clamp collar", height: 2, width: 1.26 },
   "collar-spinlock": { name: "Spin-lock collar", height: 3, width: 1 },
 };
-
-export interface DrawOptions {
-  /** The loadings shown in one row: their pictures crop the empty space to fit the longest, at one shared scale. */
-  sideBySide?: Loading[];
-}
 
 export function drawBarbell(loading: Loading, inventory: Inventory, options: DrawOptions = {}): BarbellDrawing {
   const barbell = inventory.implements.find((implement) => implement.id === "barbell");
@@ -77,7 +68,6 @@ export function drawBarbell(loading: Loading, inventory: Inventory, options: Dra
     top,
     height,
     fontSize: FONT_SIZE,
-    hardwareFontSize: HARDWARE_FONT_SIZE,
     handle,
     stop,
     sleeve,
@@ -89,16 +79,7 @@ export function drawBarbell(loading: Loading, inventory: Inventory, options: Dra
 
 function drawCollar(hardware: Hardware, x: number, pictureWidth: number): HardwareDrawing {
   const shape = collarShape(hardware);
-  const width = collarWidth(hardware);
-  const centre = x + width / 2;
-  return {
-    name: shape.name,
-    x,
-    width,
-    height: shape.height,
-    label: { text: shape.name, x: clampLabel(shape.name, centre, HARDWARE_FONT_SIZE, 0, pictureWidth), y: HARDWARE_LABEL_Y },
-    leaders: [{ x1: centre, y1: shape.height / 2, x2: centre, y2: QUICK_LOCK_PLATE / 2 + LEADER_LENGTH - 0.1 }],
-  };
+  return drawHardware(shape.name, x, { width: collarWidth(hardware), height: shape.height }, pictureWidth);
 }
 
 function collarShape(hardware: Hardware) {

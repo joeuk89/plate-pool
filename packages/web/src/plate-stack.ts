@@ -39,6 +39,11 @@ export interface HardwareDrawing extends Callout {
   height: number;
 }
 
+export interface DrawOptions {
+  /** The loadings shown in one row: their pictures crop the empty space to fit the longest, at one shared scale. */
+  sideBySide?: Loading[];
+}
+
 // Sizes in inches. Only the Quick-Lock plate size comes from the spec; the rest are drawing-only values.
 export const QUICK_LOCK_PLATE = 6.7;
 export const PLATE_TOP = -QUICK_LOCK_PLATE / 2;
@@ -55,6 +60,7 @@ export const LABELS_TOP = OUTSIDE_LABEL_Y - FONT_SIZE * 0.75 - MARGIN;
 /** The baseline of a hardware label under the plates, and the bottom of a picture that has one. */
 export const HARDWARE_LABEL_Y = QUICK_LOCK_PLATE / 2 + LEADER_LENGTH + HARDWARE_FONT_SIZE * 0.75;
 export const HARDWARE_LABEL_BOTTOM = HARDWARE_LABEL_Y + MARGIN;
+export const HARDWARE_LEADER_END = QUICK_LOCK_PLATE / 2 + LEADER_LENGTH - 0.1;
 
 /** Lays plates out from `start`, innermost first, going right (1) or left (-1). */
 export function stackPlates(weights: number[], inventory: Inventory, start: number, direction: 1 | -1 = 1): PlateDrawing[] {
@@ -127,6 +133,18 @@ function spread(labels: Omit<Label, "inside">[], fontSize: number, left: number,
 export function clampLabel(text: string, centre: number, fontSize: number, left: number, right: number): number {
   const half = textWidth(text, fontSize) / 2;
   return Math.min(Math.max(centre, left + half), right - half);
+}
+
+export function drawHardware(name: string, x: number, shape: { width: number; height: number }, pictureWidth: number): HardwareDrawing {
+  const centre = x + shape.width / 2;
+  return {
+    name,
+    x,
+    width: shape.width,
+    height: shape.height,
+    label: { text: name, x: clampLabel(name, centre, HARDWARE_FONT_SIZE, 0, pictureWidth), y: HARDWARE_LABEL_Y },
+    leaders: [{ x1: centre, y1: shape.height / 2, x2: centre, y2: HARDWARE_LEADER_END }],
+  };
 }
 
 export function stackLength(weights: number[], inventory: Inventory): number {

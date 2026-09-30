@@ -3,7 +3,7 @@ import { BarbellPicture } from "./BarbellPicture";
 import { DumbbellPicture } from "./DumbbellPicture";
 import { StackPicture } from "./StackPicture";
 import { VestPicture } from "./VestPicture";
-import type { DrawOptions } from "./barbell-drawing";
+import type { DrawOptions } from "./plate-stack";
 
 interface Props extends DrawOptions {
   implement: string;

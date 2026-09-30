@@ -85,4 +85,13 @@ describe("dumbbell drawing: scale", () => {
     const pair = [below, light].map((loading) => drawDumbbell(loading, inventory, { sideBySide: [below, light] }));
     expect(pair[0]!.width).toBe(pair[1]!.width);
   });
+
+  it("shares one scale and one top between an even and an uneven dumbbell shown side by side", () => {
+    const shown = [loadingFor("11lb", false, "below"), loadingFor("11lb", false, "above")];
+    expect(shown.map((loading) => loading.uneven)).toEqual([false, true]);
+    const pair = shown.map((loading) => drawDumbbell(loading, inventory, { sideBySide: shown }));
+    expect(pair[0]!.width).toBe(pair[1]!.width);
+    expect(pair[0]!.top).toBe(pair[1]!.top);
+    expect(pair[0]!.height).toBe(pair[1]!.height);
+  });
 });

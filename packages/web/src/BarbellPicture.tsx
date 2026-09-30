@@ -1,7 +1,8 @@
 import type { Inventory, Loading } from "@plate-pool/core";
 import { useId } from "react";
-import { drawBarbell, type DrawOptions } from "./barbell-drawing";
+import { drawBarbell } from "./barbell-drawing";
 import { HardwarePart, Plates } from "./picture-parts";
+import type { DrawOptions } from "./plate-stack";
 
 interface Props extends DrawOptions {
   loading: Loading;

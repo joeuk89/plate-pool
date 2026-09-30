@@ -1,6 +1,6 @@
 import type { Inventory, Loading } from "@plate-pool/core";
-import type { DrawOptions } from "./barbell-drawing";
 import { HardwarePart, Plates } from "./picture-parts";
+import type { DrawOptions } from "./plate-stack";
 import { drawStack } from "./stack-drawing";
 
 interface Props extends DrawOptions {

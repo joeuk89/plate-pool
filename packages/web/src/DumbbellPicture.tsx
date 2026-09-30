@@ -1,8 +1,7 @@
 import type { Inventory, Loading } from "@plate-pool/core";
-import type { DrawOptions } from "./barbell-drawing";
 import { drawDumbbell, heavierTicks } from "./dumbbell-drawing";
 import { CalloutLabel, Plates } from "./picture-parts";
-import { HARDWARE_FONT_SIZE } from "./plate-stack";
+import { HARDWARE_FONT_SIZE, type DrawOptions } from "./plate-stack";
 
 interface Props extends DrawOptions {
   loading: Loading;

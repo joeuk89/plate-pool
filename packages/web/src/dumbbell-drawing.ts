@@ -1,5 +1,4 @@
 import type { Hardware, Inventory, Loading } from "@plate-pool/core";
-import type { DrawOptions } from "./barbell-drawing";
 import { endLabel } from "./describe";
 import {
   clampLabel,
@@ -7,8 +6,8 @@ import {
   HARDWARE_FONT_SIZE,
   HARDWARE_LABEL_BOTTOM,
   HARDWARE_LABEL_Y,
+  HARDWARE_LEADER_END,
   LABELS_TOP,
-  LEADER_LENGTH,
   MARGIN,
   OUTSIDE_LABEL_Y,
   placeOutsideLabels,
@@ -21,6 +20,7 @@ import {
   stackPlates,
   textWidth,
   type Callout,
+  type DrawOptions,
   type PlateDrawing,
 } from "./plate-stack";
 
@@ -50,7 +50,6 @@ export interface DumbbellDrawing {
   width: number;
   top: number;
   height: number;
-  fontSize: number;
   handle: { left: number; right: number; grip: Part; stops: [Part, Part] };
   ends: EndDrawing[];
   screwLabel?: Callout;
@@ -66,19 +65,18 @@ const HEAVIER_Y = OUTSIDE_LABEL_Y - FONT_SIZE * 0.75 - HEAVIER_GAP;
 
 export function drawDumbbell(loading: Loading, inventory: Inventory, options: DrawOptions = {}): DumbbellDrawing {
   const screwHardware = screwFor(loading, inventory);
-  const screwLabelText = screwHardware ? `${screwHardware.name}s` : undefined;
-  const heavierText = loading.uneven && loading.heavier ? `${endLabel(loading.heavier)} heavier` : undefined;
-  const top = heavierText ? heavierLabelY() - HARDWARE_FONT_SIZE * 0.75 - MARGIN : LABELS_TOP;
-  const bottom = screwHardware ? HARDWARE_LABEL_BOTTOM : QUICK_LOCK_PLATE / 2 + MARGIN;
+  const screwLabelText = screwLabel(loading, inventory);
+  const heavierText = heavierLabel(loading);
+
+  const shown = options.sideBySide ?? [loading];
+  const labels = shown.flatMap((each) => [screwLabel(each, inventory), heavierLabel(each)]).filter((text) => text !== undefined);
+  const top = shown.some(heavierLabel) ? heavierLabelY() - HARDWARE_FONT_SIZE * 0.75 - MARGIN : LABELS_TOP;
+  const bottom = shown.some((each) => screwFor(each, inventory)) ? HARDWARE_LABEL_BOTTOM : QUICK_LOCK_PLATE / 2 + MARGIN;
 
   const fullReach = screwCapacity("dumbbell", inventory) + SCREW.width;
-  const reach = Math.max(...(options.sideBySide ?? [loading]).map((shown) => longestEnd(shown, inventory)), options.sideBySide ? 0 : fullReach);
+  const reach = Math.max(...shown.map((each) => longestEnd(each, inventory)), options.sideBySide ? 0 : fullReach);
   const inner = GRIP.length / 2 + STOP.width;
-  const needed = Math.max(
-    screwLabelText ? textWidth(screwLabelText, HARDWARE_FONT_SIZE) : 0,
-    heavierText ? textWidth(heavierText, HARDWARE_FONT_SIZE) : 0,
-    options.sideBySide ? bottom - top : 0,
-  );
+  const needed = Math.max(...labels.map((text) => textWidth(text, HARDWARE_FONT_SIZE)), options.sideBySide ? bottom - top : 0);
   const width = Math.max(2 * (inner + reach + MARGIN), needed + 2 * MARGIN);
   const centre = width / 2;
   const left = centre - inner;
@@ -106,7 +104,6 @@ export function drawDumbbell(loading: Loading, inventory: Inventory, options: Dr
     width,
     top,
     height: bottom - top,
-    fontSize: FONT_SIZE,
     handle: {
       left,
       right,
@@ -125,13 +122,12 @@ export function drawDumbbell(loading: Loading, inventory: Inventory, options: Dr
 function screwCallout(text: string, ends: EndDrawing[], centre: number): Callout {
   const screws = ends.flatMap((end) => (end.screw ? [end.screw.x + end.screw.width / 2] : []));
   const bracketY = QUICK_LOCK_PLATE / 2 + 0.15;
-  const labelTop = QUICK_LOCK_PLATE / 2 + LEADER_LENGTH - 0.1;
   return {
     label: { text, x: centre, y: HARDWARE_LABEL_Y },
     leaders: [
       ...screws.map((x) => ({ x1: x, y1: SCREW.height / 2, x2: x, y2: bracketY })),
       { x1: Math.min(...screws), y1: bracketY, x2: Math.max(...screws), y2: bracketY },
-      { x1: centre, y1: bracketY, x2: centre, y2: labelTop },
+      { x1: centre, y1: bracketY, x2: centre, y2: HARDWARE_LEADER_END },
     ],
   };
 }
@@ -145,6 +141,15 @@ function markHeavier(text: string, end: EndDrawing, left: number, right: number,
   const from = onLeft ? Math.min(...edges) : right;
   const to = onLeft ? left : Math.max(...edges);
   return { text, x: clampLabel(text, (from + to) / 2, HARDWARE_FONT_SIZE, 0, width), y: heavierLabelY(), lineY: HEAVIER_Y, from, to };
+}
+
+function screwLabel(loading: Loading, inventory: Inventory): string | undefined {
+  const screw = screwFor(loading, inventory);
+  return screw ? `${screw.name}s` : undefined;
+}
+
+function heavierLabel(loading: Loading): string | undefined {
+  return loading.uneven && loading.heavier ? `${endLabel(loading.heavier)} heavier` : undefined;
 }
 
 function heavierLabelY(): number {
