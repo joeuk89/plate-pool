@@ -242,16 +242,15 @@ function screwWarnings({ implement, positions, hardware, screwByRule, total }: C
   const weight = `${amount(total, implement.unit)} ${implement.unit}`;
   const long = screwByRule.id === "screw-long";
   if (implement.id === "dumbbell") {
-    const maxLb = standardScrewMaxLb.dumbbell;
     return [
       long
-        ? `The dumbbell is ${weight}, so it takes long locking screws. Standard locking screws are for dumbbells up to ${maxLb} lb.`
-        : `The dumbbell is ${weight}, so it takes standard locking screws. Long locking screws are for dumbbells over ${maxLb} lb.`,
+        ? `The dumbbell is ${weight}, so it takes long locking screws. Standard locking screws are for dumbbells up to ${DUMBBELL_STANDARD_SCREW_MAX_LB} lb.`
+        : `The dumbbell is ${weight}, so it takes standard locking screws. Long locking screws are for dumbbells over ${DUMBBELL_STANDARD_SCREW_MAX_LB} lb.`,
     ];
   }
   return [
     long
-      ? `The kettlebell is ${weight}, so it takes a long locking screw. A standard locking screw is for a kettlebell up to ${standardScrewMaxLb.kettlebell} lb.`
+      ? `The kettlebell is ${weight}, so it takes a long locking screw. A standard locking screw is for a kettlebell up to ${KETTLEBELL_STANDARD_SCREW_MAX_LB} lb.`
       : `The kettlebell is ${weight}, so it takes a standard locking screw. A long locking screw may stick out at the top, which Ironmaster's manual calls normal.`,
   ];
 }
