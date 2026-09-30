@@ -1,6 +1,7 @@
 import {
   describeWeight,
   type Inventory,
+  type Leftover,
   type ListResponse,
   type ListRow,
   type Loading,
@@ -34,7 +35,24 @@ const positionLabels: Record<string, string> = {
 };
 
 export function loadText(response: LoadResponse, inventory: Inventory): string {
-  return response.results.map((result) => resultText(result, inventory)).join("\n");
+  const blocks = response.results.map((result) => resultText(result, inventory));
+  if (response.results.length > 1) blocks.push(leftoverText(response.leftover, inventory));
+  return blocks.join("\n");
+}
+
+function leftoverText(leftover: Leftover, inventory: Inventory): string {
+  const plates = Object.entries(leftover.plates)
+    .filter(([, count]) => count > 0)
+    .map(([id, count]) => {
+      const plate = inventory.plates.find((item) => item.id === id);
+      if (plate?.shape === "block") return `${count} ${plate.name.toLowerCase()}${count === 1 ? "" : "s"}`;
+      return `${count} × ${plate ? (plate.weight.measured ?? plate.weight.listed) : id}`;
+    });
+  const hardware = Object.entries(leftover.hardware)
+    .filter(([, count]) => count > 0)
+    .map(([id, count]) => `${count} ${hardwareLabels[id] ?? id}${count === 1 ? "" : "s"}`);
+  const list = (items: string[]) => (items.length === 0 ? "none" : items.join(", "));
+  return `Left over\n  plates: ${list(plates)}\n  locking hardware: ${list(hardware)}\n`;
 }
 
 function resultText(result: LoadResult, inventory: Inventory): string {

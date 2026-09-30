@@ -11,8 +11,9 @@ export interface Environment {
 const usage = `Usage: plate-pool <command> [options]
 
 Commands:
-  load <implement>=<target> ...   Loadings for a target, such as barbell=175 or barbell=80kg.
-                                  dumbbells=<target> is a pair, dumbbell=<target> is one
+  load <implement>=<target> ...   Loadings for one or more targets, such as barbell=175 or barbell=80kg.
+                                  dumbbells=<target> is a pair, dumbbell=<target> is one.
+                                  Targets share the plate pool. Argument order is priority order
   reverse <implement> <plates>    Total for a given loading, such as reverse barbell --side 22.5,5
   list <implement>                Achievable weights for one implement, such as barbell
                                   --from 100 --to 200. dumbbells is a pair, dumbbell is one
