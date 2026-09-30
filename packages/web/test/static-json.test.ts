@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { list, readInventory, type CollarChoice } from "@plate-pool/core";
+import { list, readInventory, type CollarChoice, type ListResponse } from "@plate-pool/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp, type Deployment } from "./build-app";
 
@@ -79,13 +79,7 @@ describe("static JSON (spec 10)", () => {
   });
 });
 
-type Table = {
-  implement: string;
-  collars?: CollarChoice;
-  pair?: boolean;
-  rows: { total: { lb: number; kg: number } }[];
-  unverified: string[];
-};
+type Table = ListResponse & { collars?: CollarChoice };
 
 function achievable(): { tables: Table[] } {
   return JSON.parse(deployed("api/achievable.json"));
