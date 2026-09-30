@@ -40,13 +40,15 @@ interface Props {
   onCollarsChange: (collars: CollarChoice) => void;
   uneven: boolean;
   onUnevenChange: (uneven: boolean) => void;
+  dumbbells: DumbbellChoice;
+  onDumbbellsChange: (dumbbells: DumbbellChoice) => void;
   onOpen: (choice: LoadChoice) => void;
 }
 
-export function ListScreen({ implement, collars, onCollarsChange, uneven, onUnevenChange, onOpen }: Props) {
+export function ListScreen(props: Props) {
+  const { implement, collars, onCollarsChange, uneven, onUnevenChange, dumbbells, onDumbbellsChange, onOpen } = props;
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [dumbbells, setDumbbells] = useState<DumbbellChoice>("pair");
   const unit = unitOf(implement);
   const outcome = useMemo(
     () => calculate(implement, from, to, { collars, uneven, dumbbells }),
@@ -63,7 +65,7 @@ export function ListScreen({ implement, collars, onCollarsChange, uneven, onUnev
         {implement === "barbell" && <Segmented label="Collars" options={collarOptions} value={collars} onChange={onCollarsChange} />}
         {implement === "dumbbell" && (
           <>
-            <Segmented label="Dumbbells" options={dumbbellOptions} value={dumbbells} onChange={setDumbbells} />
+            <Segmented label="Dumbbells" options={dumbbellOptions} value={dumbbells} onChange={onDumbbellsChange} />
             <Switch label="Uneven loading" checked={uneven} onChange={onUnevenChange} />
           </>
         )}

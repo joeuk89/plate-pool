@@ -1,7 +1,8 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { linkQuery, readLink, type View } from "./links";
 import { ListScreen } from "./ListScreen";
 import { LoadScreen, type LoadChoice } from "./LoadScreen";
-import { cardLabel, newCard, type Card } from "./plan";
+import { cardLabel, newCard, type Card, type DumbbellChoice } from "./plan";
 import { ReverseScreen } from "./ReverseScreen";
 import { useSettings } from "./settings";
 
@@ -10,8 +11,6 @@ const implementTabs = ["barbell", "dumbbell", "kettlebell", "leg", "vest"].map((
   label: cardLabel({ implement: id, dumbbells: "pair" }),
 }));
 
-type View = "load" | "list" | "reverse";
-
 const views: { id: View; label: string }[] = [
   { id: "load", label: "Load" },
   { id: "list", label: "List" },
@@ -19,10 +18,15 @@ const views: { id: View; label: string }[] = [
 ];
 
 export function App() {
-  const [settings, updateSettings] = useSettings();
-  const [cards, setCards] = useState<Card[]>(() => [newCard(settings.implement)]);
+  const [link] = useState(() => readLink(window.location.search));
+  const [settings, updateSettings] = useSettings(link.settings);
+  const [cards, setCards] = useState<Card[]>(() => (link.cards.length > 0 ? link.cards : [newCard(settings.implement)]));
   const selected = cards[0]?.implement ?? settings.implement;
-  const [view, setView] = useState<View>("load");
+  const [view, setView] = useState<View>(link.view);
+  useEffect(() => {
+    const query = linkQuery({ cards, settings, view });
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${query}${window.location.hash}`);
+  }, [cards, settings, view]);
   const tabIds = useId();
   const tabId = (implement: string) => `${tabIds}-${implement}`;
 
@@ -35,6 +39,7 @@ export function App() {
   const selectImplement = (implement: string) => {
     if (implement !== selected) changeCards([newCard(implement), ...cards.slice(1)]);
   };
+  const changeDumbbells = (dumbbells: DumbbellChoice) => changeCards([{ ...cards[0]!, dumbbells }, ...cards.slice(1)]);
   const openInLoad = (choice: LoadChoice) => {
     changeCards([{ ...newCard(selected, choice.dumbbells), target: choice.target }, ...cards.slice(1)]);
     setView("load");
@@ -83,7 +88,14 @@ export function App() {
         {view === "load" ? (
           <LoadScreen cards={cards} onCardsChange={changeCards} {...sharedOptions} />
         ) : view === "list" ? (
-          <ListScreen key={selected} implement={selected} {...sharedOptions} onOpen={openInLoad} />
+          <ListScreen
+            key={selected}
+            implement={selected}
+            {...sharedOptions}
+            dumbbells={cards[0]?.dumbbells ?? "pair"}
+            onDumbbellsChange={changeDumbbells}
+            onOpen={openInLoad}
+          />
         ) : (
           <ReverseScreen key={selected} implement={selected} {...sharedOptions} />
         )}
