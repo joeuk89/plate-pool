@@ -1,5 +1,6 @@
 import type { Hardware, Implement, Inventory, Plate } from "./inventory.js";
 import { RequestError } from "./request-error.js";
+import { loadVest } from "./vest.js";
 import { convert, describeWeight, display, parseWeight, thousandths, used, type Display } from "./weight.js";
 
 export type CollarChoice = "clamp" | "spinlock" | "none";
@@ -61,7 +62,7 @@ interface Candidate {
   plateCount: number;
 }
 
-interface Chosen {
+export interface Chosen {
   result: LoadResult;
   plates: Map<string, number>;
   hardware: Map<string, number>;
@@ -74,9 +75,12 @@ export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
   const [{ implement: implementId, target }] = request.targets as [TargetRequest];
   const implement = inventory.implements.find((candidate) => candidate.id === implementId);
   if (!implement) throw new RequestError(`Unknown implement "${implementId}".`);
-  if (implement.id !== "barbell") throw new RequestError(`Load for the ${implement.name.toLowerCase()} is not built yet.`);
+  if (implement.id !== "barbell" && implement.id !== "vest") {
+    throw new RequestError(`Load for the ${implement.name.toLowerCase()} is not built yet.`);
+  }
 
-  const chosen = loadBarbell(inventory, implement, target, request.collars);
+  const chosen =
+    implement.id === "vest" ? loadVest(inventory, implement, target) : loadBarbell(inventory, implement, target, request.collars);
   return { results: [chosen.result], leftover: leftover(inventory, [implement], chosen) };
 }
 

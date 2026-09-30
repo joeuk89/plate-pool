@@ -27,8 +27,9 @@ export function convert(milli: number, from: Unit, to: Unit): number {
 }
 
 export function display(milli: number, unit: Unit): Display {
-  const lb = round(convert(milli, unit, "lb") / 1000, 2);
-  const kg = round(convert(milli, unit, "kg") / 1000, 1);
+  const amount = milli / 1000;
+  const lb = round(unit === "lb" ? amount : amount / KG_PER_LB, 2);
+  const kg = round(unit === "kg" ? amount : amount * KG_PER_LB, 1);
   return unit === "kg" ? { kg, lb } : { lb, kg };
 }
 

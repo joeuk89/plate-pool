@@ -59,11 +59,88 @@ describe("barbell Load screen: worked examples (spec section 7)", () => {
   });
 });
 
-describe("barbell Load screen: implement tabs", () => {
-  it("holds the barbell only, selected", () => {
+describe("Load screen: implement tabs", () => {
+  it("starts on the barbell, with the vest beside it", () => {
     render(<App />);
     const tabs = within(screen.getByRole("tablist", { name: "Implements" })).getAllByRole("tab");
-    expect(tabs.map((tab) => [tab.textContent, tab.getAttribute("aria-selected")])).toEqual([["Barbell", "true"]]);
+    expect(tabs.map((tab) => [tab.textContent, tab.getAttribute("aria-selected")])).toEqual([
+      ["Barbell", "true"],
+      ["Vest", "false"],
+    ]);
+  });
+
+  it("switches to the vest and back", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "Vest" }));
+    expect(screen.getByRole("tab", { name: "Vest" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "Barbell" }).getAttribute("aria-selected")).toBe("false");
+    expect(screen.queryByRole("radiogroup", { name: "Collars" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Barbell" }));
+    expect(screen.getByRole("radiogroup", { name: "Collars" })).not.toBeNull();
+  });
+});
+
+describe("vest Load screen", () => {
+  function openVest() {
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "Vest" }));
+  }
+
+  it("starts its unit switch on kilograms", () => {
+    openVest();
+    expect(within(screen.getByRole("radiogroup", { name: "Unit" })).getByRole("radio", { name: "kg" })).toHaveProperty("checked", true);
+  });
+
+  it("example 13: 12 kg is exact, with 6 blocks on the front and 6 on the back, kilograms first", () => {
+    openVest();
+    typeTarget("12");
+    const result = text(screen.getByRole("region", { name: "Result" }));
+    expect(result).toContain("Exact");
+    expect(result).toContain("12 kg 26.46 lb");
+    expect(result).toContain("Front 6 blocks");
+    expect(result).toContain("Back 6 blocks");
+    expect(result).not.toContain("Collars");
+  });
+
+  it("example 14: 30 lb shows 13 kg below and 14 kg above, with above recommended", () => {
+    openVest();
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Unit" })).getByRole("radio", { name: "lb" }));
+    typeTarget("30");
+    const result = screen.getByRole("region", { name: "Result" });
+    expect(text(result)).toContain("No exact loading for 13.6 kg (30 lb)");
+
+    const below = within(result).getByRole("article", { name: /Below/ });
+    expect(text(below)).toContain("13 kg 28.66 lb");
+    expect(text(below)).toContain("Front 6 blocks Back 7 blocks");
+    expect(text(below)).not.toContain("Recommended");
+
+    const above = within(result).getByRole("article", { name: /Above/ });
+    expect(text(above)).toContain("14 kg 30.86 lb");
+    expect(text(above)).toContain("Front 7 blocks Back 7 blocks");
+    expect(text(above)).toContain("Recommended");
+  });
+
+  it("refuses a target above 30 blocks, showing the limit and the heaviest allowed loading", () => {
+    openVest();
+    typeTarget("35");
+    const result = screen.getByRole("region", { name: "Result" });
+    expect(text(result)).toContain("Refused: over the 30 block limit");
+    expect(text(within(result).getByRole("article", { name: /Heaviest allowed/ }))).toContain("30 kg 66.14 lb");
+    expect(text(result).match(/Refused/g)).toHaveLength(1);
+  });
+
+  it("names the empty vest's weight and the block count as unverified", () => {
+    openVest();
+    typeTarget("12");
+    const notes = within(screen.getByRole("region", { name: "Result" })).getByRole("list", { name: "Notes" });
+    expect(text(notes)).toBe("Unverified: empty vest weight, vest block count");
+  });
+
+  it("names one block in the singular and an empty position as no blocks", () => {
+    openVest();
+    typeTarget("1");
+    expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Front No blocks Back 1 block");
   });
 });
 

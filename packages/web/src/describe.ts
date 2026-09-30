@@ -11,6 +11,11 @@ export function plateList(plates: number[]): string {
   return groups.map(({ weight, count }) => `${count}\u00a0×\u00a0${weight}`).join(", ");
 }
 
+export function blockList(plates: number[]): string {
+  if (plates.length === 0) return "No blocks";
+  return plates.length === 1 ? "1 block" : `${plates.length} blocks`;
+}
+
 export function hardwareList(loading: Loading, inventory: Inventory): string {
   if (loading.hardware.length === 0) return "None";
   return loading.hardware
@@ -23,11 +28,13 @@ export function unverifiedList(keys: string[], inventory: Inventory): string {
     const id = key.slice(0, key.lastIndexOf("."));
     const field = key.slice(key.lastIndexOf(".") + 1);
     if (field === "base") {
-      return id === "barbell" ? "bar weight" : `${inventory.implements.find((item) => item.id === id)?.name.toLowerCase() ?? id} weight`;
+      if (id === "barbell") return "bar weight";
+      return id === "vest" ? "empty vest weight" : `${inventory.implements.find((item) => item.id === id)?.name.toLowerCase() ?? id} weight`;
     }
     const hardware = inventory.hardware.find((item) => item.id === id);
     if (hardware) return hardware.kind === "collar" ? "collar weight" : `${hardware.name.toLowerCase()} weight`;
     const plate = inventory.plates.find((item) => item.id === id);
+    if (plate && field === "count") return `${plate.name.toLowerCase()} count`;
     return plate ? `${plate.name} plate weight` : key;
   };
   return [...new Set(keys.map(label))].join(", ");

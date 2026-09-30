@@ -269,7 +269,7 @@ ul {
   font-variant-numeric: tabular-nums;
 }
 
-.total .lb {
+.total .primary {
   font-weight: 700;
   font-size: 1.75rem;
   line-height: 1;
@@ -279,7 +279,7 @@ ul {
   font-size: 3.25rem;
 }
 
-.total .kg {
+.total .secondary {
   font-weight: 600;
   font-size: 1.5rem;
   color: var(--muted);
