@@ -48,6 +48,31 @@ describe("barbell Reverse screen: worked examples (spec section 7)", () => {
     expect(labels(picture())).toEqual(["22.5", "22.5", "5", "5", "5", "5", "5", "5", "2.5", "Clamp collar"]);
   });
 
+  it("example 1: example 2 plus 1 micro plate on each side totals 175.5 lb (79.6 kg)", () => {
+    openReverse();
+    buildExample2();
+    add("Add 1.25 lb to each side");
+    expect(total()).toContain("175.5 lb 79.6 kg");
+    expect(screen.queryByRole("list", { name: "Warnings" })).toBeNull();
+  });
+
+  it("example 3: each side 2 × 22.5, 12 × 5 totals 228 lb, the heaviest allowed, with no warnings", () => {
+    openReverse();
+    add("Add 22.5 lb to each side", 2);
+    add("Add 5 lb to each side", 12);
+    expect(total()).toContain("228 lb 103.4 kg");
+    expect(screen.queryByRole("list", { name: "Warnings" })).toBeNull();
+  });
+
+  it("example 3: warns when the plates go over the 210 lb plate limit", () => {
+    openReverse();
+    add("Add 22.5 lb to each side", 2);
+    add("Add 5 lb to each side", 12);
+    add("Add 2.5 lb to each side");
+    expect(total()).toContain("233 lb");
+    expect(text(warnings())).toContain("The plates total 215 lb, over the 210 lb plate limit.");
+  });
+
   it("removes a plate from each side when it is tapped in the picture", () => {
     openReverse();
     buildExample2();
@@ -119,6 +144,16 @@ describe("dumbbell Reverse screen: worked examples (spec section 7)", () => {
     add("Add 5 lb to end B", 3);
     add("Add 2.5 lb to end B");
     expect(total()).toContain("47.5 lb 21.5 kg");
+  });
+
+  it("example 7: each end 1 × 22.5, 6 × 5, 1 × 2.5 totals 120 lb per dumbbell with long screws, and the pair fits the plate pool", () => {
+    openReverse("Dumbbells");
+    add("Add 22.5 lb to each end");
+    add("Add 5 lb to each end", 6);
+    add("Add 2.5 lb to each end");
+    expect(total()).toContain("120 lb 54.4 kg");
+    expect(picture().getAttribute("aria-label")).toBe("Each end, inside to outside: 22.5, 5, 5, 5, 5, 5, 5, 2.5, then a long locking screw");
+    expect(screen.queryByRole("list", { name: "Warnings" })).toBeNull();
   });
 
   it("with mirroring off, tapping a plate removes it from its own end only", () => {

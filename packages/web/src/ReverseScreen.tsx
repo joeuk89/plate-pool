@@ -6,6 +6,7 @@ import { collarOptions, dumbbellOptions, Total, unitOf, type DumbbellChoice } fr
 import { Picture } from "./Picture";
 import type { Editing } from "./picture-parts";
 import { plateColour } from "./plate-colours";
+import { used } from "./plate-stack";
 import { Segmented } from "./Segmented";
 import { Switch } from "./Switch";
 
@@ -45,7 +46,7 @@ function plateWeights(implement: string): { weight: number; shape: string }[] {
   const accepts = inventory.implements.find((item) => item.id === implement)?.accepts ?? [];
   return inventory.plates
     .filter((plate) => accepts.includes(plate.type))
-    .map((plate) => ({ weight: plate.weight.measured ?? plate.weight.listed, shape: plate.shape }))
+    .map((plate) => ({ weight: used(plate.weight), shape: plate.shape }))
     .sort((a, b) => b.weight - a.weight);
 }
 
@@ -60,7 +61,6 @@ function addPlate(positions: Positions, weight: number, to: string[]): Positions
   return positions.map((position) => (to.includes(position.name) ? { ...position, plates: [...position.plates, weight] } : position));
 }
 
-/** Removes the plate at `index` on `position`, and, when mirrored, the plate in the same place on the other positions if it has the same weight. */
 function removePlate(positions: Positions, position: string, index: number, mirrored: boolean): Positions {
   const weight = positions.find(({ name }) => name === position)?.plates[index];
   return positions.map((each) =>
