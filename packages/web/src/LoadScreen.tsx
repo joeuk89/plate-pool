@@ -2,11 +2,13 @@ import {
   describeWeight,
   load,
   RequestError,
+  step,
   type CollarChoice,
   type Display,
   type Loading,
   type LoadRequest,
   type LoadResult,
+  type StepRequest,
   type Unit,
 } from "@plate-pool/core";
 import { useId, useState } from "react";
@@ -17,15 +19,15 @@ import { Switch } from "./Switch";
 import { blockList, endLabel, hardwareList, plateList, unevenNote, unverifiedList } from "./describe";
 import { inventory } from "./inventory";
 
-const collarOptions: { value: CollarChoice; label: string }[] = [
+export const collarOptions: { value: CollarChoice; label: string }[] = [
   { value: "clamp", label: "Clamp" },
   { value: "spinlock", label: "Spin-lock" },
   { value: "none", label: "None" },
 ];
 
-type DumbbellChoice = "pair" | "one";
+export type DumbbellChoice = "pair" | "one";
 
-const dumbbellOptions: { value: DumbbellChoice; label: string }[] = [
+export const dumbbellOptions: { value: DumbbellChoice; label: string }[] = [
   { value: "pair", label: "Pair" },
   { value: "one", label: "One" },
 ];
@@ -37,15 +39,24 @@ const unitOptions: { value: Unit; label: string }[] = [
 
 type Outcome = { result: LoadResult } | { error: string } | undefined;
 
+export interface LoadChoice {
+  target: string;
+  dumbbells: DumbbellChoice;
+}
+
 interface Options {
   collars: CollarChoice;
   uneven: boolean;
   dumbbells: DumbbellChoice;
 }
 
+function targetWithUnit(target: string, unit: Unit): string {
+  return /[a-z]/i.test(target) ? target : `${target.trim()}${unit}`;
+}
+
 function calculate(implement: string, target: string, unit: Unit, { collars, uneven, dumbbells }: Options): Outcome {
   if (target.trim() === "") return undefined;
-  const withUnit = /[a-z]/i.test(target) ? target : `${target.trim()}${unit}`;
+  const withUnit = targetWithUnit(target, unit);
   const request: LoadRequest =
     implement === "dumbbell"
       ? { targets: [{ implement, target: withUnit, pair: dumbbells === "pair" }], uneven }
@@ -59,7 +70,27 @@ function calculate(implement: string, target: string, unit: Unit, { collars, une
   }
 }
 
-function unitOf(implement: string): Unit {
+function nextWeight(
+  implement: string,
+  target: string,
+  unit: Unit,
+  { collars, uneven, dumbbells }: Options,
+  direction: "up" | "down",
+): Display | undefined {
+  const request: StepRequest = {
+    implement,
+    ...(target.trim() === "" ? {} : { target: targetWithUnit(target, unit) }),
+    ...(implement === "dumbbell" ? { pair: dumbbells === "pair", uneven } : { collars }),
+  };
+  try {
+    return step(inventory, request, direction);
+  } catch (error) {
+    if (error instanceof RequestError) return undefined;
+    throw error;
+  }
+}
+
+export function unitOf(implement: string): Unit {
   return inventory.implements.find((item) => item.id === implement)?.unit ?? "lb";
 }
 
@@ -69,15 +100,24 @@ interface LoadScreenProps {
   onCollarsChange: (collars: CollarChoice) => void;
   uneven: boolean;
   onUnevenChange: (uneven: boolean) => void;
+  initial?: LoadChoice;
 }
 
-export function LoadScreen({ implement, collars, onCollarsChange, uneven, onUnevenChange }: LoadScreenProps) {
-  const [target, setTarget] = useState("");
+export function LoadScreen({ implement, collars, onCollarsChange, uneven, onUnevenChange, initial }: LoadScreenProps) {
+  const [target, setTarget] = useState(initial?.target ?? "");
   const [unit, setUnit] = useState<Unit>(unitOf(implement));
-  const [dumbbells, setDumbbells] = useState<DumbbellChoice>("pair");
+  const [dumbbells, setDumbbells] = useState<DumbbellChoice>(initial?.dumbbells ?? "pair");
   const targetId = useId();
 
-  const outcome = calculate(implement, target, unit, { collars, uneven, dumbbells });
+  const options = { collars, uneven, dumbbells };
+  const outcome = calculate(implement, target, unit, options);
+  const lighter = nextWeight(implement, target, unit, options, "down");
+  const heavier = nextWeight(implement, target, unit, options, "up");
+  const moveTo = (weight: Display) => {
+    const own = unitOf(implement);
+    setUnit(own);
+    setTarget(String(weight[own]));
+  };
 
   return (
     <div className="load">
@@ -98,6 +138,26 @@ export function LoadScreen({ implement, collars, onCollarsChange, uneven, onUnev
             onChange={(event) => setTarget(event.target.value)}
           />
           <Segmented label="Unit" showLabel={false} options={unitOptions} value={unit} onChange={setUnit} className="unit" />
+        </div>
+        <div className="steps">
+          <button
+            type="button"
+            className="step"
+            aria-label="Next lighter weight"
+            disabled={!lighter}
+            onClick={() => lighter && moveTo(lighter)}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            className="step"
+            aria-label="Next heavier weight"
+            disabled={!heavier}
+            onClick={() => heavier && moveTo(heavier)}
+          >
+            +
+          </button>
         </div>
         {implement === "barbell" && <Segmented label="Collars" options={collarOptions} value={collars} onChange={onCollarsChange} />}
         {implement === "dumbbell" && (

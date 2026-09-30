@@ -1,6 +1,8 @@
 import {
   describeWeight,
   type Inventory,
+  type ListResponse,
+  type ListRow,
   type Loading,
   type LoadResponse,
   type LoadResult,
@@ -80,6 +82,30 @@ function unitOf(implementId: string, inventory: Inventory): Unit {
 function resultLabel(result: { implement: string; pair?: boolean }): string {
   if (result.implement === "dumbbell") return result.pair === false ? "One dumbbell" : "Dumbbells (pair)";
   return implementLabels[result.implement] ?? result.implement;
+}
+
+export function listText(response: ListResponse, inventory: Inventory, range: { from?: string; to?: string }): string {
+  const unit = inventory.implements.find((implement) => implement.id === response.implement)?.unit ?? "lb";
+  const { rows } = response;
+  const bound = (text: string | undefined, row: ListRow | undefined) => {
+    if (text === undefined) return row ? `${row.total[unit]} ${unit}` : "";
+    const match = /^\s*([\d.]+)\s*(lb|kg)?\s*$/i.exec(text);
+    return match ? `${Number(match[1])} ${match[2]?.toLowerCase() ?? unit}` : text;
+  };
+  const span = `from ${bound(range.from, rows[0])} to ${bound(range.to, rows.at(-1))}`;
+  if (rows.length === 0) return `${resultLabel(response)}  no achievable weight ${span}\n`;
+
+  const lines = [`${resultLabel(response)}  ${rows.length} ${rows.length === 1 ? "weight" : "weights"} ${span}`, ""];
+  for (const row of rows) {
+    const flags = [row.uneven ? "uneven" : "", row.micro ? "micro" : ""].filter((flag) => flag !== "");
+    lines.push(`  ${[describeWeight(row.total, unit), ...flags].join("  ")}`);
+    for (const line of positionLines(response.implement, row.loading)) lines.push(`      ${line}`);
+  }
+
+  const notes = [...response.warnings];
+  if (response.unverified.length > 0) notes.push(`Unverified: ${unverifiedLabels(response.unverified, inventory).join(", ")}`);
+  if (notes.length > 0) lines.push("", ...notes);
+  return `${lines.join("\n")}\n`;
 }
 
 function positionLines(implement: string, loading: Loading): string[] {
