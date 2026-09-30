@@ -105,7 +105,7 @@ describe("barbell drawing: labels and colours", () => {
       if (seen) expect(plate.fill).toBe(seen);
       colours.set(plate.weight, plate.fill);
     }
-    expect([...colours.keys()].sort()).toEqual([1.25, 2.5, 22.5, 5]);
+    expect([...colours.keys()].sort((a, b) => a - b)).toEqual([1.25, 2.5, 5, 22.5]);
     expect(new Set(colours.values()).size).toBe(4);
   });
 });

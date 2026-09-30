@@ -51,7 +51,7 @@ export interface BarbellDrawing {
   collar?: CollarDrawing;
 }
 
-// Sizes in inches. Plate size and sleeve length come from the spec; the rest only has to look right.
+// Sizes in inches. Only the Quick-Lock plate size comes from the spec; the rest are drawing-only values.
 const QUICK_LOCK_PLATE = 6.7;
 const MICRO_PLATE = 5;
 const BAR_DIAMETER = 1;
@@ -121,7 +121,7 @@ export function drawBarbell(loading: Loading, inventory: Inventory, options: Dra
     plate.leader = { x1: centre, y1: -plate.height / 2, x2: plate.label.x, y2: plateTop - LEADER_LENGTH };
   }
 
-  const collarHardware = inventory.hardware.find((item) => item.id === loading.hardware[0]?.id && item.kind === "collar");
+  const collarHardware = collarFor(loading, inventory);
   const collar = collarHardware && drawCollar(collarHardware, x, width);
 
   return {
@@ -167,8 +167,12 @@ function collarWidth(hardware: Hardware): number {
 
 function loadedLength(loading: Loading, inventory: Inventory): number {
   const plates = (loading.positions[0]?.plates ?? []).reduce((sum, weight) => sum + stackLength(plateFor(inventory, weight)), 0);
-  const collar = inventory.hardware.find((item) => item.id === loading.hardware[0]?.id && item.kind === "collar");
+  const collar = collarFor(loading, inventory);
   return plates + (collar ? collarWidth(collar) : 0);
+}
+
+function collarFor(loading: Loading, inventory: Inventory): Hardware | undefined {
+  return inventory.hardware.find((item) => item.id === loading.hardware[0]?.id && item.kind === "collar");
 }
 
 function stackLength(plate: Plate | undefined): number {
