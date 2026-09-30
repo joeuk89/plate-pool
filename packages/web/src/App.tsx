@@ -1,16 +1,14 @@
 import { useId, useState } from "react";
 import { ListScreen } from "./ListScreen";
 import { LoadScreen, type LoadChoice } from "./LoadScreen";
+import { cardLabel, newCard, type Card } from "./plan";
 import { ReverseScreen } from "./ReverseScreen";
 import { useSettings } from "./settings";
 
-const implementTabs = [
-  { id: "barbell", label: "Barbell" },
-  { id: "dumbbell", label: "Dumbbells" },
-  { id: "kettlebell", label: "Kettlebell" },
-  { id: "leg", label: "Leg attachment" },
-  { id: "vest", label: "Vest" },
-];
+const implementTabs = ["barbell", "dumbbell", "kettlebell", "leg", "vest"].map((id) => ({
+  id,
+  label: cardLabel({ implement: id, dumbbells: "pair" }),
+}));
 
 type View = "load" | "list" | "reverse";
 
@@ -22,18 +20,23 @@ const views: { id: View; label: string }[] = [
 
 export function App() {
   const [settings, updateSettings] = useSettings();
-  const selected = settings.implement;
+  const [cards, setCards] = useState<Card[]>(() => [newCard(settings.implement)]);
+  const selected = cards[0]?.implement ?? settings.implement;
   const [view, setView] = useState<View>("load");
-  const [opened, setOpened] = useState<{ choice: LoadChoice; count: number }>();
   const tabIds = useId();
   const tabId = (implement: string) => `${tabIds}-${implement}`;
 
+  const changeCards = (next: Card[]) => {
+    const [first] = next;
+    if (!first) return;
+    setCards(next);
+    if (first.implement !== settings.implement) updateSettings({ implement: first.implement });
+  };
   const selectImplement = (implement: string) => {
-    updateSettings({ implement });
-    setOpened(undefined);
+    if (implement !== selected) changeCards([newCard(implement), ...cards.slice(1)]);
   };
   const openInLoad = (choice: LoadChoice) => {
-    setOpened({ choice, count: (opened?.count ?? 0) + 1 });
+    changeCards([{ ...newCard(selected, choice.dumbbells), target: choice.target }, ...cards.slice(1)]);
     setView("load");
   };
   const sharedOptions = {
@@ -78,12 +81,7 @@ export function App() {
       </nav>
       <div role="tabpanel" aria-labelledby={tabId(selected)}>
         {view === "load" ? (
-          <LoadScreen
-            key={`${selected}-${opened?.count ?? 0}`}
-            implement={selected}
-            {...sharedOptions}
-            {...(opened ? { initial: opened.choice } : {})}
-          />
+          <LoadScreen cards={cards} onCardsChange={changeCards} {...sharedOptions} />
         ) : view === "list" ? (
           <ListScreen key={selected} implement={selected} {...sharedOptions} onOpen={openInLoad} />
         ) : (
