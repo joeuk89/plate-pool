@@ -470,7 +470,7 @@ describe("plate-pool reverse", () => {
     [["reverse", "kettlebell", "--blocks", "5"], "--blocks is for the vest"],
     [["reverse", "barbell", "--side", "22.5,heavy"], '"heavy" is not a plate weight'],
     [["reverse", "barbell", "--side"], "--side takes a list of plate weights"],
-    [["reverse", "barbell", "--side", "10"], "The straight bar takes no 10 plate"],
+    [["reverse", "barbell", "--side", "10"], "The straight bar takes no 10 lb plate"],
     [["reverse", "vest", "--blocks", "2.5"], "--blocks takes a whole number of blocks"],
     [["load", "barbell=175", "--side", "5"], "--side is for the reverse command"],
   ])("exits 1 with the reason on standard error for %j", (args, reason) => {

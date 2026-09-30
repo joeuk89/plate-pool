@@ -145,7 +145,7 @@ function placedPlate(inventory: Inventory, implement: Implement, weight: number)
   const plate = inventory.plates.find(
     (candidate) => implement.accepts.includes(candidate.type) && thousandths(used(candidate.weight)) === thousandths(weight),
   );
-  if (!plate) throw new RequestError(`The ${implement.name.toLowerCase()} takes no ${weight} plate.`);
+  if (!plate) throw new RequestError(`The ${implement.name.toLowerCase()} takes no ${weight} ${implement.unit} plate.`);
   const unit = inventory.plateTypes.find((type) => type.id === plate.type)?.unit ?? implement.unit;
   return { plate, weight: convert(thousandths(used(plate.weight)), unit, implement.unit) };
 }
@@ -210,17 +210,15 @@ function symmetryWarnings({ positions }: Checked): string[] {
   return rest.every((other) => other === first) ? [] : ["The sides differ. Both sides carry the same plates in the same order."];
 }
 
-function limitWarnings({ inventory, implement, positions, plateWeight, total }: Checked): string[] {
-  const { unit } = implement;
-  if (implement.maxPlateWeight !== undefined && plateWeight > thousandths(implement.maxPlateWeight) && implement.id === "vest") {
-    const block = inventory.plates.find((plate) => implement.accepts.includes(plate.type))!;
-    const blockMilli = placedPlate(inventory, implement, used(block.weight)).weight;
-    const blocks = positions.reduce((sum, { placed }) => sum + placed.length, 0);
-    const blockLimit = Math.floor(thousandths(implement.maxPlateWeight) / blockMilli);
-    return [`The vest holds ${blocks} blocks, over the ${blockLimit} block limit.`];
-  }
-  if (implement.maxPlateWeight !== undefined && plateWeight > thousandths(implement.maxPlateWeight)) {
-    return [`The plates total ${amount(plateWeight, unit)} ${unit}, over the ${implement.maxPlateWeight} ${unit} plate limit.`];
+function limitWarnings({ implement, positions, plateWeight, total }: Checked): string[] {
+  const { unit, maxPlateWeight } = implement;
+  if (maxPlateWeight !== undefined && plateWeight > thousandths(maxPlateWeight)) {
+    if (implement.id === "vest") {
+      const blocks = positions.flatMap(({ placed }) => placed);
+      const blockLimit = Math.floor(thousandths(maxPlateWeight) / blocks[0]!.weight);
+      return [`The vest holds ${blocks.length} blocks, over the ${blockLimit} block limit.`];
+    }
+    return [`The plates total ${amount(plateWeight, unit)} ${unit}, over the ${maxPlateWeight} ${unit} plate limit.`];
   }
   if (implement.maxTotal !== undefined && total > thousandths(implement.maxTotal)) {
     const perDumbbell = implement.id === "dumbbell" ? " per dumbbell" : "";

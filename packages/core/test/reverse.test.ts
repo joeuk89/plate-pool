@@ -151,6 +151,27 @@ describe("Reverse: worked examples (spec section 7)", () => {
     });
     expect(Object.keys(result.total)).toEqual(["kg", "lb"]);
   });
+
+  const blocks = (count: number) => Array<number>(count).fill(1);
+  const ends = (end: number[]) => [
+    { name: "end-a", plates: end },
+    { name: "end-b", plates: end },
+  ];
+
+  it.each<[string, ReverseRequest, { lb: number; kg: number }, string]>([
+    ["example 1 above: each side 2 × 22.5, 6 × 5, 1 × 2.5, 1 micro", { implement: "barbell", positions: eachSide(22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, 1.25) }, { lb: 175.5, kg: 79.6 }, "collar-clamp"],
+    ["example 3 heaviest allowed: each side 2 × 22.5, 12 × 5", { implement: "barbell", positions: eachSide(22.5, 22.5, ...Array<number>(12).fill(5)) }, { lb: 228, kg: 103.4 }, "collar-clamp"],
+    ["example 9 below: 1 micro on the kettlebell", { implement: "kettlebell", positions: [{ name: "stack", plates: [1.25] }] }, { lb: 26.25, kg: 11.9 }, "screw-standard"],
+    ["example 9 above: 1 × 22.5 on the kettlebell", { implement: "kettlebell", positions: [{ name: "stack", plates: [22.5] }] }, { lb: 47.5, kg: 21.5 }, "screw-standard"],
+    ["example 11: each side 7 × 5 on the barbell", { implement: "barbell", positions: eachSide(5, 5, 5, 5, 5, 5, 5) }, { lb: 88, kg: 39.9 }, "collar-clamp"],
+    ["example 11: a pair with 1 × 22.5, 2 × 5 on each end", { implement: "dumbbell", positions: ends([22.5, 5, 5]) }, { lb: 75, kg: 34 }, "screw-standard"],
+    ["example 14 above: 7 blocks front and 7 back", { implement: "vest", positions: [{ name: "front", plates: blocks(7) }, { name: "back", plates: blocks(7) }] }, { lb: 30.86, kg: 14 }, ""],
+  ])("%s", (_, request, total, hardware) => {
+    const result = reverse(inventory, request);
+    expect(result.total).toEqual(total);
+    expect(result.hardware.map(({ id }) => id)).toEqual(hardware ? [hardware] : []);
+    expect(result.warnings).toEqual([]);
+  });
 });
 
 function loadingsFrom(result: LoadResult): Loading[] {
@@ -455,8 +476,8 @@ describe("Reverse: invalid loadings", () => {
   it.each([
     [{ implement: "rowing", positions: [] }, 'Unknown implement "rowing".'],
     [{ implement: "barbell", positions: [{ name: "end-a", plates: [5] }] }, 'The straight bar has no position "end-a".'],
-    [{ implement: "barbell", positions: eachSide(10) }, "The straight bar takes no 10 plate."],
-    [{ implement: "vest", positions: [{ name: "front", plates: [5] }] }, "The weighted vest takes no 5 plate."],
+    [{ implement: "barbell", positions: eachSide(10) }, "The straight bar takes no 10 lb plate."],
+    [{ implement: "vest", positions: [{ name: "front", plates: [5] }] }, "The weighted vest takes no 5 kg plate."],
   ])("refuses %j", (request, reason) => {
     expect(() => reverse(inventory, request)).toThrow(new RequestError(reason));
   });
