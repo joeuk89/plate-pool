@@ -10,14 +10,45 @@ function byId(list: { id: string }[], id: string) {
   return item as any;
 }
 
+const month =
+  "(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?)";
+
+const personalData: [string, RegExp][] = [
+  ["prices", /[£$€]\s?\d|\b(price|cost|paid)\b/i],
+  [
+    "dates",
+    new RegExp(
+      String.raw`\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b|\b(19|20)\d{2}\b|\b${month}\.?\s+\d|\b\d{1,2}(st|nd|rd|th)?\s+${month}\b`,
+      "i",
+    ),
+  ],
+  ["order numbers", /\border\s*(no\b|number|#|id\b|ref)|\binvoice\b|\bsku\b/i],
+  ["addresses and phone numbers", /\b(street|road|avenue|postcode)\b|\+?\d[\d\s]{8,}\d/i],
+];
+
 describe("equipment only (spec section 5)", () => {
-  it.each([
-    ["prices", /[£$€]\s?\d|\b(price|cost|paid)\b/i],
-    ["dates", /\b\d{4}-\d{2}-\d{2}\b|\b(19|20)\d{2}\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i],
-    ["order numbers", /\border\b|\binvoice\b|\bsku\b/i],
-    ["addresses and phone numbers", /\b(street|road|avenue|postcode)\b|\+?\d[\d\s]{8,}\d/i],
-  ])("holds no %s", (_, pattern) => {
+  it.each(personalData)("holds no %s", (_, pattern) => {
     expect(inventoryText).not.toMatch(pattern);
+  });
+
+  it.each([
+    ["dates", "Bought 1 January"],
+    ["dates", "Arrived in May 2000"],
+    ["dates", "Delivered 1/1/00"],
+    ["order numbers", "Order no. 12345"],
+    ["prices", "Paid £1"],
+  ])("detects %s in %j", (kind, text) => {
+    const pattern = personalData.find(([name]) => name === kind)?.[1];
+    expect(text).toMatch(pattern!);
+  });
+
+  it.each([
+    "The screw may stick out at the top",
+    "Marked in both pounds and kilograms",
+    "Order on a position: heaviest plate innermost",
+    "Separate from the handle",
+  ])("lets ordinary equipment notes through: %j", (text) => {
+    for (const [, pattern] of personalData) expect(text).not.toMatch(pattern);
   });
 });
 
