@@ -1,0 +1,17 @@
+{
+  "name": "plate-pool",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Plate loading calculator for one home gym",
+  "type": "module",
+  "bin": {
+    "plate-pool": "./dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "tsc -p tsconfig.json && vitest run"
+  }
+}
