@@ -27,3 +27,16 @@ This installs, builds and tests all three packages. The build stops first if the
 Every push to the main branch runs `.github/workflows/deploy.yml`: it tests, builds and deploys the web app to <https://joeuk89.github.io/plate-pool/>. A failing test or an inventory file that does not match its schema stops the deployment. Pull requests run the same tests and build, and deploy nothing.
 
 The web app installs from the browser and works offline. The build adds a service worker, `sw.js`, that caches every file of the deployment. With a network, each visit loads the latest page, and a new deployment replaces the cached copy. With no network, or none within 3 seconds, the app loads from the cache.
+
+## Release
+
+Pushing a version tag runs `.github/workflows/release.yml`. It tests and builds everything, then publishes the command-line tool to npm as `plate-pool`. A failing test stops the release, and nothing is published.
+
+To release:
+
+1. Set `version` in `packages/cli/package.json` and merge it to the main branch.
+2. Tag that commit `v` plus the version, such as `v1.0.0`, and push the tag. The workflow stops if the tag and the version differ.
+
+The workflow reads an npm access token from the repo secret `NPM_TOKEN`.
+
+The package bundles the library and `inventory/inventory.json`, so `npx plate-pool` needs no setup. To check the package before a release, run `npm pack --workspace packages/cli` and install the file it writes into an empty directory.
