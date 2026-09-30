@@ -1,9 +1,17 @@
 {
   "name": "plate-pool",
-  "version": "0.0.0",
-  "private": true,
+  "version": "1.0.0",
   "description": "Plate loading calculator for one home gym",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joeuk89/plate-pool.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://joeuk89.github.io/plate-pool/",
   "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
   "bin": {
     "plate-pool": "./dist/bin.js"
   },
@@ -11,10 +19,12 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('../../inventory/inventory.json', 'dist/inventory.json')\"",
+    "build": "tsc -p tsconfig.json && node build.js",
+    "prepack": "npm run build",
     "test": "tsc -p tsconfig.json && vitest run"
   },
-  "dependencies": {
-    "@plate-pool/core": "0.0.0"
+  "devDependencies": {
+    "@plate-pool/core": "0.0.0",
+    "esbuild": "^0.28.2"
   }
 }
