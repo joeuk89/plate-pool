@@ -240,6 +240,35 @@ describe("dumbbells Load: the bare handle and the limit (spec 4.3, 6.2)", () => 
   });
 });
 
+describe("dumbbells Load: other ways to make this (spec 6.3)", () => {
+  it("lists the other loadings of a pair of 40 lb, fewest plates first, marking the uneven one", () => {
+    const [result] = loadDumbbells("40").results;
+    expect(result!.alternatives.map((loading) => [loading.positions, loading.uneven])).toEqual([
+      [ends([5, 5, 5], [5, 5, 2.5, 2.5]), false],
+      [ends([5, 5, 5, 1.25], [5, 5, 2.5, 1.25]), true],
+    ]);
+    for (const loading of result!.alternatives) {
+      expect(loading.total).toEqual({ lb: 40, kg: 18.1 });
+      expect(loading.hardware).toEqual([{ id: "screw-standard", count: 2 }]);
+    }
+  });
+
+  it("does not list the same two ends again with end A and end B swapped", () => {
+    for (const target of ["40", "60", "80", "100"]) {
+      const [result] = loadDumbbells(target).results;
+      const layouts = [result!.loading!, ...result!.alternatives].map((loading) =>
+        JSON.stringify(loading.positions.map((position) => position.plates).sort()),
+      );
+      expect(new Set(layouts).size, target).toBe(layouts.length);
+    }
+  });
+
+  it("lists none when no loading is exact", () => {
+    expect(loadDumbbells("11.25", { pair: false, uneven: false }).results[0]!.alternatives).toEqual([]);
+    expect(loadDumbbells("130").results[0]!.alternatives).toEqual([]);
+  });
+});
+
 describe("dumbbells Load: rules that hold for every target", () => {
   const targets = Array.from({ length: (130 - 5) * 4 + 1 }, (_, i) => String(5 + i / 4));
   const stackLength = new Map(inventory.plates.map((plate) => [plate.weight.listed, plate.stackLengthIn?.listed ?? 0]));
@@ -255,7 +284,7 @@ describe("dumbbells Load: rules that hold for every target", () => {
     const dumbbells = pair ? 2 : 1;
     for (const target of targets) {
       const [result] = loadDumbbells(target, { pair, uneven }).results;
-      const loadings = [result!.loading, result!.below, result!.above].filter((loading) => loading !== undefined);
+      const loadings = [result!.loading, result!.below, result!.above, ...result!.alternatives].filter((loading) => loading !== undefined);
       expect(loadings.length, target).toBeGreaterThan(0);
       for (const loading of loadings) {
         const [endA, endB] = loading.positions.map((position) => position.plates) as [number[], number[]];

@@ -9,6 +9,7 @@ const STANDARD_SCREW_MAX_TOTAL_LB = 75;
 const SMALL_PLATE_LB = 2.5;
 const UNEVEN_LB = 2.5;
 const UNEVEN_WITHOUT_SMALL_PLATES_LB = 5;
+const MAX_ALTERNATIVES = 5;
 
 interface PlateOption {
   plate: Plate;
@@ -89,7 +90,8 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
     ...(candidate.uneven ? { heavier: implement.positions[0] } : {}),
   });
 
-  const exact = best(candidates.filter((candidate) => candidate.total === targetMilli), options);
+  const exactCandidates = candidates.filter((candidate) => candidate.total === targetMilli);
+  const exact = best(exactCandidates, options);
   const below = exact ? undefined : closest(candidates.filter((candidate) => candidate.total < targetMilli), targetMilli, options);
   const above = exact ? undefined : closest(candidates.filter((candidate) => candidate.total > targetMilli), targetMilli, options);
   const recommended =
@@ -107,16 +109,18 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
     warnings.push(`The ends differ by ${UNEVEN_WITHOUT_SMALL_PLATES_LB} lb because no ${SMALL_PLATE_LB} lb or micro plate is free.`);
   }
 
-  const shownScrews = new Set(shown.map((candidate) => candidate.screw).filter((screw) => screw !== undefined));
+  const others = exact ? otherWays(exactCandidates, exact, options) : [];
+  const listed = [...shown, ...others];
+  const listedScrews = new Set(listed.map((candidate) => candidate.screw).filter((screw) => screw !== undefined));
   const unverified = [
     ...(implement.base.status === "unverified" ? [`${implement.id}.base`] : []),
-    ...[...shownScrews].filter((screw) => screw.weight.status === "unverified").map((screw) => `${screw.id}.weight`),
-    ...[...shownScrews].filter((screw) => screw.minStackIn?.status === "unverified").map((screw) => `${screw.id}.minStackIn`),
+    ...[...listedScrews].filter((screw) => screw.weight.status === "unverified").map((screw) => `${screw.id}.weight`),
+    ...[...listedScrews].filter((screw) => screw.minStackIn?.status === "unverified").map((screw) => `${screw.id}.minStackIn`),
     ...options
       .filter(
         (option, i) =>
           option.plate.weight.status === "unverified" &&
-          shown.some((candidate) => candidate.heavier.counts[i]! + candidate.lighter.counts[i]! > 0),
+          listed.some((candidate) => candidate.heavier.counts[i]! + candidate.lighter.counts[i]! > 0),
       )
       .map((option) => `${option.plate.id}.weight`),
   ];
@@ -131,7 +135,7 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
     ...(exact ? { loading: toLoading(exact) } : {}),
     ...(below ? { below: toLoading(below) } : {}),
     ...(above ? { above: toLoading(above) } : {}),
-    alternatives: [],
+    alternatives: others.map(toLoading),
     warnings,
     unverified,
   };
@@ -202,9 +206,32 @@ function closest(candidates: Candidate[], target: number, options: PlateOption[]
 }
 
 function best(candidates: Candidate[], options: PlateOption[]): Candidate | undefined {
+  return ranked(candidates, options)[0];
+}
+
+function otherWays(candidates: Candidate[], chosen: Candidate, options: PlateOption[]): Candidate[] {
+  const seen = new Set([layoutKey(chosen)]);
+  const others: Candidate[] = [];
+  for (const candidate of ranked(candidates, options)) {
+    const key = layoutKey(candidate);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    others.push(candidate);
+    if (others.length === MAX_ALTERNATIVES) break;
+  }
+  return others;
+}
+
+function ranked(candidates: Candidate[], options: PlateOption[]): Candidate[] {
   return [...candidates].sort(
     (a, b) => a.plateCount - b.plateCount || Number(a.uneven) - Number(b.uneven) || heavierFirst(a, b, options),
-  )[0];
+  );
+}
+
+// Two ends of equal weight swapped between end A and end B are the same loading turned round.
+function layoutKey(candidate: Candidate): string {
+  const ends = [candidate.heavier.counts.join(), candidate.lighter.counts.join()].sort();
+  return [candidate.screw?.id ?? "", ...ends].join("|");
 }
 
 function heavierFirst(a: Candidate, b: Candidate, options: PlateOption[]): number {
