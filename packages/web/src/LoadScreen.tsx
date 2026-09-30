@@ -87,7 +87,7 @@ function Loadings({ result }: { result: LoadResult }) {
   if (result.loading) {
     return (
       <div className="choices single">
-        <LoadingView heading="Exact" loading={result.loading} unit={unit} />
+        <LoadingView heading="Exact" implement={result.implement} loading={result.loading} unit={unit} />
       </div>
     );
   }
@@ -96,7 +96,7 @@ function Loadings({ result }: { result: LoadResult }) {
       <>
         <p className="status">{refusal(result)}</p>
         <div className="choices single">
-          {result.below && <LoadingView heading="Heaviest allowed" loading={result.below} unit={unit} />}
+          {result.below && <LoadingView heading="Heaviest allowed" implement={result.implement} loading={result.below} unit={unit} />}
         </div>
       </>
     );
@@ -105,8 +105,12 @@ function Loadings({ result }: { result: LoadResult }) {
     <>
       <p className="status">{`No exact loading for ${describeWeight(result.target, unit)}`}</p>
       <div className={result.below && result.above ? "choices" : "choices single"}>
-        {result.below && <LoadingView heading="Below" loading={result.below} unit={unit} recommended={result.recommended === "below"} />}
-        {result.above && <LoadingView heading="Above" loading={result.above} unit={unit} recommended={result.recommended === "above"} />}
+        {result.below && (
+          <LoadingView heading="Below" implement={result.implement} loading={result.below} unit={unit} recommended={result.recommended === "below"} />
+        )}
+        {result.above && (
+          <LoadingView heading="Above" implement={result.implement} loading={result.above} unit={unit} recommended={result.recommended === "above"} />
+        )}
       </div>
     </>
   );
@@ -119,12 +123,13 @@ function refusal(result: LoadResult): string {
 
 interface LoadingViewProps {
   heading: string;
+  implement: string;
   loading: Loading;
   unit: Unit;
   recommended?: boolean;
 }
 
-function LoadingView({ heading, loading, unit, recommended = false }: LoadingViewProps) {
+function LoadingView({ heading, implement, loading, unit, recommended = false }: LoadingViewProps) {
   const headingId = useId();
   return (
     <article aria-labelledby={headingId} className={recommended ? "loading recommended" : "loading"}>
@@ -133,39 +138,41 @@ function LoadingView({ heading, loading, unit, recommended = false }: LoadingVie
         {recommended && <span className="badge">Recommended</span>}
       </header>
       <Total weight={loading.total} unit={unit} />
-      <Details loading={loading} />
+      <dl className="details">
+        {details(implement, loading).map(([term, description]) => (
+          <div key={term}>
+            <dt>{term}</dt>
+            <dd>{description}</dd>
+          </div>
+        ))}
+      </dl>
     </article>
   );
 }
 
-function Details({ loading }: { loading: Loading }) {
-  const [side, back] = loading.positions;
-  if (side?.name === "front") {
-    return (
-      <dl className="details">
-        <div>
-          <dt>Front</dt>
-          <dd>{blockList(side.plates)}</dd>
-        </div>
-        <div>
-          <dt>Back</dt>
-          <dd>{blockList(back?.plates ?? [])}</dd>
-        </div>
-      </dl>
-    );
+function details(implement: string, loading: Loading): [term: string, description: string][] {
+  const [first, second] = loading.positions;
+  const plates = plateList(first?.plates ?? []);
+  const hardware = hardwareList(loading, inventory);
+  switch (implement) {
+    case "vest":
+      return [
+        ["Front", blockList(first?.plates ?? [])],
+        ["Back", blockList(second?.plates ?? [])],
+      ];
+    case "kettlebell":
+      return [
+        ["Stack", plates],
+        ["Locking screw", hardware],
+      ];
+    case "leg":
+      return [["Stack", plates]];
+    default:
+      return [
+        ["Each side", plates],
+        ["Collars", hardware],
+      ];
   }
-  return (
-    <dl className="details">
-      <div>
-        <dt>Each side</dt>
-        <dd>{plateList(side?.plates ?? [])}</dd>
-      </div>
-      <div>
-        <dt>Collars</dt>
-        <dd>{hardwareList(loading, inventory)}</dd>
-      </div>
-    </dl>
-  );
 }
 
 function Total({ weight, unit }: { weight: Display; unit: Unit }) {
