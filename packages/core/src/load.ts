@@ -1,0 +1,241 @@
+import type { Hardware, Implement, Inventory, Plate } from "./inventory.js";
+import { RequestError } from "./request-error.js";
+import { convert, describeWeight, display, parseWeight, thousandths, used, type Display } from "./weight.js";
+
+export type CollarChoice = "clamp" | "spinlock" | "none";
+
+export interface TargetRequest {
+  implement: string;
+  target: string;
+}
+
+export interface LoadRequest {
+  targets: TargetRequest[];
+  collars?: CollarChoice;
+}
+
+export interface Loading {
+  total: Display;
+  hardware: { id: string; count: number }[];
+  positions: { name: string; plates: number[] }[];
+  uneven: boolean;
+}
+
+export interface LoadResult {
+  implement: string;
+  target: Display;
+  exact: boolean;
+  loading?: Loading;
+  recommended?: "below" | "above";
+  below?: Loading;
+  above?: Loading;
+  refused?: { limit: Display };
+  alternatives: Loading[];
+  warnings: string[];
+  unverified: string[];
+}
+
+export interface Leftover {
+  plates: Record<string, number>;
+  hardware: Record<string, number>;
+}
+
+export interface LoadResponse {
+  results: LoadResult[];
+  leftover: Leftover;
+}
+
+const MICRO_PLATE = "ql-micro";
+
+interface PlateOption {
+  plate: Plate;
+  weight: number;
+  stackLength: number;
+  max: number;
+}
+
+interface Candidate {
+  total: number;
+  plates: { option: PlateOption; perPosition: number }[];
+  plateCount: number;
+}
+
+interface Chosen {
+  result: LoadResult;
+  plates: Map<string, number>;
+  hardware: Map<string, number>;
+}
+
+export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
+  if (request.targets.length !== 1) {
+    throw new RequestError("A request holds exactly one target for now.");
+  }
+  const [{ implement: implementId, target }] = request.targets as [TargetRequest];
+  const implement = inventory.implements.find((candidate) => candidate.id === implementId);
+  if (!implement) throw new RequestError(`Unknown implement "${implementId}".`);
+  if (implement.id !== "barbell") throw new RequestError(`Load for the ${implement.name.toLowerCase()} is not built yet.`);
+
+  const chosen = loadBarbell(inventory, implement, target, request.collars);
+  return { results: [chosen.result], leftover: leftover(inventory, [implement], chosen) };
+}
+
+function loadBarbell(inventory: Inventory, implement: Implement, targetText: string, collars: CollarChoice | undefined): Chosen {
+  const target = parseWeight(targetText, implement.unit);
+  const targetMilli = convert(thousandths(target.amount), target.unit, implement.unit);
+  const collar = collarFor(inventory, implement, collars);
+  const collarsNeeded = collar ? (implement.hardware?.perPosition ?? 1) * implement.positions.length : 0;
+  const baseMilli =
+    thousandths(used(implement.base)) +
+    (collar ? collarsNeeded * convert(thousandths(used(collar.weight)), collar.unit, implement.unit) : 0);
+
+  const result: LoadResult = {
+    implement: implement.id,
+    target: display(targetMilli, implement.unit),
+    exact: false,
+    alternatives: [],
+    warnings: [],
+    unverified: [],
+  };
+
+  const enoughCollars = !collar || collar.count >= collarsNeeded;
+  if (collar && !enoughCollars) {
+    result.warnings.push(
+      `The plate pool holds ${collar.count} ${collar.name}. The ${implement.name.toLowerCase()} needs ${collarsNeeded}.`,
+    );
+  }
+  const candidates = enoughCollars ? candidatesFor(inventory, implement, collar, baseMilli) : [];
+
+  const toLoading = (candidate: Candidate): Loading => ({
+    total: display(candidate.total, implement.unit),
+    hardware: collar ? [{ id: collar.id, count: collarsNeeded }] : [],
+    positions: implement.positions.map((name) => ({ name, plates: platesInOrder(candidate) })),
+    uneven: false,
+  });
+
+  const exact = best(candidates.filter((candidate) => candidate.total === targetMilli));
+  const below = exact ? undefined : closest(candidates.filter((candidate) => candidate.total < targetMilli), targetMilli);
+  const above = exact ? undefined : closest(candidates.filter((candidate) => candidate.total > targetMilli), targetMilli);
+  const recommended =
+    exact ?? (below && (!above || targetMilli - below.total <= above.total - targetMilli) ? below : above);
+
+  if (exact) {
+    result.exact = true;
+    result.loading = toLoading(exact);
+  }
+  if (below) result.below = toLoading(below);
+  if (above) result.above = toLoading(above);
+  if (!exact && recommended) result.recommended = recommended === below ? "below" : "above";
+
+  if (implement.maxPlateWeight !== undefined && targetMilli - baseMilli > thousandths(implement.maxPlateWeight)) {
+    const limit = display(thousandths(implement.maxPlateWeight), implement.unit);
+    result.refused = { limit };
+    const heaviest = result.below ? ` Heaviest allowed: ${describeWeight(result.below.total, implement.unit)}.` : "";
+    result.warnings.push(`Refused: over the ${limit[implement.unit]} ${implement.unit} plate limit.${heaviest}`);
+  }
+
+  const shown = [exact, below, above].filter((candidate) => candidate !== undefined);
+  result.unverified = [
+    ...(implement.base.status === "unverified" ? [`${implement.id}.base`] : []),
+    ...(collar?.weight.status === "unverified" ? [`${collar.id}.weight`] : []),
+    ...inventory.plates
+      .filter((plate) => plate.weight.status === "unverified")
+      .filter((plate) => shown.some((candidate) => candidate.plates.some(({ option }) => option.plate === plate)))
+      .map((plate) => `${plate.id}.weight`),
+  ];
+
+  const positions = implement.positions.length;
+  return {
+    result,
+    plates: new Map(recommended?.plates.map(({ option, perPosition }) => [option.plate.id, perPosition * positions])),
+    hardware: new Map(collar && recommended ? [[collar.id, collarsNeeded]] : []),
+  };
+}
+
+function leftover(inventory: Inventory, implementsUsed: Implement[], chosen: Chosen): Leftover {
+  const plateTypes = new Set(implementsUsed.flatMap((implement) => implement.accepts));
+  return {
+    plates: Object.fromEntries(
+      inventory.plates
+        .filter((plate) => plateTypes.has(plate.type))
+        .map((plate) => [plate.id, plate.count - (chosen.plates.get(plate.id) ?? 0)]),
+    ),
+    hardware: Object.fromEntries(
+      inventory.hardware.map((item) => [item.id, item.count - (chosen.hardware.get(item.id) ?? 0)]),
+    ),
+  };
+}
+
+function collarFor(inventory: Inventory, implement: Implement, choice: CollarChoice | undefined): Hardware | undefined {
+  const id = choice === undefined ? implement.hardware?.default : choice === "none" ? "none" : `collar-${choice}`;
+  if (id === undefined || id === "none") return undefined;
+  const collar = inventory.hardware.find((item) => item.id === id);
+  if (!collar || !implement.hardware?.options.includes(id)) {
+    throw new RequestError(`The ${implement.name.toLowerCase()} takes no "${id}" collar.`);
+  }
+  return collar;
+}
+
+function candidatesFor(inventory: Inventory, implement: Implement, collar: Hardware | undefined, baseMilli: number): Candidate[] {
+  const positions = implement.positions.length;
+  const plateUnit = (plate: Plate) => inventory.plateTypes.find((type) => type.id === plate.type)?.unit ?? implement.unit;
+  const options: PlateOption[] = inventory.plates
+    .filter((plate) => implement.accepts.includes(plate.type))
+    .map((plate) => ({
+      plate,
+      weight: convert(thousandths(used(plate.weight)), plateUnit(plate), implement.unit),
+      stackLength: plate.stackLengthIn ? thousandths(used(plate.stackLengthIn)) : 0,
+      max: Math.min(Math.floor(plate.count / positions), plate.id === MICRO_PLATE ? 1 : Infinity),
+    }))
+    .sort((a, b) => b.weight - a.weight);
+
+  const capacity = implement.positionLengthIn
+    ? thousandths(used(implement.positionLengthIn)) - thousandths(collar?.widthIn ?? 0)
+    : Infinity;
+  const maxPlateWeight = implement.maxPlateWeight === undefined ? Infinity : thousandths(implement.maxPlateWeight);
+
+  const candidates: Candidate[] = [];
+  const walk = (index: number, chosen: Candidate["plates"], weight: number, length: number) => {
+    if (length > capacity || weight * positions > maxPlateWeight) return;
+    const option = options[index];
+    if (!option) {
+      candidates.push({
+        total: baseMilli + weight * positions,
+        plates: chosen,
+        plateCount: chosen.reduce((sum, item) => sum + item.perPosition, 0) * positions,
+      });
+      return;
+    }
+    for (let count = 0; count <= option.max; count++) {
+      const next = count === 0 ? chosen : [...chosen, { option, perPosition: count }];
+      walk(index + 1, next, weight + option.weight * count, length + option.stackLength * count);
+    }
+  };
+  walk(0, [], 0, 0);
+  return candidates;
+}
+
+function closest(candidates: Candidate[], target: number): Candidate | undefined {
+  const distance = Math.min(...candidates.map((candidate) => Math.abs(candidate.total - target)));
+  return best(candidates.filter((candidate) => Math.abs(candidate.total - target) === distance));
+}
+
+function best(candidates: Candidate[]): Candidate | undefined {
+  return [...candidates].sort((a, b) => a.plateCount - b.plateCount || heavierFirst(a, b))[0];
+}
+
+function heavierFirst(a: Candidate, b: Candidate): number {
+  const left = platesInOrder(a);
+  const right = platesInOrder(b);
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const difference = (right[i] ?? 0) - (left[i] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+function platesInOrder(candidate: Candidate): number[] {
+  const isMicro = (item: Candidate["plates"][number]) => Number(item.option.plate.id === MICRO_PLATE);
+  return [...candidate.plates]
+    .sort((a, b) => isMicro(a) - isMicro(b) || b.option.weight - a.option.weight)
+    .flatMap(({ option, perPosition }) => Array<number>(perPosition).fill(used(option.plate.weight)));
+}
