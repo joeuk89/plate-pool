@@ -46,6 +46,7 @@ export interface LoadResponse {
 }
 
 const MICRO_PLATE = "ql-micro";
+const MAX_ALTERNATIVES = 5;
 
 interface PlateOption {
   plate: Plate;
@@ -102,7 +103,8 @@ function loadBarbell(inventory: Inventory, implement: Implement, targetText: str
     uneven: false,
   });
 
-  const exact = best(candidates.filter((candidate) => candidate.total === targetMilli));
+  const exactCandidates = candidates.filter((candidate) => candidate.total === targetMilli);
+  const exact = best(exactCandidates);
   const below = exact ? undefined : closest(candidates.filter((candidate) => candidate.total < targetMilli), targetMilli);
   const above = exact ? undefined : closest(candidates.filter((candidate) => candidate.total > targetMilli), targetMilli);
   const recommended =
@@ -117,7 +119,8 @@ function loadBarbell(inventory: Inventory, implement: Implement, targetText: str
     warnings.push(`Refused: over the ${refused.limit[implement.unit]} ${implement.unit} plate limit.${heaviest}`);
   }
 
-  const shown = [exact, below, above].filter((candidate) => candidate !== undefined);
+  const others = exact ? otherWays(exactCandidates, exact) : [];
+  const shown = [exact, below, above, ...others].filter((candidate) => candidate !== undefined);
   const unverified = [
     ...(implement.base.status === "unverified" ? [`${implement.id}.base`] : []),
     ...(collar?.weight.status === "unverified" ? [`${collar.id}.weight`] : []),
@@ -136,7 +139,7 @@ function loadBarbell(inventory: Inventory, implement: Implement, targetText: str
     ...(exact ? { loading: toLoading(exact) } : {}),
     ...(below ? { below: toLoading(below) } : {}),
     ...(above ? { above: toLoading(above) } : {}),
-    alternatives: [],
+    alternatives: others.map(toLoading),
     warnings,
     unverified,
   };
@@ -218,7 +221,17 @@ function closest(candidates: Candidate[], target: number): Candidate | undefined
 }
 
 function best(candidates: Candidate[]): Candidate | undefined {
-  return [...candidates].sort((a, b) => a.plateCount - b.plateCount || heavierFirst(a, b))[0];
+  return ranked(candidates)[0];
+}
+
+function otherWays(candidates: Candidate[], chosen: Candidate): Candidate[] {
+  return ranked(candidates)
+    .filter((candidate) => candidate !== chosen)
+    .slice(0, MAX_ALTERNATIVES);
+}
+
+function ranked(candidates: Candidate[]): Candidate[] {
+  return [...candidates].sort((a, b) => a.plateCount - b.plateCount || heavierFirst(a, b));
 }
 
 function heavierFirst(a: Candidate, b: Candidate): number {
