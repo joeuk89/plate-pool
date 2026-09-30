@@ -178,7 +178,7 @@ The build fills in the remaining plates, hardware and implements from section 4.
 
 1. **A target is a total.** It includes the base weight: bar, handle, screws and collars.
 2. **Measured beats listed.** See section 5.
-3. **Unverified values are flagged.** Every result names the unverified values it used.
+3. **Unverified values are flagged.** Every result names the unverified values it used, except plate stack lengths. Those decide whether plates fit, never the total, and section 13 tracks them.
 4. **Pounds first.** Results show pounds with kilograms beside them. The vest shows kilograms first. Input accepts either unit: `175`, `175lb`, `80kg`. A bare number means pounds, or kilograms for the vest.
 5. **Exact arithmetic.** The library calculates in whole thousandths of the implement's unit, so sums never drift. It converts to the other unit for display only, with 1 lb = 0.45359237 kg. Pounds show up to two decimals and kilograms one.
 6. **The pool is never exceeded.** No result uses more plates or hardware than the inventory holds.
@@ -206,6 +206,7 @@ The build fills in the remaining plates, hardware and implements from section 4.
 
 - One stack, one screw. Standard screw up to 57.5 lb, long screw above.
 - If no standard screw is free, the kettlebell takes a long screw. The result warns that the screw may stick out at the top, which Ironmaster's manual calls normal.
+- At most one 22.5 lb plate. Ironmaster's manual allows 5 lb and 2.5 lb plates "or the 22.5 lb plate", and the 80 lb kit holds one.
 - At most one micro plate.
 
 **Leg attachment**
@@ -534,6 +535,7 @@ None of these block the build. Each is one value in the inventory file.
 | Empty vest weight, and block count | 0 kg, 30 blocks | Bathroom scale, and counting |
 | Do 2 × 22.5 + 12 × 5 lb fit on one bar side with the collar on | Allowed. Calculated to fit with a clamp collar, 0.49 in spare | Loading it once |
 | Does a long screw lock on a lightly loaded kettlebell | Allowed, with a warning | Trying it once |
+| Do two 22.5 lb plates fit on the kettlebell | Not allowed: at most one | Trying it once |
 | Shortest stack a long screw locks on a dumbbell | 3.0 in | Trying it once |
 | Plate stack lengths | Calculated values in 4.1 | Measuring a stack of five 5 lb plates |
 
