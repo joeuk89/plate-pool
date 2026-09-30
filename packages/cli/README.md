@@ -9,6 +9,6 @@ npx plate-pool reverse barbell --side 22.5,22.5,5,5
 npx plate-pool inventory
 ```
 
-Add `--json` for structured output. Run `npx plate-pool` with no command for every option.
+Add `--json` for structured output. Run `npx plate-pool` with no command for every option. Agents: read the [agent guide](https://github.com/joeuk89/plate-pool/blob/main/docs/agent-guide.md) for the JSON shapes and the rules.
 
 The package bundles the owner's inventory file. Use `--inventory <path>` to read a different one. Source and specification: <https://github.com/joeuk89/plate-pool>.
