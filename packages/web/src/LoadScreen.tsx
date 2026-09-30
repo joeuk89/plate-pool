@@ -314,7 +314,7 @@ function DumbbellDetails({ pair, loading }: { pair: boolean; loading: Loading })
   );
 }
 
-function Total({ weight, unit }: { weight: Display; unit: Unit }) {
+export function Total({ weight, unit }: { weight: Display; unit: Unit }) {
   const [first, second]: [Unit, Unit] = unit === "kg" ? ["kg", "lb"] : ["lb", "kg"];
   return (
     <p className="total">

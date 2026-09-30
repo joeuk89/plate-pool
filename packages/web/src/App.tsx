@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { ListScreen } from "./ListScreen";
 import { LoadScreen, type LoadChoice } from "./LoadScreen";
+import { ReverseScreen } from "./ReverseScreen";
 import { useSettings } from "./settings";
 
 const implementTabs = [
@@ -11,11 +12,12 @@ const implementTabs = [
   { id: "vest", label: "Vest" },
 ];
 
-type View = "load" | "list";
+type View = "load" | "list" | "reverse";
 
 const views: { id: View; label: string }[] = [
   { id: "load", label: "Load" },
   { id: "list", label: "List" },
+  { id: "reverse", label: "Reverse" },
 ];
 
 export function App() {
@@ -82,8 +84,10 @@ export function App() {
             {...sharedOptions}
             {...(opened ? { initial: opened.choice } : {})}
           />
-        ) : (
+        ) : view === "list" ? (
           <ListScreen key={selected} implement={selected} {...sharedOptions} onOpen={openInLoad} />
+        ) : (
+          <ReverseScreen key={selected} implement={selected} {...sharedOptions} />
         )}
       </div>
     </main>
