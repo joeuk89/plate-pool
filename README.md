@@ -25,3 +25,5 @@ This installs, builds and tests all three packages. The build stops first if the
 ## Deployment
 
 Every push to the main branch runs `.github/workflows/deploy.yml`: it tests, builds and deploys the web app to <https://joeuk89.github.io/plate-pool/>. A failing test or an inventory file that does not match its schema stops the deployment. Pull requests run the same tests and build, and deploy nothing.
+
+The web app installs from the browser and works offline. The build adds a service worker, `sw.js`, that caches every file of the deployment. With a network, each visit loads the latest page, and a new deployment replaces the cached copy. With no network, or none within 3 seconds, the app loads from the cache.
