@@ -16,6 +16,25 @@ export function blockList(plates: number[]): string {
   return plates.length === 1 ? "1 block" : `${plates.length} blocks`;
 }
 
+const endLetters: Record<string, string> = {
+  "end-a": "A",
+  "end-b": "B",
+};
+
+export function endLabel(position: string): string {
+  const letter = endLetters[position];
+  return letter ? `End ${letter}` : position;
+}
+
+export function unevenNote(label: string, loading: Loading): string {
+  const heavier = loading.positions.find((position) => position.name === loading.heavier);
+  const lighter = loading.positions.find((position) => position.name !== loading.heavier);
+  const weight = (plates: number[] = []) => plates.reduce((sum, plate) => sum + plate, 0);
+  const difference = Math.round((weight(heavier?.plates) - weight(lighter?.plates)) * 1000) / 1000;
+  const inSentence = (name = "") => endLabel(name).replace(/^End /, "end ");
+  return `${label}: ${inSentence(heavier?.name)} is ${difference} lb heavier than ${inSentence(lighter?.name)}.`;
+}
+
 export function hardwareList(loading: Loading, inventory: Inventory): string {
   if (loading.hardware.length === 0) return "None";
   return loading.hardware
@@ -32,6 +51,7 @@ export function unverifiedList(keys: string[], inventory: Inventory): string {
       return id === "vest" ? "empty vest weight" : `${inventory.implements.find((item) => item.id === id)?.name.toLowerCase() ?? id} weight`;
     }
     const hardware = inventory.hardware.find((item) => item.id === id);
+    if (hardware && field === "minStackIn") return `shortest stack on a ${hardware.name.toLowerCase()}`;
     if (hardware) return hardware.kind === "collar" ? "collar weight" : `${hardware.name.toLowerCase()} weight`;
     const plate = inventory.plates.find((item) => item.id === id);
     if (plate && field === "count") return `${plate.name.toLowerCase()} count`;

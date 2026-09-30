@@ -1,5 +1,5 @@
 import type { Loading, LoadResult } from "@plate-pool/core";
-import { plateList } from "./describe";
+import { endLabel, plateList } from "./describe";
 
 const positionNouns: Record<string, string> = { barbell: "side", dumbbell: "end" };
 
@@ -12,9 +12,12 @@ export function OtherWays({ result }: { result: LoadResult }) {
         {result.alternatives.map((loading) => (
           <li key={JSON.stringify(loading.positions)}>
             <dl className="details">
-              {positionRows(result.implement, loading).map(({ label, plates }) => (
+              {positionRows(result.implement, loading).map(({ label, plates, heavier }) => (
                 <div key={label}>
-                  <dt>{label}</dt>
+                  <dt>
+                    {label}
+                    {heavier && <span className="heavier"> heavier</span>}
+                  </dt>
                   <dd>{plateList(plates)}</dd>
                 </div>
               ))}
@@ -27,15 +30,17 @@ export function OtherWays({ result }: { result: LoadResult }) {
   );
 }
 
-function positionRows(implement: string, loading: Loading): { label: string; plates: number[] }[] {
+function positionRows(implement: string, loading: Loading): { label: string; plates: number[]; heavier?: boolean }[] {
   const [first, ...rest] = loading.positions;
   const noun = positionNouns[implement];
   const mirrored = first && rest.length > 0 && rest.every((position) => position.plates.join() === first.plates.join());
   if (noun && first && mirrored) return [{ label: `Each ${noun}`, plates: first.plates }];
-  return loading.positions.map(({ name, plates }) => ({ label: positionLabel(name), plates }));
+  return loading.positions.map(({ name, plates }) => ({ label: positionLabel(name), plates, heavier: name === loading.heavier }));
 }
 
 function positionLabel(name: string): string {
+  const end = endLabel(name);
+  if (end !== name) return end;
   const words = name.replaceAll("-", " ");
   return words.charAt(0).toUpperCase() + words.slice(1);
 }

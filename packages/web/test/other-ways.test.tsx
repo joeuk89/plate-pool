@@ -46,6 +46,7 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
       hardware: [{ id: "screw-standard", count: 2 }],
       positions,
       uneven,
+      ...(uneven ? { heavier: "end-a" } : {}),
     });
     const result: LoadResult = {
       implement: "dumbbell",
@@ -62,7 +63,17 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
     render(<OtherWays result={result} />);
     expect(screen.getAllByRole("listitem").map(text)).toEqual([
       "Each end 3 × 5, 1 × 2.5, 1 × 1.25",
-      "End a 1 × 22.5 End b 2 × 5, 1 × 2.5 Uneven",
+      "End A heavier 1 × 22.5 End B 2 × 5, 1 × 2.5 Uneven",
+    ]);
+  });
+
+  it("lists the other loadings of a pair of dumbbells", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
+    typeTarget("40");
+    expect(within(otherWays()!).getAllByRole("listitem").map(text)).toEqual([
+      "End A 3 × 5 End B 2 × 5, 2 × 2.5",
+      "End A heavier 3 × 5, 1 × 1.25 End B 2 × 5, 1 × 2.5, 1 × 1.25 Uneven",
     ]);
   });
 

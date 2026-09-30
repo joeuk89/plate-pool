@@ -62,10 +62,11 @@ describe("barbell Load screen: worked examples (spec section 7)", () => {
 describe("Load screen: implement tabs", () => {
   const tabs = () => within(screen.getByRole("tablist", { name: "Implements" })).getAllByRole("tab");
 
-  it("opens on the barbell, with the kettlebell, leg attachment and vest tabs beside it", () => {
+  it("opens on the barbell, with the dumbbells, kettlebell, leg attachment and vest tabs beside it", () => {
     render(<App />);
     expect(tabs().map((tab) => [tab.textContent, tab.getAttribute("aria-selected")])).toEqual([
       ["Barbell", "true"],
+      ["Dumbbells", "false"],
       ["Kettlebell", "false"],
       ["Leg attachment", "false"],
       ["Vest", "false"],
@@ -75,7 +76,7 @@ describe("Load screen: implement tabs", () => {
   it("selects the tab that is pressed", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
-    expect(tabs().map((tab) => tab.getAttribute("aria-selected"))).toEqual(["false", "true", "false", "false"]);
+    expect(tabs().map((tab) => tab.getAttribute("aria-selected"))).toEqual(["false", "false", "true", "false", "false"]);
     expect(screen.getByRole("tabpanel", { name: "Kettlebell" })).toBeTruthy();
   });
 
@@ -296,5 +297,75 @@ describe("barbell Load screen: notes", () => {
     typeTarget("173");
     const notes = within(screen.getByRole("region", { name: "Result" })).getByRole("list", { name: "Notes" });
     expect(text(notes)).toBe("Unverified: bar weight, collar weight");
+  });
+});
+
+describe("dumbbells Load screen", () => {
+  function openDumbbells() {
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
+  }
+  const dumbbells = () => screen.getByRole("radiogroup", { name: "Dumbbells" });
+  const result = () => screen.getByRole("region", { name: "Result" });
+
+  it("selects the dumbbells tab, asks for a pair unless one is picked, and has no collar choice", () => {
+    openDumbbells();
+    expect(screen.getByRole("tab", { name: "Dumbbells" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(dumbbells()).getByRole("radio", { name: "Pair" })).toHaveProperty("checked", true);
+    expect(screen.queryByRole("radiogroup", { name: "Collars" })).toBeNull();
+  });
+
+  it("example 4: a pair of 40 lb shows 3 × 5 on each end and standard screws", () => {
+    openDumbbells();
+    typeTarget("40");
+    const shown = text(result());
+    expect(shown).toContain("Exact");
+    expect(shown).toContain("40 lb 18.1 kg");
+    expect(shown).toContain("Each end 3 × 5");
+    expect(shown).toContain("Screws per dumbbell 2 × Standard locking screw");
+    expect(within(result()).queryByRole("list", { name: "Notes" })).toBeNull();
+  });
+
+  it("example 5: one dumbbell of 12.5 lb shows each end and the uneven note naming the heavier end", () => {
+    openDumbbells();
+    fireEvent.click(within(dumbbells()).getByRole("radio", { name: "One" }));
+    typeTarget("12.5");
+    const shown = text(result());
+    expect(shown).toContain("End A heavier 1 × 2.5");
+    expect(shown).toContain("End B No plates");
+    expect(shown).toContain("Screws 2 × Standard locking screw");
+    expect(text(within(result()).getByRole("list", { name: "Notes" }))).toBe("Uneven: end A is 2.5 lb heavier than end B.");
+  });
+
+  it("marks the uneven loadings when no loading is exact", () => {
+    openDumbbells();
+    fireEvent.click(within(dumbbells()).getByRole("radio", { name: "One" }));
+    typeTarget("48");
+    const notes = text(within(result()).getByRole("list", { name: "Notes" }));
+    expect(notes).toContain("Below is uneven: end A is 2.5 lb heavier than end B.");
+    expect(notes).toContain("Above is uneven: end A is 1.25 lb heavier than end B.");
+  });
+
+  it("example 7: a pair of 120 lb uses long screws and names the unverified shortest stack", () => {
+    openDumbbells();
+    typeTarget("120");
+    const shown = text(result());
+    expect(shown).toContain("Each end 1 × 22.5, 6 × 5, 1 × 2.5");
+    expect(shown).toContain("Screws per dumbbell 2 × Long locking screw");
+    expect(shown).toContain("Unverified: shortest stack on a long locking screw");
+  });
+
+  it("refuses a target over 120 lb per dumbbell and shows the heaviest allowed loading", () => {
+    openDumbbells();
+    typeTarget("130");
+    expect(text(result())).toContain("Refused: over the 120 lb limit per dumbbell");
+    expect(text(within(result()).getByRole("article", { name: /Heaviest allowed/ }))).toContain("120 lb 54.4 kg");
+    expect(text(result()).match(/Refused/g)).toHaveLength(1);
+  });
+
+  it("shows the bare handle with no screws", () => {
+    openDumbbells();
+    typeTarget("5");
+    expect(text(result())).toContain("Screws per dumbbell None");
   });
 });
