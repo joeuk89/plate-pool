@@ -77,6 +77,27 @@ describe("List screen (spec 8.5)", () => {
     expect(rows()[1]).toEqual(["18", "8.2", "Each side No plates", ""]);
   });
 
+  it("shares the collar choice with the Load screen", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("radio", { name: "Spin-lock" }));
+    openList();
+    expect((screen.getByRole("radio", { name: "Spin-lock" }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole("radio", { name: "None" }));
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "Load" }));
+    expect((screen.getByRole("radio", { name: "None" }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("leaves out the weights that need uneven dumbbells when uneven loading is off", () => {
+    render(<App />);
+    openList();
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
+    fireEvent.click(screen.getByRole("radio", { name: "One" }));
+    setRange("10", "12.5");
+    expect(rows().slice(1).map(([lb]) => lb)).toEqual(["10", "11.25", "12.5"]);
+    fireEvent.click(screen.getByRole("switch", { name: "Uneven loading" }));
+    expect(rows().slice(1).map(([lb]) => lb)).toEqual(["10", "12.5"]);
+  });
+
   it("explains a range it cannot read", () => {
     render(<App />);
     openList();
@@ -155,5 +176,9 @@ describe("Load screen: step buttons (spec 8.2)", () => {
     fireEvent.change(screen.getByLabelText("Target"), { target: { value: "10" } });
     up();
     expect(target()).toBe("11.25");
+    fireEvent.click(screen.getByRole("switch", { name: "Uneven loading" }));
+    down();
+    up();
+    expect(target()).toBe("12.5");
   });
 });
