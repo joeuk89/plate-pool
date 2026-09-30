@@ -111,3 +111,21 @@ describe("leg attachment Load: 100 lb plate limit (spec 6.2)", () => {
     }
   });
 });
+
+describe("leg attachment Load: other ways to make this (spec 6.3)", () => {
+  it("lists the other stacks that reach 30 lb, fewest plates first", () => {
+    const result = loadLeg("30");
+    expect(result.loading?.positions).toEqual(stack(22.5, 5, 2.5));
+    expect(result.alternatives.map((loading) => loading.positions)).toEqual([
+      stack(22.5, 2.5, 2.5, 2.5),
+      stack(5, 5, 5, 5, 5, 5),
+      stack(5, 5, 5, 5, 5, 2.5, 2.5),
+      stack(5, 5, 5, 5, 2.5, 2.5, 2.5, 2.5),
+    ]);
+    expect(result.alternatives.every((loading) => loading.hardware.length === 0)).toBe(true);
+  });
+
+  it("lists none when no stack reaches the target", () => {
+    expect(loadLeg("120").alternatives).toEqual([]);
+  });
+});

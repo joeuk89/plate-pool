@@ -1,5 +1,5 @@
 import type { Hardware, Implement, Inventory } from "./inventory.js";
-import { best, candidatesFor, closest, platesInOrder, type Candidate, type Chosen, type Loading, type LoadResult } from "./load.js";
+import { best, candidatesFor, closest, otherWays, platesInOrder, type Candidate, type Chosen, type Loading, type LoadResult } from "./load.js";
 import { convert, describeWeight, display, parseWeight, thousandths, used } from "./weight.js";
 
 const STANDARD_SCREW_MAX_TOTAL_LB = 57.5;
@@ -70,12 +70,14 @@ function stackResult(
     };
   };
 
-  const exact = best(candidates.filter((candidate) => candidate.total === targetMilli));
+  const exactCandidates = candidates.filter((candidate) => candidate.total === targetMilli);
+  const exact = best(exactCandidates);
   const below = exact ? undefined : closest(candidates.filter((candidate) => candidate.total < targetMilli), targetMilli);
   const above = exact ? undefined : closest(candidates.filter((candidate) => candidate.total > targetMilli), targetMilli);
   const recommended =
     exact ?? (below && (!above || targetMilli - below.total <= above.total - targetMilli) ? below : above);
-  const shown = [exact, below, above].filter((candidate) => candidate !== undefined);
+  const others = exact ? otherWays(exactCandidates, exact) : [];
+  const shown = [exact, below, above, ...others].filter((candidate) => candidate !== undefined);
 
   const warnings: string[] = [];
   const limit = limitOf(implement);
@@ -106,7 +108,7 @@ function stackResult(
     ...(exact ? { loading: toLoading(exact) } : {}),
     ...(below ? { below: toLoading(below) } : {}),
     ...(above ? { above: toLoading(above) } : {}),
-    alternatives: [],
+    alternatives: others.map(toLoading),
     warnings,
     unverified,
   };

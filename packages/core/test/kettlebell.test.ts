@@ -204,3 +204,23 @@ describe("kettlebell Load: the plate pool (spec 6.1 rule 6)", () => {
     expect(loadKettlebell("80").unverified).toEqual([]);
   });
 });
+
+describe("kettlebell Load: other ways to make this (spec 6.3)", () => {
+  it("lists the other stacks that reach 50 lb, fewest plates first, each on the same locking screw", () => {
+    const result = loadKettlebell("50");
+    expect(result.loading?.positions).toEqual(stack(22.5, 2.5));
+    expect(result.alternatives.map((loading) => loading.positions)).toEqual([
+      stack(5, 5, 5, 5, 5),
+      stack(5, 5, 5, 5, 2.5, 2.5),
+      stack(5, 5, 5, 2.5, 2.5, 2.5, 2.5),
+    ]);
+    for (const loading of result.alternatives) {
+      expect(loading.total).toEqual({ lb: 50, kg: 22.7 });
+      expect(loading.hardware).toEqual([{ id: "screw-standard", count: 1 }]);
+    }
+  });
+
+  it("lists none when no stack reaches the target", () => {
+    expect(loadKettlebell("85").alternatives).toEqual([]);
+  });
+});
