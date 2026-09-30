@@ -2,11 +2,11 @@ import type { Hardware, Implement, Inventory } from "./inventory.js";
 import { best, candidatesFor, closest, otherWays, platesInOrder, type Candidate, type Chosen, type Loading, type LoadResult } from "./load.js";
 import { convert, describeWeight, display, parseWeight, thousandths, used } from "./weight.js";
 
-const STANDARD_SCREW_MAX_TOTAL_LB = 57.5;
+export const STANDARD_SCREW_MAX_TOTAL_LB = 57.5;
 // Ironmaster's manual allows 5 lb and 2.5 lb plates "or the 22.5 lb plate", so a kettlebell takes one at most.
-const KETTLEBELL_LARGE_PLATE = "ql-22.5";
+export const KETTLEBELL_LARGE_PLATE = "ql-22.5";
 
-const LEG_NOTE = "Plate weight only. The lever changes the resistance you feel.";
+export const LEG_NOTE = "Plate weight only. The lever changes the resistance you feel.";
 
 const STICKS_OUT_WARNING =
   "No standard locking screw is free, so the kettlebell uses a long locking screw. It may stick out at the top, which Ironmaster's manual calls normal.";
