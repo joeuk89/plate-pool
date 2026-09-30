@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { load, readInventory, reverse } from "@plate-pool/core";
+import { list, load, readInventory, reverse } from "@plate-pool/core";
 import { describe, expect, it } from "vitest";
 import { run } from "../src/main.js";
 
@@ -473,6 +473,92 @@ describe("plate-pool reverse", () => {
     [["reverse", "barbell", "--side", "10"], "The straight bar takes no 10 lb plate"],
     [["reverse", "vest", "--blocks", "2.5"], "--blocks takes a whole number of blocks"],
     [["load", "barbell=175", "--side", "5"], "--side is for the reverse command"],
+  ])("exits 1 with the reason on standard error for %j", (args, reason) => {
+    const result = runWith(args);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain(reason);
+  });
+});
+
+describe("plate-pool list", () => {
+  it("prints the same JSON as the library's result (spec 12.3)", () => {
+    const result = runWith(["list", "barbell", "--from", "100", "--to", "200", "--json"]);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual(list(inventory, { implement: "barbell", from: "100", to: "200" }));
+  });
+
+  it("reads dumbbells as a pair and dumbbell as one dumbbell", () => {
+    const pair = JSON.parse(runWith(["list", "dumbbells", "--from", "10", "--to", "15", "--json"]).stdout);
+    expect(pair).toEqual(list(inventory, { implement: "dumbbell", from: "10", to: "15" }));
+    expect(pair.pair).toBe(true);
+
+    const single = JSON.parse(runWith(["list", "dumbbell", "--from", "10", "--to", "15", "--json"]).stdout);
+    expect(single).toEqual(list(inventory, { implement: "dumbbell", pair: false, from: "10", to: "15" }));
+    expect(single.pair).toBe(false);
+  });
+
+  it("changes the list with --collars and --no-uneven the way they change Load", () => {
+    const spinlock = JSON.parse(runWith(["list", "barbell", "--from", "18", "--to", "20.5", "--collars", "spinlock", "--json"]).stdout);
+    expect(spinlock).toEqual(list(inventory, { implement: "barbell", collars: "spinlock", from: "18", to: "20.5" }));
+
+    const even = JSON.parse(runWith(["list", "dumbbell", "--from=10", "--to=15", "--no-uneven", "--json"]).stdout);
+    expect(even).toEqual(list(inventory, { implement: "dumbbell", pair: false, uneven: false, from: "10", to: "15" }));
+  });
+
+  it("lists the full range when --from and --to are left out", () => {
+    const { rows } = JSON.parse(runWith(["list", "kettlebell", "--json"]).stdout);
+    expect(rows[0].total.lb).toBe(22.5);
+    expect(rows.at(-1).total.lb).toBe(80);
+  });
+
+  it("prints one line per weight with a one-line plate layout per position", () => {
+    expect(runWith(["list", "barbell", "--from", "170", "--to", "176"]).stdout).toBe(
+      [
+        "Barbell  3 weights from 170 lb to 176 lb",
+        "",
+        "  170.5 lb (77.3 kg)  micro",
+        "      each side: 22.5 22.5 5 5 5 5 5 5 1.25 | clamp collar",
+        "  173 lb (78.5 kg)",
+        "      each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
+        "  175.5 lb (79.6 kg)  micro",
+        "      each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | clamp collar",
+        "",
+        "Unverified: bar weight, collar weight",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("marks uneven dumbbells and shows each end", () => {
+    const output = runWith(["list", "dumbbell", "--from", "12.5", "--to", "12.5"]).stdout;
+    expect(output).toBe(
+      [
+        "One dumbbell  1 weight from 12.5 lb to 12.5 lb",
+        "",
+        "  12.5 lb (5.7 kg)  uneven",
+        "      end A: 2.5 (heavier)",
+        "      end B: no plates",
+        "      standard screws",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("says so when no weight falls in the range", () => {
+    expect(runWith(["list", "barbell", "--from", "19", "--to", "20"]).stdout).toBe(
+      "Barbell  no achievable weight from 19 lb to 20 lb\n",
+    );
+  });
+
+  it.each([
+    [["list"], "Name an implement"],
+    [["list", "barbell", "kettlebell"], "list takes one implement"],
+    [["list", "rowing"], 'Unknown implement "rowing"'],
+    [["list", "barbell=175"], 'Unknown implement "barbell=175"'],
+    [["list", "barbell", "--from"], "--from takes a weight"],
+    [["list", "barbell", "--to", "heavy"], '"heavy" is not a weight'],
+    [["list", "barbell", "--from", "200", "--to", "100"], "Its start must not be above its end"],
   ])("exits 1 with the reason on standard error for %j", (args, reason) => {
     const result = runWith(args);
     expect(result.code).toBe(1);

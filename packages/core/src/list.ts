@@ -33,6 +33,7 @@ export interface ListResponse {
   implement: string;
   pair?: boolean;
   rows: ListRow[];
+  warnings: string[];
   unverified: string[];
 }
 
@@ -43,17 +44,20 @@ export function list(inventory: Inventory, request: ListRequest): ListResponse {
   if (from > to) throw new RequestError(`The range starts at ${request.from} and ends at ${request.to}. Its start must not be above its end.`);
 
   const rows: ListRow[] = [];
+  const warnings = new Set<string>();
   const unverified = new Set<string>();
   for (let next = nextAbove(from - 1); next !== undefined && next <= to; next = nextAbove(next)) {
     const result = loadAt(next);
     if (!result?.exact || !result.loading) continue;
     rows.push(rowOf(inventory, result.loading));
+    for (const warning of result.warnings) warnings.add(warning);
     for (const key of result.unverified) unverified.add(key);
   }
   return {
     implement: request.implement,
     ...(request.implement === "dumbbell" ? { pair: request.pair ?? true } : {}),
     rows,
+    warnings: [...warnings],
     unverified: [...unverified],
   };
 }

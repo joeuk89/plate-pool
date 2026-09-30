@@ -97,6 +97,13 @@ describe("List (spec 6.5)", () => {
     expect(list(inventory, { implement: "vest", to: "2" }).unverified).toEqual(["vest.base", "vest-block.count"]);
   });
 
+  it("carries the leg attachment's fixed note (spec 6.2)", () => {
+    expect(list(inventory, { implement: "leg", to: "10" }).warnings).toEqual([
+      "Plate weight only. The lever changes the resistance you feel.",
+    ]);
+    expect(list(inventory, { implement: "barbell", to: "30" }).warnings).toEqual([]);
+  });
+
   it("accepts a range in the other unit", () => {
     expect(totals(list(inventory, { implement: "barbell", from: "45kg", to: "47kg" }))).toEqual([100.5, 103]);
   });

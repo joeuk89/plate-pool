@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import { InventoryError, load, readInventory, RequestError, reverse, type CollarChoice, type Inventory, type ReverseRequest } from "@plate-pool/core";
-import { inventoryText, loadText, reverseText } from "./format.js";
+import { InventoryError, list, load, readInventory, RequestError, reverse, type CollarChoice, type Inventory, type ReverseRequest } from "@plate-pool/core";
+import { inventoryText, listText, loadText, reverseText } from "./format.js";
 
 export interface Environment {
   stdout: (text: string) => void;
@@ -14,12 +14,15 @@ Commands:
   load <implement>=<target> ...   Loadings for a target, such as barbell=175 or barbell=80kg.
                                   dumbbells=<target> is a pair, dumbbell=<target> is one
   reverse <implement> <plates>    Total for a given loading, such as reverse barbell --side 22.5,5
+  list <implement>                Achievable weights for one implement, such as barbell
+                                  --from 100 --to 200. dumbbells is a pair, dumbbell is one
   inventory                       What the owner has
 
 Options:
   --json                          Structured output for agents
   --collars <clamp|spinlock|none> Barbell collar choice. Default: clamp
   --no-uneven                     Turn uneven dumbbell loading off
+  --from <weight>, --to <weight>  The range for list. Default: the implement's full range
   --inventory <path>              Use a different inventory file
 
 Plates for reverse, innermost first:
@@ -38,6 +41,8 @@ const implementNames: Record<string, string> = {
   leg: "leg",
   vest: "vest",
 };
+
+const implementChoices = "Use barbell, dumbbells, dumbbell, kettlebell, leg or vest.";
 
 const collarChoices: CollarChoice[] = ["clamp", "spinlock", "none"];
 
@@ -58,6 +63,8 @@ interface Options {
   plates: Partial<Record<PlateOption, number[]>>;
   blocks?: number;
   reverseOptions: string[];
+  from?: string;
+  to?: string;
   positional: string[];
 }
 
@@ -67,7 +74,7 @@ export function run(args: string[], environment: Environment): number {
   const [command, ...rest] = args;
   try {
     if (command === undefined) throw new InputError(usage);
-    if (command !== "load" && command !== "reverse" && command !== "inventory") {
+    if (command !== "load" && command !== "reverse" && command !== "list" && command !== "inventory") {
       throw new InputError(`Unknown command "${command}".\n${usage}`);
     }
 
@@ -76,9 +83,31 @@ export function run(args: string[], environment: Environment): number {
     if (command !== "reverse" && reverseOption) throw new InputError(`${reverseOption} is for the reverse command.`);
     const inventory = readInventoryFile(options.inventoryPath ?? environment.defaultInventoryPath);
 
+    if (command !== "list" && (options.from !== undefined || options.to !== undefined)) {
+      throw new InputError("--from and --to work with list only.");
+    }
+
     if (command === "reverse") {
       const result = reverse(inventory, reverseRequest(options, inventory));
       environment.stdout(options.json ? json(result) : reverseText(result, inventory));
+      return 0;
+    }
+
+    if (command === "list") {
+      if (options.positional.length === 0) throw new InputError("Name an implement, such as barbell.");
+      if (options.positional.length > 1) throw new InputError("list takes one implement.");
+      const name = options.positional[0]!;
+      const implement = implementNames[name];
+      if (!implement) throw new InputError(`Unknown implement "${name}". ${implementChoices}`);
+      const response = list(inventory, {
+        implement,
+        ...(name === "dumbbell" ? { pair: false } : {}),
+        ...(options.from === undefined ? {} : { from: options.from }),
+        ...(options.to === undefined ? {} : { to: options.to }),
+        ...(options.collars ? { collars: options.collars } : {}),
+        ...(options.uneven ? {} : { uneven: false }),
+      });
+      environment.stdout(options.json ? json(response) : listText(response, inventory, options));
       return 0;
     }
 
@@ -126,6 +155,13 @@ function parseOptions(args: string[]): Options {
         options.collars = choice as CollarChoice;
         break;
       }
+      case "--from":
+      case "--to": {
+        const weight = value();
+        if (!weight) throw new InputError(`${flag} takes a weight, such as 100 or 45kg.`);
+        options[flag === "--from" ? "from" : "to"] = weight;
+        break;
+      }
       case "--inventory": {
         const path = value();
         if (!path) throw new InputError("--inventory takes the path of an inventory file.");
@@ -136,9 +172,9 @@ function parseOptions(args: string[]): Options {
       case "--end-a":
       case "--end-b":
       case "--stack": {
-        const list = value();
-        if (list === undefined) throw new InputError(`${flag} takes a list of plate weights, such as 22.5,5,2.5.`);
-        options.plates[flag.slice(2) as PlateOption] = parsePlates(list);
+        const weights = value();
+        if (weights === undefined) throw new InputError(`${flag} takes a list of plate weights, such as 22.5,5,2.5.`);
+        options.plates[flag.slice(2) as PlateOption] = parsePlates(weights);
         options.reverseOptions.push(flag);
         break;
       }
@@ -162,7 +198,7 @@ function parseTarget(arg: string) {
   if (separator < 0) throw new InputError(`Write "${arg}" as implement=target, such as barbell=175.`);
   const name = arg.slice(0, separator);
   const implement = implementNames[name];
-  if (!implement) throw new InputError(`Unknown implement "${name}". Use barbell, dumbbells, dumbbell, kettlebell, leg or vest.`);
+  if (!implement) throw new InputError(`Unknown implement "${name}". ${implementChoices}`);
   const target = arg.slice(separator + 1);
   if (name === "dumbbell") return { implement, target, pair: false };
   return { implement, target };
