@@ -674,7 +674,8 @@ ul {
   stop-color: var(--steel);
 }
 
-.picture .collar {
+.picture .collar,
+.picture .screw {
   fill: var(--ink);
 }
 
@@ -689,13 +690,46 @@ ul {
   fill: var(--ink);
 }
 
-.picture .collar-label {
+.picture .hardware-label {
   fill: var(--muted);
 }
 
 .picture .leader {
   stroke: var(--muted);
   stroke-width: 0.05;
+  stroke-linecap: round;
+}
+
+.picture .handle {
+  fill: none;
+  stroke: var(--steel);
+}
+
+.picture .vest-panel {
+  fill: none;
+  stroke: var(--steel);
+  stroke-width: 0.12;
+}
+
+.picture .vest-slot {
+  fill: none;
+  stroke: var(--rule);
+  stroke-width: 0.06;
+  stroke-dasharray: 0.15 0.12;
+}
+
+.picture .vest-caption {
+  fill: var(--ink);
+}
+
+.picture .heavier-mark text {
+  fill: var(--ink);
+  font-weight: 700;
+}
+
+.picture .heavier-mark line {
+  stroke: var(--ink);
+  stroke-width: 0.1;
   stroke-linecap: round;
 }
 

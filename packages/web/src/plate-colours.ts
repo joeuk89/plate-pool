@@ -10,6 +10,7 @@ const byWeight: Record<string, PlateColour> = {
   "5 lb": { fill: "#2f67cc", ink: "#ffffff" },
   "2.5 lb": { fill: "#1c8a55", ink: "#ffffff" },
   "1.25 lb": { fill: "#7a4fc4", ink: "#ffffff" },
+  "1 kg": { fill: "#a4521f", ink: "#ffffff" },
 };
 
 const unknown: PlateColour = { fill: "#6f7780", ink: "#ffffff" };
