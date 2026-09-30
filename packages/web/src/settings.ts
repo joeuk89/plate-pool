@@ -35,12 +35,11 @@ function writeSettings(settings: Settings): void {
   }
 }
 
-export function useSettings(): [Settings, (change: Partial<Settings>) => void] {
-  const [settings, setSettings] = useState(readSettings);
+export function useSettings(overrides: Partial<Settings> = {}): [Settings, (change: Partial<Settings>) => void] {
+  const [settings, setSettings] = useState(() => ({ ...readSettings(), ...overrides }));
   const update = (change: Partial<Settings>) => {
-    const next = { ...settings, ...change };
-    writeSettings(next);
-    setSettings(next);
+    writeSettings({ ...readSettings(), ...change });
+    setSettings({ ...settings, ...change });
   };
   return [settings, update];
 }
