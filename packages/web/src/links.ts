@@ -1,6 +1,6 @@
 import type { CollarChoice, Unit } from "@plate-pool/core";
 import { newCard, unitOf, type Card, type DumbbellChoice } from "./plan";
-import type { Settings } from "./settings";
+import { collarChoices, type Settings } from "./settings";
 
 const implementParameters: Record<string, { implement: string; dumbbells: DumbbellChoice }> = {
   barbell: { implement: "barbell", dumbbells: "pair" },
@@ -14,7 +14,6 @@ const implementParameters: Record<string, { implement: string; dumbbells: Dumbbe
 export type View = "load" | "list" | "reverse";
 
 const views: readonly string[] = ["load", "list", "reverse"];
-const collarChoices: readonly string[] = ["clamp", "spinlock", "none"];
 const unevenValues: Record<string, boolean> = { "0": false, "1": true };
 
 export interface Link {
@@ -39,7 +38,7 @@ export function readLink(search: string): Link {
   for (const [parameter, value] of new URLSearchParams(search)) {
     const card = cardFrom(parameter, value);
     if (card) cards.push(card);
-    if (parameter === "collars" && collarChoices.includes(value)) settings.collars = value as CollarChoice;
+    if (parameter === "collars" && collarChoices.includes(value as CollarChoice)) settings.collars = value as CollarChoice;
     if (parameter === "view" && views.includes(value)) view = value as View;
     if (parameter === "uneven" && Object.hasOwn(unevenValues, value)) settings.uneven = unevenValues[value]!;
   }

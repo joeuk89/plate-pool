@@ -55,7 +55,9 @@ describe("links: the example in spec 8.7", () => {
     expect(text(result(1))).toContain("Each side 2 × 22.5, 6 × 5, 1 × 2.5");
     expect(text(result(2))).toContain("Exact");
     expect(text(result(2))).toContain("Each end 3 × 5");
-    expect(text(screen.getByRole("region", { name: "Left over" }))).toContain("Plates 1 × 22.5, 2 × 2.5, 4 × 1.25");
+    const leftover = text(screen.getByRole("region", { name: "Left over" }));
+    expect(leftover).toContain("Plates 1 × 22.5, 2 × 2.5, 4 × 1.25");
+    expect(leftover).toContain("Locking hardware 5 × Long locking screw");
   });
 });
 
@@ -273,5 +275,6 @@ describe("links: a parameter wins over a remembered setting", () => {
     localStorage.setItem("plate-pool:settings", JSON.stringify({ collars: "spinlock", uneven: false }));
     open("/plate-pool/?barbell=173&collars=rope&dumbbell=11.25&uneven=maybe");
     expect(collar("Spin-lock")).toHaveProperty("checked", true);
+    expect(unevenSwitch().getAttribute("aria-checked")).toBe("false");
   });
 });

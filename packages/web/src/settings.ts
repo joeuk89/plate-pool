@@ -9,7 +9,7 @@ export interface Settings {
 }
 
 const storageKey = "plate-pool:settings";
-const collarChoices: readonly CollarChoice[] = ["clamp", "spinlock", "none"];
+export const collarChoices: readonly CollarChoice[] = ["clamp", "spinlock", "none"];
 const defaults: Settings = { implement: "barbell", collars: "clamp", uneven: true };
 
 function readSettings(): Settings {
