@@ -318,6 +318,61 @@ ul {
   gap: 0.25rem;
 }
 
+.other-ways {
+  border-top: 2px solid var(--rule);
+}
+
+.other-ways summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3rem;
+  font: 600 1.25rem/1 var(--display);
+  cursor: pointer;
+  list-style: none;
+}
+
+.other-ways summary::-webkit-details-marker {
+  display: none;
+}
+
+.other-ways summary::after {
+  content: "+";
+  font-size: 1.75rem;
+  color: var(--muted);
+}
+
+.other-ways[open] summary::after {
+  content: "−";
+}
+
+.other-ways summary:focus-visible {
+  outline: 3px solid var(--signal);
+  outline-offset: 2px;
+}
+
+.other-ways ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.other-ways li {
+  background: var(--surface);
+  border: 2px solid var(--rule);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  display: grid;
+  gap: 0.375rem;
+}
+
+.other-ways .uneven {
+  font-size: 0.9375rem;
+  color: var(--muted);
+}
+
 .error {
   color: var(--error);
   font-weight: 500;

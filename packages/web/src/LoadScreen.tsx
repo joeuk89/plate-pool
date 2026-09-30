@@ -1,5 +1,6 @@
 import { describeWeight, load, RequestError, type CollarChoice, type Display, type Loading, type LoadResult, type Unit } from "@plate-pool/core";
 import { useId, useState } from "react";
+import { OtherWays } from "./OtherWays";
 import { Segmented } from "./Segmented";
 import { hardwareList, plateList, unverifiedList } from "./describe";
 import { inventory } from "./inventory";
@@ -72,6 +73,7 @@ function ResultView({ result }: { result: LoadResult }) {
     <>
       <Loadings result={result} />
       <Notes result={result} />
+      <OtherWays result={result} />
     </>
   );
 }

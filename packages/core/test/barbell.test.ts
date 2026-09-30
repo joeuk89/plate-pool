@@ -238,7 +238,7 @@ describe("barbell Load: rules that hold for every target", () => {
     );
     for (const target of targets) {
       const result = loadBarbell(target, { collars });
-      const loadings = [result.loading, result.below, result.above].filter((loading) => loading !== undefined);
+      const loadings = [result.loading, result.below, result.above, ...result.alternatives].filter((loading) => loading !== undefined);
       expect(loadings.length, target).toBeGreaterThan(0);
       for (const loading of loadings) {
         const [left, right] = loading.positions;

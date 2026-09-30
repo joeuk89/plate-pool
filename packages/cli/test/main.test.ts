@@ -42,6 +42,14 @@ describe("plate-pool load", () => {
     expect(JSON.parse(result.stdout)).toEqual(load(inventory, { targets: [{ implement: "barbell", target: "175" }] }));
   });
 
+  it("lists the other loadings that reach the target under alternatives", () => {
+    const [result] = JSON.parse(runWith(["load", "barbell=88", "--json"]).stdout).results;
+    const [expected] = load(inventory, { targets: [{ implement: "barbell", target: "88" }] }).results;
+    expect(result.alternatives).toHaveLength(2);
+    expect(result.alternatives).toEqual(expected!.alternatives);
+    expect(result.alternatives[0].positions[0]).toEqual({ name: "left", plates: [5, 5, 5, 5, 5, 5, 5] });
+  });
+
   it("orders each result's fields as the JSON example in spec section 9 does", () => {
     const [result] = JSON.parse(runWith(["load", "barbell=175", "--json"]).stdout).results;
     expect(Object.keys(result)).toEqual([
