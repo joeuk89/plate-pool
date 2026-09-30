@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { load, readInventory } from "@plate-pool/core";
+import { load, readInventory, reverse } from "@plate-pool/core";
 import { describe, expect, it } from "vitest";
 import { run } from "../src/main.js";
 
@@ -346,6 +346,138 @@ describe("plate-pool load kettlebell= and leg=", () => {
         "",
       ].join("\n"),
     );
+  });
+});
+
+describe("plate-pool reverse", () => {
+  it("prints the same JSON as the library's result (spec 12.3)", () => {
+    const result = runWith(["reverse", "barbell", "--side", "22.5,22.5,5,5", "--json"]);
+    expect(result.code).toBe(0);
+    const side = [22.5, 22.5, 5, 5];
+    expect(JSON.parse(result.stdout)).toEqual(
+      reverse(inventory, {
+        implement: "barbell",
+        positions: [
+          { name: "left", plates: side },
+          { name: "right", plates: side },
+        ],
+      }),
+    );
+  });
+
+  it("prints the barbell's total, each side and the unverified values as text", () => {
+    expect(runWith(["reverse", "barbell", "--side", "22.5,22.5,5,5,5,5,5,5,2.5"]).stdout).toBe(
+      [
+        "Barbell  total 173 lb (78.5 kg)",
+        "",
+        "  each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
+        "",
+        "Unverified: bar weight, collar weight",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("takes --collars for the barbell", () => {
+    expect(runWith(["reverse", "barbell", "--side=5", "--collars", "none"]).stdout).toContain("each side: 5 | no collars");
+  });
+
+  it("reads --end-a and --end-b for one dumbbell, names the screws and marks the heavier end", () => {
+    expect(runWith(["reverse", "dumbbell", "--end-a", "5,5,5,2.5", "--end-b", "5,5,5,5"]).stdout).toBe(
+      [
+        "One dumbbell  total 47.5 lb (21.5 kg)  uneven",
+        "",
+        "  end A: 5 5 5 2.5",
+        "  end B: 5 5 5 5 (heavier)",
+        "  standard screws",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("reads dumbbells as a pair and prints the total for each", () => {
+    const result = runWith(["reverse", "dumbbells", "--end-a", "5,5,5", "--end-b", "5,5,5", "--json"]);
+    expect(JSON.parse(result.stdout)).toMatchObject({ pair: true, total: { lb: 40, kg: 18.1 } });
+    expect(runWith(["reverse", "dumbbells", "--end-a", "5,5,5", "--end-b", "5,5,5"]).stdout).toBe(
+      ["Dumbbells (pair)  total 40 lb (18.1 kg) each", "", "  each end: 5 5 5 | standard screws", ""].join("\n"),
+    );
+  });
+
+  it("lists both ends when they weigh the same but carry different plates", () => {
+    const output = runWith(["reverse", "dumbbell", "--end-a", "5", "--end-b", "2.5,2.5"]).stdout;
+    expect(output).toContain("  end A: 5\n  end B: 2.5 2.5\n  standard screws\n");
+  });
+
+  it("prints each rule the loading breaks, and still prints the total", () => {
+    const result = runWith(["reverse", "dumbbell", "--end-a", "5", "--no-uneven"]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe(
+      [
+        "One dumbbell  total 15 lb (6.8 kg)  uneven",
+        "",
+        "  end A: 5 (heavier)",
+        "  end B: no plates",
+        "  standard screws",
+        "",
+        "Uneven loading is off, and the ends differ by 5 lb.",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("reads --stack for the kettlebell and the leg attachment", () => {
+    expect(runWith(["reverse", "kettlebell", "--stack", "22.5,5,5,5,5,5,5,2.5"]).stdout).toBe(
+      ["Kettlebell  total 80 lb (36.3 kg)", "", "  stack: 22.5 5 5 5 5 5 5 2.5 | long screw", ""].join("\n"),
+    );
+    expect(runWith(["reverse", "leg", "--stack", "22.5,22.5,5"]).stdout).toBe(
+      [
+        "Leg attachment  total 50 lb (22.7 kg)",
+        "",
+        "  stack: 22.5 22.5 5",
+        "",
+        "Plate weight only. The lever changes the resistance you feel.",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("reads --blocks for the vest and splits them with the extra block on the back", () => {
+    expect(runWith(["reverse", "vest", "--blocks", "13"]).stdout).toBe(
+      [
+        "Vest  total 13 kg (28.66 lb)",
+        "",
+        "  front: 6 blocks",
+        "  back: 7 blocks",
+        "",
+        "Unverified: empty vest weight, vest block count",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("reads a missing position as empty", () => {
+    expect(runWith(["reverse", "barbell"]).stdout).toContain("Barbell  total 18 lb (8.2 kg)");
+  });
+
+  it.each([
+    [["reverse"], "Name an implement"],
+    [["reverse", "rowing"], 'Unknown implement "rowing"'],
+    [["reverse", "barbell", "vest"], "reverse takes one implement"],
+    [["reverse", "barbell=175"], 'Unknown implement "barbell=175"'],
+    [["reverse", "barbell", "--stack", "5"], "--stack is for the kettlebell and leg attachment"],
+    [["reverse", "dumbbell", "--side", "5"], "--side is for the barbell"],
+    [["reverse", "vest", "--end-a", "5"], "--end-a is for a dumbbell"],
+    [["reverse", "kettlebell", "--blocks", "5"], "--blocks is for the vest"],
+    [["reverse", "barbell", "--side", "22.5,heavy"], '"heavy" is not a plate weight'],
+    [["reverse", "barbell", "--side"], "--side takes a list of plate weights"],
+    [["reverse", "barbell", "--side", "10"], "The straight bar takes no 10 plate"],
+    [["reverse", "vest", "--blocks", "2.5"], "--blocks takes a whole number of blocks"],
+    [["load", "barbell=175", "--side", "5"], "--side is for the reverse command"],
+  ])("exits 1 with the reason on standard error for %j", (args, reason) => {
+    const result = runWith(args);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain(reason);
   });
 });
 
