@@ -1,7 +1,7 @@
-import { describeWeight, load, RequestError, type CollarChoice, type Loading, type LoadResult, type Unit } from "@plate-pool/core";
+import { describeWeight, load, RequestError, type CollarChoice, type Display, type Loading, type LoadResult, type Unit } from "@plate-pool/core";
 import { useId, useState } from "react";
 import { Segmented } from "./Segmented";
-import { hardwareList, kilograms, plateList, pounds, unverifiedList } from "./describe";
+import { hardwareList, plateList, unverifiedList } from "./describe";
 import { inventory } from "./inventory";
 
 const collarOptions: { value: CollarChoice; label: string }[] = [
@@ -39,11 +39,27 @@ export function LoadScreen() {
 
   return (
     <div className="load">
-      <label htmlFor={targetId}>Target</label>
-      <input id={targetId} inputMode="decimal" value={target} onChange={(event) => setTarget(event.target.value)} />
-      <Segmented label="Unit" options={unitOptions} value={unit} onChange={setUnit} />
-      <Segmented label="Collars" options={collarOptions} value={collars} onChange={setCollars} />
-      <section aria-label="Result">
+      <div className="request">
+        <label htmlFor={targetId} className="field-label">
+          Target
+        </label>
+        <div className="target-row">
+          <input
+            id={targetId}
+            className="target"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            enterKeyHint="done"
+            placeholder="0"
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+          />
+          <Segmented label="Unit" showLabel={false} options={unitOptions} value={unit} onChange={setUnit} className="unit" />
+        </div>
+        <Segmented label="Collars" options={collarOptions} value={collars} onChange={setCollars} />
+      </div>
+      <section aria-label="Result" aria-live="polite" className="result">
         {outcome && "result" in outcome && <ResultView result={outcome.result} />}
         {outcome && "error" in outcome && <p className="error">{outcome.error}</p>}
       </section>
@@ -61,23 +77,66 @@ function ResultView({ result }: { result: LoadResult }) {
 }
 
 function Loadings({ result }: { result: LoadResult }) {
-  if (result.loading) return <LoadingView heading="Exact" loading={result.loading} />;
+  if (result.loading) {
+    return (
+      <div className="choices single">
+        <LoadingView heading="Exact" loading={result.loading} />
+      </div>
+    );
+  }
   if (result.refused) {
     return (
       <>
-        <p>{`Refused: over the ${pounds(result.refused.limit)} plate limit`}</p>
-        {result.below && <LoadingView heading="Heaviest allowed" loading={result.below} />}
+        <p className="status">{`Refused: over the ${result.refused.limit.lb} lb plate limit`}</p>
+        <div className="choices single">
+          {result.below && <LoadingView heading="Heaviest allowed" loading={result.below} />}
+        </div>
       </>
     );
   }
   return (
     <>
-      <p>{`No exact loading for ${describeWeight(result.target, "lb")}`}</p>
+      <p className="status">{`No exact loading for ${describeWeight(result.target, "lb")}`}</p>
       <div className="choices">
         {result.below && <LoadingView heading="Below" loading={result.below} recommended={result.recommended === "below"} />}
         {result.above && <LoadingView heading="Above" loading={result.above} recommended={result.recommended === "above"} />}
       </div>
     </>
+  );
+}
+
+function LoadingView({ heading, loading, recommended = false }: { heading: string; loading: Loading; recommended?: boolean }) {
+  const [side] = loading.positions;
+  const headingId = useId();
+  return (
+    <article aria-labelledby={headingId} className={recommended ? "loading recommended" : "loading"}>
+      <header className="loading-head">
+        <h2 id={headingId}>{heading}</h2>
+        {recommended && <span className="badge">Recommended</span>}
+      </header>
+      <Total weight={loading.total} />
+      <dl className="details">
+        <div>
+          <dt>Each side</dt>
+          <dd>{plateList(side?.plates ?? [])}</dd>
+        </div>
+        <div>
+          <dt>Collars</dt>
+          <dd>{hardwareList(loading, inventory)}</dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
+
+function Total({ weight }: { weight: Display }) {
+  return (
+    <p className="total">
+      <span className="lb">
+        <span className="amount">{weight.lb}</span> lb
+      </span>{" "}
+      <span className="kg">{weight.kg} kg</span>
+    </p>
   );
 }
 
@@ -92,27 +151,5 @@ function Notes({ result }: { result: LoadResult }) {
         <li key={note}>{note}</li>
       ))}
     </ul>
-  );
-}
-
-function LoadingView({ heading, loading, recommended = false }: { heading: string; loading: Loading; recommended?: boolean }) {
-  const [side] = loading.positions;
-  const headingId = useId();
-  return (
-    <article aria-labelledby={headingId} className={recommended ? "loading recommended" : "loading"}>
-      <h2 id={headingId}>
-        {heading}
-        {recommended && <span className="badge">Recommended</span>}
-      </h2>
-      <p>
-        <span>{pounds(loading.total)}</span> <span>{kilograms(loading.total)}</span>
-      </p>
-      <dl>
-        <dt>Each side</dt>
-        <dd>{plateList(side?.plates ?? [])}</dd>
-        <dt>Collars</dt>
-        <dd>{hardwareList(loading, inventory)}</dd>
-      </dl>
-    </article>
   );
 }

@@ -1,4 +1,4 @@
-import type { Display, Inventory, Loading } from "@plate-pool/core";
+import type { Inventory, Loading } from "@plate-pool/core";
 
 export function plateList(plates: number[]): string {
   if (plates.length === 0) return "No plates";
@@ -8,13 +8,13 @@ export function plateList(plates: number[]): string {
     if (last?.weight === weight) last.count++;
     else groups.push({ weight, count: 1 });
   }
-  return groups.map(({ weight, count }) => `${count} × ${weight}`).join(", ");
+  return groups.map(({ weight, count }) => `${count}\u00a0×\u00a0${weight}`).join(", ");
 }
 
 export function hardwareList(loading: Loading, inventory: Inventory): string {
   if (loading.hardware.length === 0) return "None";
   return loading.hardware
-    .map(({ id, count }) => `${count} × ${inventory.hardware.find((item) => item.id === id)?.name ?? id}`)
+    .map(({ id, count }) => `${count}\u00a0×\u00a0${inventory.hardware.find((item) => item.id === id)?.name ?? id}`)
     .join(", ");
 }
 
@@ -31,12 +31,4 @@ export function unverifiedList(keys: string[], inventory: Inventory): string {
     return plate ? `${plate.name} plate weight` : key;
   };
   return [...new Set(keys.map(label))].join(", ");
-}
-
-export function pounds(weight: Display): string {
-  return `${weight.lb} lb`;
-}
-
-export function kilograms(weight: Display): string {
-  return `${weight.kg} kg`;
 }
