@@ -78,6 +78,20 @@ describe("barbell Load screen: target", () => {
     expect(text(within(result).getByRole("article", { name: /Below/ }))).toContain("175.5 lb 79.6 kg");
   });
 
+  it("recommends the bare bar, alone, for a target under the base weight", () => {
+    render(<App />);
+    typeTarget("5");
+    const result = screen.getByRole("region", { name: "Result" });
+    expect(text(result)).toContain("No exact loading for 5 lb (2.3 kg)");
+    expect(within(result).queryByRole("article", { name: /Below/ })).toBeNull();
+
+    const above = within(result).getByRole("article", { name: /Above/ });
+    expect(text(above)).toContain("18 lb 8.2 kg");
+    expect(text(above)).toContain("Each side No plates");
+    expect(text(above)).toContain("Recommended");
+    expect(above.parentElement?.classList).toContain("single");
+  });
+
   it("shows no result until a target is typed", () => {
     render(<App />);
     expect(screen.getByRole("region", { name: "Result" }).textContent).toBe("");

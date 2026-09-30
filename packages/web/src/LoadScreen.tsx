@@ -97,7 +97,7 @@ function Loadings({ result }: { result: LoadResult }) {
   return (
     <>
       <p className="status">{`No exact loading for ${describeWeight(result.target, "lb")}`}</p>
-      <div className="choices">
+      <div className={result.below && result.above ? "choices" : "choices single"}>
         {result.below && <LoadingView heading="Below" loading={result.below} recommended={result.recommended === "below"} />}
         {result.above && <LoadingView heading="Above" loading={result.above} recommended={result.recommended === "above"} />}
       </div>

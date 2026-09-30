@@ -140,10 +140,6 @@ ul {
   color: var(--rule);
 }
 
-.target:focus {
-  outline: none;
-}
-
 .segmented {
   display: flex;
   align-items: center;
