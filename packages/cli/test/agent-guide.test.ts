@@ -20,7 +20,7 @@ function examples(): Example[] {
   }));
 }
 
-function runJson(args: string[]) {
+function runCli(args: string[]) {
   let stdout = "";
   let stderr = "";
   const code = run(args, {
@@ -28,7 +28,7 @@ function runJson(args: string[]) {
     stderr: (text) => (stderr += text),
     defaultInventoryPath: inventoryPath,
   });
-  return { code, stderr, output: code === 0 ? JSON.parse(stdout) : undefined };
+  return { code, stdout, stderr };
 }
 
 function firstOfEachList(inventory: Record<string, unknown>) {
@@ -42,9 +42,10 @@ describe("the agent guide", () => {
 
   it.each(examples().map((example) => [example.args.join(" "), example] as const))("prints the documented JSON for %s", (_, example) => {
     expect(example.args).toContain("--json");
-    const { code, stderr, output } = runJson(example.args);
+    const { code, stdout, stderr } = runCli(example.args);
     expect(stderr).toBe("");
     expect(code).toBe(0);
+    const output = JSON.parse(stdout);
     const expected = example.args[0] === "inventory" ? firstOfEachList(output) : output;
     expect(example.documented).toEqual(expected);
   });
@@ -52,7 +53,7 @@ describe("the agent guide", () => {
   it.each([...guide.matchAll(/npx plate-pool ((?:load|list|reverse|inventory)[^`\n]*)/g)].map(([, command]) => command!))(
     "runs npx plate-pool %s as written",
     (command) => {
-      const { code, stderr } = runJson(command.split(" "));
+      const { code, stderr } = runCli(command.split(" "));
       expect(stderr).toBe("");
       expect(code).toBe(0);
     },

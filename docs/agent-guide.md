@@ -102,7 +102,7 @@ npx plate-pool load barbell=175 dumbbells=40 --json
 ```
 
 - An exact result holds `loading`. A result that is not exact holds `below`, `above` and `recommended`. One side is missing when nothing exists in that direction.
-- A barbell target over the plate limit gets `refused`, which holds the `limit`, and a `below` loading at the heaviest allowed total.
+- A target over an implement's limit gets `refused`, which holds the `limit`, and a `below` loading at the heaviest allowed total. The barbell's limit is 210 lb of plates.
 - `alternatives` holds up to five other loadings that reach the same total.
 - For a pair of dumbbells, `hardware` and `positions` describe one dumbbell. The other is the same.
 - A dumbbell loading with `uneven: true` has ends of different weights, and `heavier` names the heavier end.
@@ -185,7 +185,7 @@ npx plate-pool reverse dumbbell --end-a 5,5,5,2.5 --end-b 5,5,5 --json
 
 ### inventory
 
-What the owner has: the inventory file. Every weight has a `listed` value, an optional `measured` value that overrides it, and a `status` of `verified` or `unverified`.
+What the owner has: the inventory file. Every weight has a `listed` value, an optional `measured` value that overrides it, and a `status`: `verified` (the manufacturer states it), `owner` (the owner confirmed it on the equipment) or `unverified`.
 
 ```sh
 npx plate-pool inventory --json
@@ -250,7 +250,7 @@ If you have web access but cannot run commands, read these files. They need no l
 
 | URL | Contents |
 | --- | --- |
-| <https://joeuk89.github.io/plate-pool/api/inventory.json> | The inventory file as deployed. Same as `plate-pool inventory --json`. |
+| <https://joeuk89.github.io/plate-pool/api/inventory.json> | The inventory file as deployed. `plate-pool inventory --json` prints the same four lists. |
 | <https://joeuk89.github.io/plate-pool/api/achievable.json> | List results for every implement over its full range, with the whole pool free. |
 
 `achievable.json` holds `{ "tables": [...] }`. Each table has the shape of `plate-pool list --json`, and `implement` says which implement it covers. The tables come in this order:
