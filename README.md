@@ -1,6 +1,6 @@
 # plate-pool
 
-A calculator for one home gym. It answers Load, List and Reverse for five implements that share one plate pool. [docs/spec.md](docs/spec.md) is the specification.
+A calculator for one home gym. It answers Load, List and Reverse for five implements that share one plate pool. [docs/spec.md](docs/spec.md) is the specification. Agents that plan training start with [docs/agent-guide.md](docs/agent-guide.md).
 
 ## Layout
 
