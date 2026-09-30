@@ -1,4 +1,5 @@
 import type { Hardware, Implement, Inventory, Plate } from "./inventory.js";
+import { loadDumbbells } from "./dumbbells.js";
 import { RequestError } from "./request-error.js";
 import { loadKettlebell, loadLeg } from "./stack.js";
 import { loadVest } from "./vest.js";
@@ -9,11 +10,13 @@ export type CollarChoice = "clamp" | "spinlock" | "none";
 export interface TargetRequest {
   implement: string;
   target: string;
+  pair?: boolean;
 }
 
 export interface LoadRequest {
   targets: TargetRequest[];
   collars?: CollarChoice;
+  uneven?: boolean;
 }
 
 export interface Loading {
@@ -21,10 +24,12 @@ export interface Loading {
   hardware: { id: string; count: number }[];
   positions: { name: string; plates: number[] }[];
   uneven: boolean;
+  heavier?: string;
 }
 
 export interface LoadResult {
   implement: string;
+  pair?: boolean;
   target: Display;
   exact: boolean;
   loading?: Loading;
@@ -73,13 +78,17 @@ export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
   if (request.targets.length !== 1) {
     throw new RequestError("A request holds exactly one target for now.");
   }
-  const [{ implement: implementId, target }] = request.targets as [TargetRequest];
+  const [targetRequest] = request.targets as [TargetRequest];
+  const { implement: implementId, target } = targetRequest;
   const implement = inventory.implements.find((candidate) => candidate.id === implementId);
   if (!implement) throw new RequestError(`Unknown implement "${implementId}".`);
   let chosen: Chosen;
   switch (implement.id) {
     case "barbell":
       chosen = loadBarbell(inventory, implement, target, request.collars);
+      break;
+    case "dumbbell":
+      chosen = loadDumbbells(inventory, implement, targetRequest, request.uneven ?? true);
       break;
     case "kettlebell":
       chosen = loadKettlebell(inventory, implement, target);
