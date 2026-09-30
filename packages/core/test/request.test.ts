@@ -96,6 +96,21 @@ describe("requests with several implements: choosing the loading set (spec 6.3)"
     expect(platesUsed(response)).toBe(16);
   });
 
+  it("gives a light kettlebell a long screw when later dumbbells need every standard screw: kettlebell 40 lb then dumbbells 40 lb", () => {
+    const [bell, pair] = request(kettlebell("40"), dumbbells("40")).results;
+    expect(bell).toMatchObject({ exact: true, loading: { hardware: [{ id: "screw-long", count: 1 }], positions: [{ plates: [5, 5, 5] }] } });
+    expect(bell!.warnings[0]).toMatch(/^No standard locking screw is free, so the kettlebell uses a long locking screw\./);
+    expect(pair).toMatchObject({ exact: true, loading: { hardware: [{ id: "screw-standard", count: 2 }], positions: ends(5, 5, 5) } });
+    expect(pair!.warnings).toEqual([]);
+  });
+
+  it("keeps the standard screw on a light kettlebell when one is still free: kettlebell 40 lb then one dumbbell 40 lb", () => {
+    const response = request(kettlebell("40"), dumbbell("40"));
+    expect(response.results[0]).toMatchObject({ exact: true, loading: { hardware: [{ id: "screw-standard", count: 1 }] }, warnings: [] });
+    expect(response.results[1]).toMatchObject({ exact: true, loading: { hardware: [{ id: "screw-standard", count: 2 }] } });
+    expect(response.leftover.hardware).toMatchObject({ "screw-standard": 1, "screw-long": 5 });
+  });
+
   it("gives an implement that is exact on its own no warning", () => {
     const [, pair] = request(barbell("173"), dumbbells("40")).results;
     expect(pair!.warnings).toEqual([]);
@@ -115,6 +130,7 @@ describe("requests with several implements: the plate pool (spec 6.1 and 6.4)", 
     [leg("100"), kettlebell("80"), barbell("150"), dumbbells("60")],
     [dumbbell("120"), dumbbell("120"), barbell("100"), kettlebell("50"), leg("50"), vest("30kg")],
     [kettlebell("57.5"), dumbbells("75"), barbell("68")],
+    [kettlebell("40"), dumbbell("40"), dumbbell("30")],
   ];
 
   it.each(requests.map((targets) => [targets.map((target) => `${target.implement}=${target.target}`).join(" "), targets] as const))(
@@ -158,6 +174,13 @@ describe("requests with several implements: the plate pool (spec 6.1 and 6.4)", 
     expect(bar).toMatchObject({ exact: false, recommended: "below" });
     expect(bar!.warnings[0]).toBe(
       "Further from 175 lb than it could be, because the dumbbells use the 22.5 lb plates, 5 lb plates and 2.5 lb plates the barbell needs to get closer.",
+    );
+  });
+
+  it("names two single dumbbells as the dumbbells in the warning", () => {
+    const [, , bar] = request(dumbbell("101.25"), dumbbell("98.75"), barbell("150")).results;
+    expect(bar!.warnings[0]).toBe(
+      "Further from 150 lb than it could be, because the dumbbells use the 22.5 lb plates the barbell needs to get closer.",
     );
   });
 
