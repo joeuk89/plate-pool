@@ -168,6 +168,72 @@ describe("plate-pool load", () => {
   });
 });
 
+describe("plate-pool load for dumbbells", () => {
+  it("reads dumbbells= as a pair and prints the same JSON as the library's result", () => {
+    const result = runWith(["load", "dumbbells=40", "--json"]);
+    expect(result.code).toBe(0);
+    const response = JSON.parse(result.stdout);
+    expect(response).toEqual(load(inventory, { targets: [{ implement: "dumbbell", target: "40" }] }));
+    expect(response.results[0].pair).toBe(true);
+  });
+
+  it("reads dumbbell= as one dumbbell", () => {
+    const response = JSON.parse(runWith(["load", "dumbbell=12.5", "--json"]).stdout);
+    expect(response).toEqual(load(inventory, { targets: [{ implement: "dumbbell", target: "12.5", pair: false }] }));
+    expect(response.results[0].pair).toBe(false);
+  });
+
+  it("turns uneven loading off with --no-uneven", () => {
+    const response = JSON.parse(runWith(["load", "dumbbell=11.25", "--no-uneven", "--json"]).stdout);
+    expect(response).toEqual(
+      load(inventory, { targets: [{ implement: "dumbbell", target: "11.25", pair: false }], uneven: false }),
+    );
+    expect(response.results[0].exact).toBe(false);
+  });
+
+  it("prints a pair with the plates on each end and the screws to use", () => {
+    expect(runWith(["load", "dumbbells=40"]).stdout).toBe(
+      [
+        "Dumbbells (pair)  target 40 lb (18.1 kg) each  exact",
+        "",
+        "  exact  40 lb (18.1 kg)",
+        "         each end: 5 5 5 | standard screws",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("prints an uneven dumbbell with each end and marks the heavier end", () => {
+    expect(runWith(["load", "dumbbell=47.5"]).stdout).toBe(
+      [
+        "One dumbbell  target 47.5 lb (21.5 kg)  exact",
+        "",
+        "  exact  47.5 lb (21.5 kg)  uneven",
+        "         end A: 5 5 5 5 (heavier)",
+        "         end B: 5 5 5 2.5",
+        "         standard screws",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("names the long screw's shortest stack as unverified", () => {
+    const output = runWith(["load", "dumbbells=120"]).stdout;
+    expect(output).toContain("each end: 22.5 5 5 5 5 5 5 2.5 | long screws");
+    expect(output).toContain("Unverified: shortest stack on a long locking screw");
+  });
+
+  it("prints the bare handle with no screws", () => {
+    expect(runWith(["load", "dumbbell=5"]).stdout).toContain("each end: no plates | no screws");
+  });
+
+  it("states the limit per dumbbell for a refused target", () => {
+    const output = runWith(["load", "dumbbells=130"]).stdout;
+    expect(output).toContain("Dumbbells (pair)  target 130 lb (59 kg) each  refused");
+    expect(output).toContain("Refused: over the 120 lb limit per dumbbell. Heaviest allowed: 120 lb (54.4 kg).");
+  });
+});
+
 describe("plate-pool load vest=", () => {
   it.each(["12kg", "30lb", "35"])("prints the same JSON as the library's result for vest=%s", (target) => {
     const result = runWith(["load", `vest=${target}`, "--json"]);

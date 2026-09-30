@@ -11,7 +11,8 @@ export interface Environment {
 const usage = `Usage: plate-pool <command> [options]
 
 Commands:
-  load <implement>=<target> ...   Loadings for a target, such as barbell=175 or barbell=80kg
+  load <implement>=<target> ...   Loadings for a target, such as barbell=175 or barbell=80kg.
+                                  dumbbells=<target> is a pair, dumbbell=<target> is one
   inventory                       What the owner has
 
 Options:
@@ -35,6 +36,7 @@ const collarChoices: CollarChoice[] = ["clamp", "spinlock", "none"];
 interface Options {
   json: boolean;
   collars?: CollarChoice;
+  uneven: boolean;
   inventoryPath?: string;
   positional: string[];
 }
@@ -58,7 +60,11 @@ export function run(args: string[], environment: Environment): number {
 
     if (options.positional.length === 0) throw new InputError("Name a target, such as barbell=175.");
     const targets = options.positional.map(parseTarget);
-    const response = load(inventory, { targets, ...(options.collars ? { collars: options.collars } : {}) });
+    const response = load(inventory, {
+      targets,
+      ...(options.collars ? { collars: options.collars } : {}),
+      ...(options.uneven ? {} : { uneven: false }),
+    });
     environment.stdout(options.json ? json(response) : loadText(response, inventory));
     return 0;
   } catch (error) {
@@ -71,7 +77,7 @@ export function run(args: string[], environment: Environment): number {
 }
 
 function parseOptions(args: string[]): Options {
-  const options: Options = { json: false, positional: [] };
+  const options: Options = { json: false, uneven: true, positional: [] };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
     const equals = arg.startsWith("--") ? arg.indexOf("=") : -1;
@@ -82,6 +88,7 @@ function parseOptions(args: string[]): Options {
         options.json = true;
         break;
       case "--no-uneven":
+        options.uneven = false;
         break;
       case "--collars": {
         const choice = value();
@@ -109,7 +116,9 @@ function parseTarget(arg: string) {
   const name = arg.slice(0, separator);
   const implement = implementNames[name];
   if (!implement) throw new InputError(`Unknown implement "${name}". Use barbell, dumbbells, dumbbell, kettlebell, leg or vest.`);
-  return { implement, target: arg.slice(separator + 1) };
+  const target = arg.slice(separator + 1);
+  if (name === "dumbbell") return { implement, target, pair: false };
+  return { implement, target };
 }
 
 function readInventoryFile(path: string): Inventory {

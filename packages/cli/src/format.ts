@@ -15,6 +15,11 @@ const hardwareLabels: Record<string, string> = {
   "screw-long": "long screw",
 };
 
+const positionLabels: Record<string, string> = {
+  "end-a": "end A",
+  "end-b": "end B",
+};
+
 export function loadText(response: LoadResponse, inventory: Inventory): string {
   return response.results.map((result) => resultText(result, inventory)).join("\n");
 }
@@ -22,10 +27,11 @@ export function loadText(response: LoadResponse, inventory: Inventory): string {
 function resultText(result: LoadResult, inventory: Inventory): string {
   const unit = inventory.implements.find((implement) => implement.id === result.implement)?.unit ?? "lb";
   const status = result.exact ? "exact" : result.refused ? "refused" : result.below || result.above ? "no exact loading" : "no loading";
-  const lines = [`${implementLabels[result.implement] ?? result.implement}  target ${describeWeight(result.target, unit)}  ${status}`, ""];
+  const each = result.pair ? " each" : "";
+  const lines = [`${resultLabel(result)}  target ${describeWeight(result.target, unit)}${each}  ${status}`, ""];
 
   const option = (label: string, loading: Loading, recommended: boolean) => {
-    lines.push(`${recommended ? "*" : " "} ${label}  ${describeWeight(loading.total, unit)}`);
+    lines.push(`${recommended ? "*" : " "} ${label}  ${describeWeight(loading.total, unit)}${loading.uneven ? "  uneven" : ""}`);
     const indent = " ".repeat(label.length + 4);
     for (const line of positionLines(result.implement, loading)) lines.push(`${indent}${line}`);
   };
@@ -42,11 +48,18 @@ function resultText(result: LoadResult, inventory: Inventory): string {
   return `${lines.join("\n")}\n`;
 }
 
+function resultLabel(result: LoadResult): string {
+  if (result.implement === "dumbbell") return result.pair === false ? "One dumbbell" : "Dumbbells (pair)";
+  return implementLabels[result.implement] ?? result.implement;
+}
+
 function positionLines(implement: string, loading: Loading): string[] {
   const hardware =
     loading.hardware.length === 0
-      ? "no collars"
-      : loading.hardware.map((item) => hardwareLabels[item.id] ?? item.id).join(", ");
+      ? implement === "dumbbell"
+        ? "no screws"
+        : "no collars"
+      : loading.hardware.map((item) => `${hardwareLabels[item.id] ?? item.id}${implement === "dumbbell" ? "s" : ""}`).join(", ");
   const [first] = loading.positions;
   const plates = (list: number[]) => (list.length === 0 ? "no plates" : list.join(" "));
   if (implement === "barbell" && first) return [`each side: ${plates(first.plates)} | ${hardware}`];
@@ -56,7 +69,14 @@ function positionLines(implement: string, loading: Loading): string[] {
     return [`${first.name}: ${plates(first.plates)} | ${screw}`];
   }
   if (implement === "leg" && first) return [`${first.name}: ${plates(first.plates)}`];
-  return [...loading.positions.map((position) => `${position.name}: ${plates(position.plates)}`), hardware];
+  if (implement === "dumbbell" && first && !loading.uneven) return [`each end: ${plates(first.plates)} | ${hardware}`];
+  return [
+    ...loading.positions.map((position) => {
+      const heavier = position.name === loading.heavier ? " (heavier)" : "";
+      return `${positionLabels[position.name] ?? position.name}: ${plates(position.plates)}${heavier}`;
+    }),
+    hardware,
+  ];
 }
 
 function blocks(count: number): string {
@@ -72,6 +92,7 @@ function unverifiedLabels(keys: string[], inventory: Inventory): string[] {
       return id === "vest" ? "empty vest weight" : `${(implementLabels[id] ?? id).toLowerCase()} weight`;
     }
     const hardware = inventory.hardware.find((item) => item.id === id);
+    if (hardware && field === "minStackIn") return `shortest stack on a ${hardware.name.toLowerCase()}`;
     if (hardware?.kind === "collar") return "collar weight";
     if (hardware) return `${hardware.name.toLowerCase()} weight`;
     const plate = inventory.plates.find((item) => item.id === id);
