@@ -1,4 +1,4 @@
-import type { Display, Inventory, Loading, LoadResponse, LoadResult, Unit, Value } from "@plate-pool/core";
+import { describeWeight, type Inventory, type Loading, type LoadResponse, type LoadResult, type Unit, type Value } from "@plate-pool/core";
 
 const implementLabels: Record<string, string> = {
   barbell: "Barbell",
@@ -20,10 +20,10 @@ export function loadText(response: LoadResponse, inventory: Inventory): string {
 function resultText(result: LoadResult, inventory: Inventory): string {
   const unit = inventory.implements.find((implement) => implement.id === result.implement)?.unit ?? "lb";
   const status = result.exact ? "exact" : result.refused ? "refused" : result.below || result.above ? "no exact loading" : "no loading";
-  const lines = [`${implementLabels[result.implement] ?? result.implement}  target ${weight(result.target, unit)}  ${status}`, ""];
+  const lines = [`${implementLabels[result.implement] ?? result.implement}  target ${describeWeight(result.target, unit)}  ${status}`, ""];
 
   const option = (label: string, loading: Loading, recommended: boolean) => {
-    lines.push(`${recommended ? "*" : " "} ${label}  ${weight(loading.total, unit)}`);
+    lines.push(`${recommended ? "*" : " "} ${label}  ${describeWeight(loading.total, unit)}`);
     const indent = " ".repeat(label.length + 4);
     for (const line of positionLines(result.implement, loading)) lines.push(`${indent}${line}`);
   };
@@ -64,14 +64,9 @@ function unverifiedLabels(keys: string[], inventory: Inventory): string[] {
   return [...new Set(keys.map(label))];
 }
 
-function weight(value: Display, unit: Unit): string {
-  const other: Unit = unit === "lb" ? "kg" : "lb";
-  return `${value[unit]} ${unit} (${value[other]} ${other})`;
-}
-
 export function inventoryText(inventory: Inventory): string {
   const unitOf = (type: string) => inventory.plateTypes.find((plateType) => plateType.id === type)?.unit ?? "lb";
-  const rows: [string, string[][]][] = [
+  const rows: [heading: string, items: [name: string, count: string, detail: string][]][] = [
     [
       "Plates",
       inventory.plates.map((plate) => [
@@ -98,12 +93,12 @@ export function inventoryText(inventory: Inventory): string {
     ],
   ];
 
-  const nameWidth = Math.max(...rows.flatMap(([, list]) => list.map(([name]) => name!.length)));
-  const countWidth = Math.max(...rows.flatMap(([, list]) => list.map(([, count]) => count!.length)));
+  const nameWidth = Math.max(...rows.flatMap(([, list]) => list.map(([name]) => name.length)));
+  const countWidth = Math.max(...rows.flatMap(([, list]) => list.map(([, count]) => count.length)));
   return rows
     .map(
       ([heading, list]) =>
-        `${heading}\n${list.map(([name, count, detail]) => `  ${name!.padEnd(nameWidth)}  ${count!.padEnd(countWidth)}  ${detail}\n`).join("")}`,
+        `${heading}\n${list.map(([name, count, detail]) => `  ${name.padEnd(nameWidth)}  ${count.padEnd(countWidth)}  ${detail}\n`).join("")}`,
     )
     .join("\n");
 }

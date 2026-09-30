@@ -42,6 +42,21 @@ describe("plate-pool load", () => {
     expect(JSON.parse(result.stdout)).toEqual(load(inventory, { targets: [{ implement: "barbell", target: "175" }] }));
   });
 
+  it("orders each result's fields as the JSON example in spec section 9 does", () => {
+    const [result] = JSON.parse(runWith(["load", "barbell=175", "--json"]).stdout).results;
+    expect(Object.keys(result)).toEqual([
+      "implement",
+      "target",
+      "exact",
+      "recommended",
+      "below",
+      "above",
+      "alternatives",
+      "warnings",
+      "unverified",
+    ]);
+  });
+
   it("prints text in the layout of spec section 9 when no loading is exact", () => {
     const result = runWith(["load", "barbell=175"]);
     expect(result.code).toBe(0);

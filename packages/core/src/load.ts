@@ -88,20 +88,10 @@ function loadBarbell(inventory: Inventory, implement: Implement, targetText: str
     thousandths(used(implement.base)) +
     (collar ? collarsNeeded * convert(thousandths(used(collar.weight)), collar.unit, implement.unit) : 0);
 
-  const result: LoadResult = {
-    implement: implement.id,
-    target: display(targetMilli, implement.unit),
-    exact: false,
-    alternatives: [],
-    warnings: [],
-    unverified: [],
-  };
-
+  const warnings: string[] = [];
   const enoughCollars = !collar || collar.count >= collarsNeeded;
   if (collar && !enoughCollars) {
-    result.warnings.push(
-      `The plate pool holds ${collar.count} ${collar.name}. The ${implement.name.toLowerCase()} needs ${collarsNeeded}.`,
-    );
+    warnings.push(`The plate pool holds ${collar.count} ${collar.name}. The ${implement.name.toLowerCase()} needs ${collarsNeeded}.`);
   }
   const candidates = enoughCollars ? candidatesFor(inventory, implement, collar, baseMilli) : [];
 
@@ -118,23 +108,17 @@ function loadBarbell(inventory: Inventory, implement: Implement, targetText: str
   const recommended =
     exact ?? (below && (!above || targetMilli - below.total <= above.total - targetMilli) ? below : above);
 
-  if (exact) {
-    result.exact = true;
-    result.loading = toLoading(exact);
-  }
-  if (below) result.below = toLoading(below);
-  if (above) result.above = toLoading(above);
-  if (!exact && recommended) result.recommended = recommended === below ? "below" : "above";
-
-  if (implement.maxPlateWeight !== undefined && targetMilli - baseMilli > thousandths(implement.maxPlateWeight)) {
-    const limit = display(thousandths(implement.maxPlateWeight), implement.unit);
-    result.refused = { limit };
-    const heaviest = result.below ? ` Heaviest allowed: ${describeWeight(result.below.total, implement.unit)}.` : "";
-    result.warnings.push(`Refused: over the ${limit[implement.unit]} ${implement.unit} plate limit.${heaviest}`);
+  const refused =
+    implement.maxPlateWeight !== undefined && targetMilli - baseMilli > thousandths(implement.maxPlateWeight)
+      ? { limit: display(thousandths(implement.maxPlateWeight), implement.unit) }
+      : undefined;
+  if (refused) {
+    const heaviest = below ? ` Heaviest allowed: ${describeWeight(toLoading(below).total, implement.unit)}.` : "";
+    warnings.push(`Refused: over the ${refused.limit[implement.unit]} ${implement.unit} plate limit.${heaviest}`);
   }
 
   const shown = [exact, below, above].filter((candidate) => candidate !== undefined);
-  result.unverified = [
+  const unverified = [
     ...(implement.base.status === "unverified" ? [`${implement.id}.base`] : []),
     ...(collar?.weight.status === "unverified" ? [`${collar.id}.weight`] : []),
     ...inventory.plates
@@ -142,6 +126,20 @@ function loadBarbell(inventory: Inventory, implement: Implement, targetText: str
       .filter((plate) => shown.some((candidate) => candidate.plates.some(({ option }) => option.plate === plate)))
       .map((plate) => `${plate.id}.weight`),
   ];
+
+  const result: LoadResult = {
+    implement: implement.id,
+    target: display(targetMilli, implement.unit),
+    exact: exact !== undefined,
+    ...(refused ? { refused } : {}),
+    ...(!exact && recommended ? { recommended: recommended === below ? ("below" as const) : ("above" as const) } : {}),
+    ...(exact ? { loading: toLoading(exact) } : {}),
+    ...(below ? { below: toLoading(below) } : {}),
+    ...(above ? { above: toLoading(above) } : {}),
+    alternatives: [],
+    warnings,
+    unverified,
+  };
 
   const positions = implement.positions.length;
   return {
