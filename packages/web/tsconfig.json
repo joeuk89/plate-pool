@@ -12,5 +12,5 @@
       "@plate-pool/core": ["../core/src/index.ts"]
     }
   },
-  "include": ["src", "test", "vite.config.ts"]
+  "include": ["src", "test", "vite.config.ts", "sw/plugin.ts"]
 }
