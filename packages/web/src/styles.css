@@ -300,6 +300,15 @@ ul {
   color: var(--muted);
 }
 
+.details .heavier {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.recommended .details .heavier {
+  color: var(--on-signal);
+}
+
 .details dd {
   font: 600 1.375rem/1.2 var(--display);
 }

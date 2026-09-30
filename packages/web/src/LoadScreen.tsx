@@ -1,14 +1,31 @@
-import { describeWeight, load, RequestError, type CollarChoice, type Display, type Loading, type LoadResult, type Unit } from "@plate-pool/core";
+import {
+  describeWeight,
+  load,
+  RequestError,
+  type CollarChoice,
+  type Display,
+  type Loading,
+  type LoadRequest,
+  type LoadResult,
+  type Unit,
+} from "@plate-pool/core";
 import { useId, useState } from "react";
 import { OtherWays } from "./OtherWays";
 import { Segmented } from "./Segmented";
-import { blockList, hardwareList, plateList, unverifiedList } from "./describe";
+import { blockList, endLabel, hardwareList, plateList, unevenNote, unverifiedList } from "./describe";
 import { inventory } from "./inventory";
 
 const collarOptions: { value: CollarChoice; label: string }[] = [
   { value: "clamp", label: "Clamp" },
   { value: "spinlock", label: "Spin-lock" },
   { value: "none", label: "None" },
+];
+
+type DumbbellChoice = "pair" | "one";
+
+const dumbbellOptions: { value: DumbbellChoice; label: string }[] = [
+  { value: "pair", label: "Pair" },
+  { value: "one", label: "One" },
 ];
 
 const unitOptions: { value: Unit; label: string }[] = [
@@ -18,11 +35,15 @@ const unitOptions: { value: Unit; label: string }[] = [
 
 type Outcome = { result: LoadResult } | { error: string } | undefined;
 
-function calculate(implement: string, target: string, unit: Unit, collars: CollarChoice): Outcome {
+function calculate(implement: string, target: string, unit: Unit, collars: CollarChoice, dumbbells: DumbbellChoice): Outcome {
   if (target.trim() === "") return undefined;
   const withUnit = /[a-z]/i.test(target) ? target : `${target.trim()}${unit}`;
+  const request: LoadRequest =
+    implement === "dumbbell"
+      ? { targets: [{ implement, target: withUnit, pair: dumbbells === "pair" }] }
+      : { targets: [{ implement, target: withUnit }], collars };
   try {
-    const [result] = load(inventory, { targets: [{ implement, target: withUnit }], collars }).results;
+    const [result] = load(inventory, request).results;
     return result && { result };
   } catch (error) {
     if (error instanceof RequestError) return { error: error.message.replace(withUnit, target.trim()) };
@@ -38,9 +59,10 @@ export function LoadScreen({ implement }: { implement: string }) {
   const [target, setTarget] = useState("");
   const [unit, setUnit] = useState<Unit>(unitOf(implement));
   const [collars, setCollars] = useState<CollarChoice>("clamp");
+  const [dumbbells, setDumbbells] = useState<DumbbellChoice>("pair");
   const targetId = useId();
 
-  const outcome = calculate(implement, target, unit, collars);
+  const outcome = calculate(implement, target, unit, collars, dumbbells);
 
   return (
     <div className="load">
@@ -63,6 +85,9 @@ export function LoadScreen({ implement }: { implement: string }) {
           <Segmented label="Unit" showLabel={false} options={unitOptions} value={unit} onChange={setUnit} className="unit" />
         </div>
         {implement === "barbell" && <Segmented label="Collars" options={collarOptions} value={collars} onChange={setCollars} />}
+        {implement === "dumbbell" && (
+          <Segmented label="Dumbbells" options={dumbbellOptions} value={dumbbells} onChange={setDumbbells} />
+        )}
       </div>
       <section aria-label="Result" aria-live="polite" className="result">
         {outcome && "result" in outcome && <ResultView result={outcome.result} />}
@@ -87,7 +112,7 @@ function Loadings({ result }: { result: LoadResult }) {
   if (result.loading) {
     return (
       <div className="choices single">
-        <LoadingView heading="Exact" implement={result.implement} loading={result.loading} unit={unit} />
+        <LoadingView heading="Exact" result={result} loading={result.loading} unit={unit} />
       </div>
     );
   }
@@ -96,7 +121,7 @@ function Loadings({ result }: { result: LoadResult }) {
       <>
         <p className="status">{refusal(result)}</p>
         <div className="choices single">
-          {result.below && <LoadingView heading="Heaviest allowed" implement={result.implement} loading={result.below} unit={unit} />}
+          {result.below && <LoadingView heading="Heaviest allowed" result={result} loading={result.below} unit={unit} />}
         </div>
       </>
     );
@@ -106,10 +131,10 @@ function Loadings({ result }: { result: LoadResult }) {
       <p className="status">{`No exact loading for ${describeWeight(result.target, unit)}`}</p>
       <div className={result.below && result.above ? "choices" : "choices single"}>
         {result.below && (
-          <LoadingView heading="Below" implement={result.implement} loading={result.below} unit={unit} recommended={result.recommended === "below"} />
+          <LoadingView heading="Below" result={result} loading={result.below} unit={unit} recommended={result.recommended === "below"} />
         )}
         {result.above && (
-          <LoadingView heading="Above" implement={result.implement} loading={result.above} unit={unit} recommended={result.recommended === "above"} />
+          <LoadingView heading="Above" result={result} loading={result.above} unit={unit} recommended={result.recommended === "above"} />
         )}
       </div>
     </>
@@ -123,13 +148,13 @@ function refusal(result: LoadResult): string {
 
 interface LoadingViewProps {
   heading: string;
-  implement: string;
+  result: LoadResult;
   loading: Loading;
   unit: Unit;
   recommended?: boolean;
 }
 
-function LoadingView({ heading, implement, loading, unit, recommended = false }: LoadingViewProps) {
+function LoadingView({ heading, result, loading, unit, recommended = false }: LoadingViewProps) {
   const headingId = useId();
   return (
     <article aria-labelledby={headingId} className={recommended ? "loading recommended" : "loading"}>
@@ -139,12 +164,16 @@ function LoadingView({ heading, implement, loading, unit, recommended = false }:
       </header>
       <Total weight={loading.total} unit={unit} />
       <dl className="details">
-        {details(implement, loading).map(([term, description]) => (
-          <div key={term}>
-            <dt>{term}</dt>
-            <dd>{description}</dd>
-          </div>
-        ))}
+        {result.implement === "dumbbell" ? (
+          <DumbbellDetails pair={result.pair !== false} loading={loading} />
+        ) : (
+          details(result.implement, loading).map(([term, description]) => (
+            <div key={term}>
+              <dt>{term}</dt>
+              <dd>{description}</dd>
+            </div>
+          ))
+        )}
       </dl>
     </article>
   );
@@ -175,6 +204,34 @@ function details(implement: string, loading: Loading): [term: string, descriptio
   }
 }
 
+function DumbbellDetails({ pair, loading }: { pair: boolean; loading: Loading }) {
+  const [first] = loading.positions;
+  return (
+    <>
+      {loading.uneven ? (
+        loading.positions.map((position) => (
+          <div key={position.name}>
+            <dt>
+              {endLabel(position.name)}
+              {position.name === loading.heavier && <span className="heavier"> heavier</span>}
+            </dt>
+            <dd>{plateList(position.plates)}</dd>
+          </div>
+        ))
+      ) : (
+        <div>
+          <dt>Each end</dt>
+          <dd>{plateList(first?.plates ?? [])}</dd>
+        </div>
+      )}
+      <div>
+        <dt>{pair ? "Screws per dumbbell" : "Screws"}</dt>
+        <dd>{hardwareList(loading, inventory)}</dd>
+      </div>
+    </>
+  );
+}
+
 function Total({ weight, unit }: { weight: Display; unit: Unit }) {
   const [first, second]: [Unit, Unit] = unit === "kg" ? ["kg", "lb"] : ["lb", "kg"];
   return (
@@ -191,7 +248,12 @@ function Total({ weight, unit }: { weight: Display; unit: Unit }) {
 
 function Notes({ result }: { result: LoadResult }) {
   const warnings = result.refused ? result.warnings.filter((warning) => !warning.startsWith("Refused:")) : result.warnings;
-  const notes = [...warnings];
+  const uneven = [
+    { label: "Uneven", loading: result.loading },
+    { label: "Below is uneven", loading: result.below },
+    { label: "Above is uneven", loading: result.above },
+  ].flatMap(({ label, loading }) => (loading?.uneven ? [unevenNote(label, loading)] : []));
+  const notes = [...uneven, ...warnings];
   if (result.unverified.length > 0) notes.push(`Unverified: ${unverifiedList(result.unverified, inventory)}`);
   if (notes.length === 0) return null;
   return (

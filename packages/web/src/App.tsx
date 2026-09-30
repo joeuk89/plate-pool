@@ -3,6 +3,7 @@ import { LoadScreen } from "./LoadScreen";
 
 const implementTabs = [
   { id: "barbell", label: "Barbell" },
+  { id: "dumbbell", label: "Dumbbells" },
   { id: "kettlebell", label: "Kettlebell" },
   { id: "leg", label: "Leg attachment" },
   { id: "vest", label: "Vest" },
