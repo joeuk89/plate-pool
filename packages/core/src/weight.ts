@@ -45,10 +45,10 @@ function round(amount: number, decimals: number): number {
 
 const weightPattern = /^\s*(\d+(?:\.\d+)?|\.\d+)\s*(lb|kg)?\s*$/i;
 
-export function parseWeight(text: string, defaultUnit: Unit): Quantity {
+export function parseWeight(text: string, defaultUnit: Unit, { allowZero = false } = {}): Quantity {
   const match = weightPattern.exec(text);
   const amount = Number(match?.[1]);
-  if (!match || !(amount > 0)) {
+  if (!match || !(amount > 0 || (allowZero && amount === 0))) {
     throw new RequestError(`"${text}" is not a weight. Use a positive number with an optional unit, such as 175, 175lb or 80kg.`);
   }
   const unit = (match[2]?.toLowerCase() as Unit | undefined) ?? defaultUnit;
