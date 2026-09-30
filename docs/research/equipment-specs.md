@@ -148,7 +148,7 @@ Arithmetic, using manufacturer lengths and a 6.5" grip:
 **Locking hardware**
 
 - 2 spin-lock collars. These are threaded collars, not Quick-Lock screws. VERIFIED ([US-BAR], [UK-BAR], [EU-BAR]).
-- Collar weight: UNKNOWN.
+- Collar weight: 433 g (0.95 lb) each, weighed by the owner on a kitchen scale. The app counts 1 lb. OWNER. Ironmaster's US, UK and EU pages state no collar weight; the EZ Curl Bar page says only that the collars "are weighted to easily screw on and off".
 - Collar thickness: UNKNOWN.
 
 **Bar weight**
@@ -158,8 +158,9 @@ Arithmetic, using manufacturer lengths and a 6.5" grip:
 | "about 18 lbs" (8 kg) | VERIFIED | [US-BAR], [UK-BAR], [EU-BAR] |
 | "21 lb bar" | VERIFIED, older | 2016 catalogue, [CAT-2016] |
 | 17 lb, weighed by a customer | SECONDARY | [WB-BAR-2024] |
+| 17.7 lb, collars off, weighed by the owner | OWNER | The owner's scale |
 
-No source says whether any figure includes the two collars. UNKNOWN.
+No source says whether any figure includes the two collars. The owner weighed the bar at 17.7 lb with its collars off, so Ironmaster's "about 18 lb" is the bare bar. The app counts 18 lb. OWNER.
 
 **Capacity**
 
@@ -419,7 +420,7 @@ Mirafit facts come from Wayback Machine copies of Mirafit's page. The Amazon UK 
 
 **Weight**
 
-- Weight of one collar: UNKNOWN. Weight of one pair: UNKNOWN.
+- Weight of one collar: not weighed. The owner judges the nylon collar to weigh next to nothing, so the app counts it as 0 lb. OWNER.
 - Mirafit's page states no weight, in the 2022 and 2025 copies ([MF-COLLAR-2025], [MF-COLLAR-2022]).
 - The Amazon UK listing shows no item weight and no package weight ([AMZ-COLLAR]). The listing is "currently unavailable", and the Wayback Machine holds no copy of it.
 - No other retailer listing found gives a weight.
@@ -525,11 +526,11 @@ All DERIVED from the counts above.
 
 ## 4. Open questions
 
-Each line names the check that settles it. The owner has no scales for now, so the weighing checks must wait.
+Each line names the check that settles it. The owner has a kitchen scale, which settles the small parts. The bar needs a bathroom scale.
 
 | # | Question | Why it matters | Check |
 | --- | --- | --- | --- |
-| 1 | Does the Straight Bar's 18 lb include the two collars? Sources give 17, 18 and 21 lb. | Every barbell total depends on it. | Weigh the bar alone, then one collar. |
+| 1 | Does the Straight Bar's 18 lb include the two collars? Sources give 17, 18 and 21 lb. | Every barbell total depends on it. | Settled: the bar alone weighs 17.7 lb and one spin-lock collar 433 g (OWNER). The app counts 18 lb and 1 lb. |
 | 2 | How thick is a spin-lock collar, and how much of the 11.5" end can hold plates? | Sets plates per end. | Measure a collar. Thread it on fully and measure the free length. |
 | 3 | What produces the 210 lb plate rating? | Decides whether the app caps by weight, by length or both. | Load 2 × 22.5 lb + 12 × 5 lb on one end and check the collar threads on fully. |
 | 4 | What does a long locking screw weigh? Sources say "about 3 lb" and 1.5 kg. | True weight differs from nominal by about 0.5 lb per screw. | Weigh one long screw and one standard screw. |

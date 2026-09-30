@@ -84,8 +84,8 @@ Stack length is how much a plate adds to a stack. Ironmaster publishes no thickn
 | --- | --- | --- | --- | --- |
 | Standard locking screw | 4 | 2.5 lb | Up to 3.25 in of plates (six 5 lb + one 2.5 lb) | Verified |
 | Long locking screw | 5 | 2.5 lb | Up to 5.125 in of plates (one 22.5 lb + six 5 lb + one 2.5 lb) | Listed weight verified. Real weight is about 3 lb |
-| Ironmaster spin-lock collar | 2 | 0 lb | n/a | Unverified |
-| Mirafit 1" clamp collar | 4 | 0 lb | n/a. 1.26 in wide | Unverified |
+| Ironmaster spin-lock collar | 2 | 1 lb | n/a | Owner: weighed at 433 g, counted as 1 lb |
+| Mirafit 1" clamp collar | 4 | 0 lb | n/a. 1.26 in wide | Owner: nylon, weighs next to nothing |
 
 Ironmaster counts the long screw as 2.5 lb, and so does the app. A dumbbell listed at 120 lb weighs about 121 lb.
 
@@ -101,7 +101,7 @@ Ironmaster counts the long screw as 2.5 lb, and so does the app. A dumbbell list
 
 Notes:
 
-- **Straight bar.** Ironmaster states "about 18 lb" and does not say whether that includes collars. The app uses 18 lb for the bar and adds the collar weight, which is 0 lb until known. Status: unverified. Each side has 11.5 in for plates and the collar.
+- **Straight bar.** Ironmaster states "about 18 lb". The owner weighed it at 17.7 lb with its collars off and counts it as 18 lb. The app adds the collar weight: 2 lb for two spin-lock collars, 0 lb for two clamp collars. Status: owner. Each side has 11.5 in for plates and the collar.
 - **Bare handles.** A dumbbell with no screws and no plates weighs 5 lb. A kettlebell with no screw and no plates weighs 22.5 lb. Both are valid loadings.
 - **Leg attachment.** Its lever weight is not published. The app reports plate weight only.
 - **Vest.** The empty vest's weight is not published. It counts as 0 kg. Status: unverified.
@@ -257,7 +257,7 @@ Reverse takes a loading and returns its total. It also checks the loading agains
 
 ## 7. Worked examples
 
-These use the inventory in section 4 with both collar types at 0 lb. They are acceptance tests for the library.
+These use the inventory in section 4 with the default clamp collars, which weigh 0 lb. They are acceptance tests for the library.
 
 | # | Request | Result |
 | --- | --- | --- |
@@ -404,8 +404,6 @@ Barbell  target 175 lb (79.4 kg)  no exact loading
          each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar
 * above  175.5 lb (79.6 kg)
          each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | clamp collar
-
-Unverified: bar weight, collar weight
 ```
 
 JSON output example:
@@ -438,7 +436,7 @@ JSON output example:
       },
       "alternatives": [],
       "warnings": [],
-      "unverified": ["barbell.base", "collar-clamp.weight"]
+      "unverified": []
     }
   ],
   "leftover": {
@@ -468,7 +466,7 @@ The repo holds `docs/agent-guide.md`. It covers:
 - What plate-pool answers, in three lines.
 - Each command with one example, and the JSON shape of its output.
 - The static JSON URLs.
-- The rules an agent must know: a target is a total; barbell totals are 18 lb plus a multiple of 2.5; implements share one pool; a request's order is its priority.
+- The rules an agent must know: a target is a total; barbell totals are 18 lb plus a multiple of 2.5 with clamp collars, and 20 lb plus a multiple of 2.5 with spin-lock collars; implements share one pool; a request's order is its priority.
 - A snippet to paste into another repo's agent instructions.
 
 ## 12. Build
@@ -529,8 +527,6 @@ None of these block the build. Each is one value in the inventory file.
 
 | Item | Value used now | Settled by |
 | --- | --- | --- |
-| Bar's real weight, and whether 18 lb includes collars | 18 lb, collars extra | Bathroom scale: weigh yourself holding the bar, subtract your bodyweight |
-| Weight of each collar type | 0 lb | Kitchen scale |
 | Long screw's real weight | 2.5 lb (Ironmaster's convention) | Kitchen scale |
 | Empty vest weight, and block count | 0 kg, 30 blocks | Bathroom scale, and counting |
 | Do 2 × 22.5 + 12 × 5 lb fit on one bar side with the collar on | Allowed. Calculated to fit with a clamp collar, 0.49 in spare | Loading it once |

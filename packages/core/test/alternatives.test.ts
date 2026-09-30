@@ -56,7 +56,7 @@ describe("other ways to make this (spec 6.3)", () => {
   });
 
   it("uses the collars asked for", () => {
-    const result = loadBarbell("88", { collars: "spinlock" });
+    const result = loadBarbell("90", { collars: "spinlock" });
     expect(result.alternatives.map((loading) => loading.hardware)).toEqual([
       [{ id: "collar-spinlock", count: 2 }],
       [{ id: "collar-spinlock", count: 2 }],

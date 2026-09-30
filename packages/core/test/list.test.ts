@@ -64,13 +64,11 @@ describe("List (spec 6.5)", () => {
   });
 
   it("loads the barbell with the chosen collars", () => {
-    const heavyCollars = structuredClone(inventory);
-    heavyCollars.hardware.find((item) => item.id === "collar-spinlock")!.weight.listed = 1;
-    const spinlock = list(heavyCollars, { implement: "barbell", collars: "spinlock", from: "18", to: "23" });
+    const spinlock = list(inventory, { implement: "barbell", collars: "spinlock", from: "18", to: "23" });
     expect(totals(spinlock)).toEqual([20, 22.5]);
     expect(spinlock.rows[0]?.loading.hardware).toEqual([{ id: "collar-spinlock", count: 2 }]);
 
-    const none = list(heavyCollars, { implement: "barbell", collars: "none", from: "18", to: "18" });
+    const none = list(inventory, { implement: "barbell", collars: "none", from: "18", to: "18" });
     expect(none.rows[0]?.loading.hardware).toEqual([]);
   });
 
@@ -93,7 +91,7 @@ describe("List (spec 6.5)", () => {
   });
 
   it("names the unverified values its rows use (spec 6.1)", () => {
-    expect(list(inventory, { implement: "barbell", from: "100", to: "110" }).unverified).toEqual(["barbell.base", "collar-clamp.weight"]);
+    expect(list(inventory, { implement: "barbell", from: "100", to: "110" }).unverified).toEqual([]);
     expect(list(inventory, { implement: "vest", to: "2" }).unverified).toEqual(["vest.base", "vest-block.count"]);
   });
 

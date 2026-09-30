@@ -280,23 +280,21 @@ describe("barbell Load screen: collars", () => {
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Collars 2 × Ironmaster spin-lock collar");
   });
 
-  it("loads with no collars, and drops the collar weight from the unverified values", () => {
+  it("loads with no collars", () => {
     render(<App />);
     typeTarget("173");
     fireEvent.click(within(collars()).getByRole("radio", { name: "None" }));
     const result = text(screen.getByRole("region", { name: "Result" }));
     expect(result).toContain("Collars None");
-    expect(result).toContain("Unverified: bar weight");
-    expect(result).not.toContain("collar weight");
+    expect(result).not.toContain("Unverified");
   });
 });
 
 describe("barbell Load screen: notes", () => {
-  it("names the unverified values under the result", () => {
+  it("names no unverified values, since the owner confirmed the bar and collar weights", () => {
     render(<App />);
     typeTarget("173");
-    const notes = within(screen.getByRole("region", { name: "Result" })).getByRole("list", { name: "Notes" });
-    expect(text(notes)).toBe("Unverified: bar weight, collar weight");
+    expect(text(screen.getByRole("region", { name: "Result" }))).not.toContain("Unverified");
   });
 });
 

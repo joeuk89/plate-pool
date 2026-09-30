@@ -13,7 +13,7 @@ plate-pool knows every plate, piece of locking hardware and implement in one hom
 ## Rules you must know
 
 - **A target is a total.** It includes the base weight: bar, handle, locking screws and collars. Ask for `barbell=173`, not for 155 lb of plates.
-- **Barbell totals are 18 lb plus a multiple of 2.5.** The bar weighs 18 lb and the collars count as 0 lb, so 123 and 125.5 lb exist and 125 lb does not. Both values are unverified. If the owner measures them, the inventory file changes and so do the totals.
+- **Barbell totals are 18 lb plus a multiple of 2.5 with the default clamp collars, and 20 lb plus a multiple of 2.5 with spin-lock collars.** The bar counts as 18 lb, a clamp collar as 0 lb and a spin-lock collar as 1 lb. With clamps, 123 and 125.5 lb exist and 125 lb does not. With spin-locks, 125 lb exists.
 - **Implements share one plate pool.** Plates on the barbell are not free for the dumbbells. Put every implement a workout uses at the same time in one request, so the answer never uses a plate twice.
 - **A request's order is its priority.** The first target gets as close as the plate pool allows. Each later target gets as close as it can without moving an earlier one away from its target. Put the implement that matters most first.
 
@@ -22,7 +22,7 @@ Also:
 - A bare number means pounds, or kilograms for the vest. Add a unit to be explicit: `175lb`, `80kg`, `vest=12kg`.
 - `dumbbells` means a pair. `dumbbell` means one.
 - When no loading reaches a target exactly, the result holds the closest loading `below` and `above`, and `recommended` names the nearer one.
-- Every result lists the `unverified` values it used, such as `barbell.base`. Tell the user when a total depends on one.
+- Every result lists the `unverified` values it used, such as `vest.base`. Tell the user when a total depends on one.
 - Read `warnings`. They say why a target is refused or missed, or which rule a loading breaks.
 
 ## Command-line tool
@@ -76,7 +76,7 @@ npx plate-pool load barbell=175 dumbbells=40 --json
       },
       "alternatives": [],
       "warnings": [],
-      "unverified": ["barbell.base", "collar-clamp.weight"]
+      "unverified": []
     },
     {
       "implement": "dumbbell",
@@ -150,7 +150,7 @@ npx plate-pool list barbell --from 100 --to 105 --json
     }
   ],
   "warnings": [],
-  "unverified": ["barbell.base", "collar-clamp.weight"]
+  "unverified": []
 }
 ```
 
@@ -226,8 +226,8 @@ The output has four lists. This shows the first entry of each:
       "unit": "lb",
       "base": {
         "listed": 18,
-        "status": "unverified",
-        "note": "Ironmaster states about 18 lb and does not say whether that includes collars. Collars are added."
+        "status": "owner",
+        "note": "Ironmaster states about 18 lb. The owner weighed it at 17.7 lb with its collars off and counts it as 18 lb. Collars are added."
       },
       "positions": ["left", "right"],
       "symmetric": true,
@@ -283,7 +283,7 @@ Use plate-pool for any weight on the owner's barbell, dumbbells, kettlebell, leg
 Rules:
 
 - A target is a total, including the bar, handle, screws and collars.
-- Barbell totals are 18 lb plus a multiple of 2.5. There is no 125 lb; the nearest are 123 and 125.5 lb.
+- Barbell totals are 18 lb plus a multiple of 2.5 with the default clamp collars, and 20 lb plus a multiple of 2.5 with spin-lock collars. With clamps there is no 125 lb; the nearest are 123 and 125.5 lb.
 - All implements share one plate pool. Put every implement used at the same time in one `load` request.
 - A request's order is its priority. Put the implement that matters most first.
 - Plan only weights plate-pool says exist. When a result is not exact, use the `recommended` loading.

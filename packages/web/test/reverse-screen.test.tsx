@@ -259,7 +259,8 @@ describe("Reverse screen: rule warnings under the total (spec 6.6)", () => {
   });
 
   it("names the unverified values the total uses", () => {
-    openReverse();
-    expect(text(notes())).toContain("Unverified: bar weight, collar weight");
+    openReverse("Vest");
+    add("Add 1 kg to the front");
+    expect(text(notes())).toBe("Unverified: empty vest weight, vest block count");
   });
 });

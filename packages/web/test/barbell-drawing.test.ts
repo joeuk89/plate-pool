@@ -120,7 +120,7 @@ describe("barbell drawing: collars", () => {
   });
 
   it("names the spin-lock collar", () => {
-    expect(drawBarbell(loadingFor("173", "spinlock"), inventory).collar?.name).toBe("Spin-lock collar");
+    expect(drawBarbell(loadingFor("175", "spinlock"), inventory).collar?.name).toBe("Spin-lock collar");
   });
 
   it("draws no collar when the loading has none", () => {

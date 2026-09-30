@@ -50,7 +50,7 @@ describe("static JSON (spec 10)", () => {
     const ends = achievable().tables.map(({ rows }) => [rows[0]!.total, rows.at(-1)!.total]);
     expect(ends).toEqual([
       [{ lb: 18, kg: 8.2 }, { lb: 228, kg: 103.4 }],
-      [{ lb: 18, kg: 8.2 }, { lb: 228, kg: 103.4 }],
+      [{ lb: 20, kg: 9.1 }, { lb: 230, kg: 104.3 }],
       [{ lb: 18, kg: 8.2 }, { lb: 228, kg: 103.4 }],
       [{ lb: 5, kg: 2.3 }, { lb: 120, kg: 54.4 }],
       [{ lb: 5, kg: 2.3 }, { lb: 120, kg: 54.4 }],
@@ -73,9 +73,9 @@ describe("static JSON (spec 10)", () => {
 
   it("names the unverified values each table uses (spec 13)", () => {
     const [clamp, spinlock, none] = achievable().tables;
-    expect(clamp!.unverified).toEqual(expect.arrayContaining(["barbell.base", "collar-clamp.weight"]));
-    expect(spinlock!.unverified).toEqual(expect.arrayContaining(["barbell.base", "collar-spinlock.weight"]));
-    expect(none!.unverified).toEqual(["barbell.base"]);
+    expect(clamp!.unverified).toEqual([]);
+    expect(spinlock!.unverified).toEqual([]);
+    expect(none!.unverified).toEqual([]);
   });
 });
 

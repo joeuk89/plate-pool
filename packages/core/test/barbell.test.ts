@@ -128,7 +128,7 @@ describe("barbell Load: weights (spec 6.1 rules 2, 3 and 5)", () => {
     const result = loadBarbell("175", { inventory: measuredBar });
     expect(result.exact).toBe(true);
     expect(result.loading?.positions).toEqual(eachSide(22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5));
-    expect(result.unverified).toEqual(["collar-clamp.weight"]);
+    expect(result.unverified).toEqual([]);
   });
 
   it("counts both collars' weight in the total", () => {
@@ -157,19 +157,30 @@ describe("barbell Load: weights (spec 6.1 rules 2, 3 and 5)", () => {
     expect(loadBarbell("18.126", { inventory: measuredBar }).loading?.total).toEqual({ lb: 18.13, kg: 8.2 });
   });
 
-  it.each([
-    ["clamp", ["barbell.base", "collar-clamp.weight"]],
-    ["spinlock", ["barbell.base", "collar-spinlock.weight"]],
-    ["none", ["barbell.base"]],
-  ] as const)("names the unverified values it used with %s collars", (collars, unverified) => {
-    expect(loadBarbell("175", { collars }).unverified).toEqual(unverified);
+  it.each(["clamp", "spinlock", "none"] as const)("names no unverified values with %s collars, since the owner confirmed the bar and collars", (collars) => {
+    expect(loadBarbell("175", { collars }).unverified).toEqual([]);
+  });
+
+  it("names an unverified bar weight", () => {
+    const unverifiedBar = changed((copy) => {
+      byId(copy.implements, "barbell").base = { listed: 18, status: "unverified" };
+    });
+    expect(loadBarbell("175", { inventory: unverifiedBar }).unverified).toEqual(["barbell.base"]);
   });
 });
 
 describe("barbell Load: collars and fit (spec 6.2, 4.3 notes)", () => {
+  it("adds the spin-lock collars, 1 lb each, to the total", () => {
+    const clamp = loadBarbell("173");
+    const spinLock = loadBarbell("175", { collars: "spinlock" });
+    expect(spinLock.exact).toBe(true);
+    expect(spinLock.loading?.positions).toEqual(clamp.loading?.positions);
+    expect(spinLock.loading?.total).toEqual({ lb: 175, kg: 79.4 });
+  });
+
   it("uses clamp collars unless asked otherwise", () => {
     expect(loadBarbell("173").loading?.hardware).toEqual([{ id: "collar-clamp", count: 2 }]);
-    expect(loadBarbell("173", { collars: "spinlock" }).loading?.hardware).toEqual([{ id: "collar-spinlock", count: 2 }]);
+    expect(loadBarbell("175", { collars: "spinlock" }).loading?.hardware).toEqual([{ id: "collar-spinlock", count: 2 }]);
     expect(loadBarbell("173", { collars: "none" }).loading?.hardware).toEqual([]);
   });
 
@@ -182,7 +193,7 @@ describe("barbell Load: collars and fit (spec 6.2, 4.3 notes)", () => {
     expect(clamp.below?.positions).toEqual(eachSide(22.5));
     expect(clamp.above).toBeUndefined();
 
-    const spinLock = loadBarbell("68", { inventory: shortBar, collars: "spinlock" });
+    const spinLock = loadBarbell("70", { inventory: shortBar, collars: "spinlock" });
     expect(spinLock.exact).toBe(true);
     expect(spinLock.loading?.positions).toEqual(eachSide(22.5, 2.5));
   });
@@ -279,7 +290,7 @@ describe("barbell Load: the JSON shape in spec section 9", () => {
           },
           alternatives: [],
           warnings: [],
-          unverified: ["barbell.base", "collar-clamp.weight"],
+          unverified: [],
         },
       ],
       leftover: {

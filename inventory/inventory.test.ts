@@ -122,25 +122,30 @@ describe("locking hardware (spec table 4.2)", () => {
     });
   });
 
-  it("holds 2 Ironmaster spin-lock collars of unverified weight 0 lb", () => {
+  it("holds 2 Ironmaster spin-lock collars the owner counts as 1 lb each", () => {
     expect(byId(inventory.hardware, "collar-spinlock")).toEqual({
       id: "collar-spinlock",
       name: "Ironmaster spin-lock collar",
       kind: "collar",
       count: 2,
       unit: "lb",
-      weight: { listed: 0, status: "unverified" },
+      weight: {
+        listed: 0,
+        measured: 1,
+        status: "owner",
+        note: "Weighed at 433 g (0.95 lb) on a kitchen scale and counted as 1 lb. Ironmaster publishes no collar weight.",
+      },
     });
   });
 
-  it("holds 4 Mirafit clamp collars of unverified weight 0 lb, 1.26 in wide", () => {
+  it("holds 4 Mirafit clamp collars that count as 0 lb, 1.26 in wide", () => {
     expect(byId(inventory.hardware, "collar-clamp")).toEqual({
       id: "collar-clamp",
       name: 'Mirafit 1" clamp collar',
       kind: "collar",
       count: 4,
       unit: "lb",
-      weight: { listed: 0, status: "unverified" },
+      weight: { listed: 0, status: "owner", note: "Nylon. Weighs next to nothing, so it counts as 0." },
       widthIn: 1.26,
     });
   });
@@ -156,7 +161,7 @@ describe("locking hardware (spec table 4.2)", () => {
 });
 
 describe("implements (spec table 4.3)", () => {
-  it("holds the straight bar: 18 lb unverified, collars extra, 2 sides of 11.5 in, 210 lb of plates", () => {
+  it("holds the straight bar: 18 lb confirmed by the owner, collars extra, 2 sides of 11.5 in, 210 lb of plates", () => {
     expect(byId(inventory.implements, "barbell")).toEqual({
       id: "barbell",
       name: "Straight bar",
@@ -164,8 +169,8 @@ describe("implements (spec table 4.3)", () => {
       unit: "lb",
       base: {
         listed: 18,
-        status: "unverified",
-        note: "Ironmaster states about 18 lb and does not say whether that includes collars. Collars are added.",
+        status: "owner",
+        note: "Ironmaster states about 18 lb. The owner weighed it at 17.7 lb with its collars off and counts it as 18 lb. Collars are added.",
       },
       positions: ["left", "right"],
       symmetric: true,

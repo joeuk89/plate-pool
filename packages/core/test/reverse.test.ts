@@ -22,7 +22,7 @@ describe("Reverse: worked examples (spec section 7)", () => {
       uneven: false,
       warnings: [],
       notes: [],
-      unverified: ["barbell.base", "collar-clamp.weight"],
+      unverified: [],
     });
   });
 

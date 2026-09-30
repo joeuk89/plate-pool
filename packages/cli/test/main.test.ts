@@ -78,8 +78,6 @@ describe("plate-pool load", () => {
         "* above  175.5 lb (79.6 kg)",
         "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | clamp collar",
         "",
-        "Unverified: bar weight, collar weight",
-        "",
       ].join("\n"),
     );
   });
@@ -91,8 +89,6 @@ describe("plate-pool load", () => {
         "",
         "  exact  173 lb (78.5 kg)",
         "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
-        "",
-        "Unverified: bar weight, collar weight",
         "",
       ].join("\n"),
     );
@@ -109,7 +105,6 @@ describe("plate-pool load", () => {
         "         each side: 22.5 22.5 5 5 5 5 5 5 5 5 5 5 5 5 | clamp collar",
         "",
         "Refused: over the 210 lb plate limit. Heaviest allowed: 228 lb (103.4 kg).",
-        "Unverified: bar weight, collar weight",
         "",
       ].join("\n"),
     );
@@ -140,7 +135,7 @@ describe("plate-pool load", () => {
     const result = runWith(["load", "barbell=175", "--inventory", path]);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("Barbell  target 175 lb (79.4 kg)  exact");
-    expect(result.stdout).toContain("Unverified: collar weight");
+    expect(result.stdout).not.toContain("Unverified:");
   });
 
   it.each([
@@ -387,8 +382,6 @@ describe("plate-pool load with several targets", () => {
         "  exact  173 lb (78.5 kg)",
         "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
         "",
-        "Unverified: bar weight, collar weight",
-        "",
         "Dumbbells (pair)  target 40 lb (18.1 kg) each  exact",
         "",
         "  exact  40 lb (18.1 kg)",
@@ -444,8 +437,6 @@ describe("plate-pool reverse", () => {
         "Barbell  total 173 lb (78.5 kg)",
         "",
         "  each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
-        "",
-        "Unverified: bar weight, collar weight",
         "",
       ].join("\n"),
     );
@@ -597,8 +588,6 @@ describe("plate-pool list", () => {
         "  175.5 lb (79.6 kg)  micro",
         "      each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | clamp collar",
         "",
-        "Unverified: bar weight, collar weight",
-        "",
       ].join("\n"),
     );
   });
@@ -657,8 +646,9 @@ describe("plate-pool inventory", () => {
     expect(result.stdout).toMatch(/22\.5 lb +× 5 +22\.5 lb each\n/);
     expect(result.stdout).toMatch(/Micro +× 4 +1\.25 lb each\n/);
     expect(result.stdout).toMatch(/Vest block +× 30 +1 kg each, count unverified\n/);
-    expect(result.stdout).toMatch(/Mirafit 1" clamp collar +× 4 +0 lb each, weight unverified\n/);
-    expect(result.stdout).toMatch(/Straight bar +× 1 +base 18 lb, unverified\n/);
+    expect(result.stdout).toMatch(/Ironmaster spin-lock collar +× 2 +1 lb each, measured\n/);
+    expect(result.stdout).toMatch(/Mirafit 1" clamp collar +× 4 +0 lb each\n/);
+    expect(result.stdout).toMatch(/Straight bar +× 1 +base 18 lb\n/);
   });
 
   it("marks a measured weight", () => {
