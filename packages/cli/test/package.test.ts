@@ -46,6 +46,12 @@ describe("the packed plate-pool package, installed in an empty directory", () =>
     expect(manifest.private).not.toBe(true);
   });
 
+  it("carries the MIT licence", () => {
+    const packageRoot = join(installDirectory, "node_modules", "plate-pool");
+    expect(JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")).license).toBe("MIT");
+    expect(readFileSync(join(packageRoot, "LICENSE"), "utf8")).toMatch(/^MIT License/);
+  });
+
   it("runs inventory with the owner's inventory file bundled", () => {
     expect(platePool("inventory")).toEqual(inventory);
   });

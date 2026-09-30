@@ -2,6 +2,7 @@
   "name": "plate-pool",
   "version": "1.0.0",
   "description": "Plate loading calculator for one home gym",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/joeuk89/plate-pool.git",
