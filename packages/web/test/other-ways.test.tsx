@@ -66,6 +66,21 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
     ]);
   });
 
+  it("lists the kettlebell's and the leg attachment's other stacks", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
+    typeTarget("50");
+    expect(within(otherWays()!).getAllByRole("listitem").map(text)).toEqual([
+      "Stack 5 × 5",
+      "Stack 4 × 5, 2 × 2.5",
+      "Stack 3 × 5, 4 × 2.5",
+    ]);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Leg attachment" }));
+    typeTarget("30");
+    expect(text(otherWays()!.querySelector("summary")!)).toBe("Other ways to make this (4)");
+  });
+
   it("shows nothing when no other loading reaches the target", () => {
     render(<App />);
     typeTarget("18");

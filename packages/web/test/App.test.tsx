@@ -60,13 +60,23 @@ describe("barbell Load screen: worked examples (spec section 7)", () => {
 });
 
 describe("Load screen: implement tabs", () => {
-  it("starts on the barbell, with the vest beside it", () => {
+  const tabs = () => within(screen.getByRole("tablist", { name: "Implements" })).getAllByRole("tab");
+
+  it("opens on the barbell, with the kettlebell, leg attachment and vest tabs beside it", () => {
     render(<App />);
-    const tabs = within(screen.getByRole("tablist", { name: "Implements" })).getAllByRole("tab");
-    expect(tabs.map((tab) => [tab.textContent, tab.getAttribute("aria-selected")])).toEqual([
+    expect(tabs().map((tab) => [tab.textContent, tab.getAttribute("aria-selected")])).toEqual([
       ["Barbell", "true"],
+      ["Kettlebell", "false"],
+      ["Leg attachment", "false"],
       ["Vest", "false"],
     ]);
+  });
+
+  it("selects the tab that is pressed", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
+    expect(tabs().map((tab) => tab.getAttribute("aria-selected"))).toEqual(["false", "true", "false", "false"]);
+    expect(screen.getByRole("tabpanel", { name: "Kettlebell" })).toBeTruthy();
   });
 
   it("switches to the vest and back", () => {
@@ -141,6 +151,77 @@ describe("vest Load screen", () => {
     openVest();
     typeTarget("1");
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Front No blocks Back 1 block");
+  });
+});
+
+describe("kettlebell Load screen", () => {
+  function openKettlebell() {
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
+  }
+
+  it("example 8: 80 lb is exact, with the stack and the long locking screw", () => {
+    openKettlebell();
+    typeTarget("80");
+    const result = text(screen.getByRole("region", { name: "Result" }));
+    expect(result).toContain("Exact");
+    expect(result).toContain("80 lb 36.3 kg");
+    expect(result).toContain("Stack 1 × 22.5, 6 × 5, 1 × 2.5");
+    expect(result).toContain("Locking screw 1 × Long locking screw");
+  });
+
+  it("shows the bare handle with no locking screw", () => {
+    openKettlebell();
+    typeTarget("22.5");
+    const result = text(screen.getByRole("region", { name: "Result" }));
+    expect(result).toContain("Stack No plates");
+    expect(result).toContain("Locking screw None");
+  });
+
+  it("has no collar choice", () => {
+    openKettlebell();
+    expect(screen.queryByRole("radiogroup", { name: "Collars" })).toBeNull();
+  });
+
+  it("refuses a target over 80 lb, showing the limit and the heaviest allowed loading", () => {
+    openKettlebell();
+    typeTarget("85");
+    const result = screen.getByRole("region", { name: "Result" });
+    expect(text(result)).toContain("Refused: over the 80 lb limit");
+    expect(text(within(result).getByRole("article", { name: /Heaviest allowed/ }))).toContain("80 lb 36.3 kg");
+    expect(text(result).match(/Refused/g)).toHaveLength(1);
+  });
+});
+
+describe("leg attachment Load screen", () => {
+  function openLeg() {
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "Leg attachment" }));
+  }
+
+  it("example 12: 50 lb is exact, with the stack and no locking hardware", () => {
+    openLeg();
+    typeTarget("50");
+    const result = screen.getByRole("region", { name: "Result" });
+    expect(text(result)).toContain("50 lb 22.7 kg");
+    expect(text(result)).toContain("Stack 2 × 22.5, 1 × 5");
+    expect(text(result)).not.toContain("screw");
+    expect(text(result)).not.toContain("Collars");
+  });
+
+  it("carries the fixed note under the result", () => {
+    openLeg();
+    typeTarget("50");
+    const notes = within(screen.getByRole("region", { name: "Result" })).getByRole("list", { name: "Notes" });
+    expect(text(notes)).toBe("Plate weight only. The lever changes the resistance you feel.");
+  });
+
+  it("refuses a target over 100 lb of plates, showing the limit and the heaviest allowed loading", () => {
+    openLeg();
+    typeTarget("120");
+    const result = screen.getByRole("region", { name: "Result" });
+    expect(text(result)).toContain("Refused: over the 100 lb plate limit");
+    expect(text(within(result).getByRole("article", { name: /Heaviest allowed/ }))).toContain("100 lb 45.4 kg");
   });
 });
 

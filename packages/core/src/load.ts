@@ -1,5 +1,6 @@
 import type { Hardware, Implement, Inventory, Plate } from "./inventory.js";
 import { RequestError } from "./request-error.js";
+import { loadKettlebell, loadLeg } from "./stack.js";
 import { loadVest } from "./vest.js";
 import { convert, describeWeight, display, parseWeight, thousandths, used, type Display } from "./weight.js";
 
@@ -56,7 +57,7 @@ interface PlateOption {
   max: number;
 }
 
-interface Candidate {
+export interface Candidate {
   total: number;
   plates: { option: PlateOption; perPosition: number }[];
   plateCount: number;
@@ -75,12 +76,23 @@ export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
   const [{ implement: implementId, target }] = request.targets as [TargetRequest];
   const implement = inventory.implements.find((candidate) => candidate.id === implementId);
   if (!implement) throw new RequestError(`Unknown implement "${implementId}".`);
-  if (implement.id !== "barbell" && implement.id !== "vest") {
-    throw new RequestError(`Load for the ${implement.name.toLowerCase()} is not built yet.`);
+  let chosen: Chosen;
+  switch (implement.id) {
+    case "barbell":
+      chosen = loadBarbell(inventory, implement, target, request.collars);
+      break;
+    case "kettlebell":
+      chosen = loadKettlebell(inventory, implement, target);
+      break;
+    case "leg":
+      chosen = loadLeg(inventory, implement, target);
+      break;
+    case "vest":
+      chosen = loadVest(inventory, implement, target);
+      break;
+    default:
+      throw new RequestError(`Load for the ${implement.name.toLowerCase()} is not built yet.`);
   }
-
-  const chosen =
-    implement.id === "vest" ? loadVest(inventory, implement, target) : loadBarbell(inventory, implement, target, request.collars);
   return { results: [chosen.result], leftover: leftover(inventory, [implement], chosen) };
 }
 
@@ -180,7 +192,7 @@ function collarFor(inventory: Inventory, implement: Implement, choice: CollarCho
   return collar;
 }
 
-function candidatesFor(inventory: Inventory, implement: Implement, collar: Hardware | undefined, baseMilli: number): Candidate[] {
+export function candidatesFor(inventory: Inventory, implement: Implement, collar: Hardware | undefined, baseMilli: number): Candidate[] {
   const positions = implement.positions.length;
   const plateUnit = (plate: Plate) => inventory.plateTypes.find((type) => type.id === plate.type)?.unit ?? implement.unit;
   const options: PlateOption[] = inventory.plates
@@ -219,16 +231,16 @@ function candidatesFor(inventory: Inventory, implement: Implement, collar: Hardw
   return candidates;
 }
 
-function closest(candidates: Candidate[], target: number): Candidate | undefined {
+export function closest(candidates: Candidate[], target: number): Candidate | undefined {
   const distance = Math.min(...candidates.map((candidate) => Math.abs(candidate.total - target)));
   return best(candidates.filter((candidate) => Math.abs(candidate.total - target) === distance));
 }
 
-function best(candidates: Candidate[]): Candidate | undefined {
+export function best(candidates: Candidate[]): Candidate | undefined {
   return ranked(candidates)[0];
 }
 
-function otherWays(candidates: Candidate[], chosen: Candidate): Candidate[] {
+export function otherWays(candidates: Candidate[], chosen: Candidate): Candidate[] {
   return ranked(candidates)
     .filter((candidate) => candidate !== chosen)
     .slice(0, MAX_ALTERNATIVES);
@@ -248,7 +260,7 @@ function heavierFirst(a: Candidate, b: Candidate): number {
   return 0;
 }
 
-function platesInOrder(candidate: Candidate): number[] {
+export function platesInOrder(candidate: Candidate): number[] {
   const isMicro = (item: Candidate["plates"][number]) => Number(item.option.plate.id === MICRO_PLATE);
   return [...candidate.plates]
     .sort((a, b) => isMicro(a) - isMicro(b) || b.option.weight - a.option.weight)

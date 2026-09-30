@@ -1,33 +1,41 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { LoadScreen } from "./LoadScreen";
 
 const implementTabs = [
   { id: "barbell", label: "Barbell" },
+  { id: "kettlebell", label: "Kettlebell" },
+  { id: "leg", label: "Leg attachment" },
   { id: "vest", label: "Vest" },
 ];
 
 export function App() {
-  const [implement, setImplement] = useState("barbell");
+  const [selected, setSelected] = useState("barbell");
+  const tabIds = useId();
+  const tabId = (implement: string) => `${tabIds}-${implement}`;
+
   return (
     <main className="app">
       <header className="masthead">
         <h1>plate-pool</h1>
       </header>
       <nav className="tabs" role="tablist" aria-label="Implements">
-        {implementTabs.map((tab) => (
+        {implementTabs.map(({ id, label }) => (
           <button
-            key={tab.id}
+            key={id}
+            id={tabId(id)}
             type="button"
             role="tab"
-            aria-selected={tab.id === implement}
+            aria-selected={id === selected}
             className="tab"
-            onClick={() => setImplement(tab.id)}
+            onClick={() => setSelected(id)}
           >
-            {tab.label}
+            {label}
           </button>
         ))}
       </nav>
-      <LoadScreen key={implement} implement={implement} />
+      <div role="tabpanel" aria-labelledby={tabId(selected)}>
+        <LoadScreen key={selected} implement={selected} />
+      </div>
     </main>
   );
 }
