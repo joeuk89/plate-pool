@@ -106,6 +106,7 @@ npx plate-pool load barbell=175 dumbbells=40 --json
 - `alternatives` holds up to five other loadings that reach the same total.
 - For a pair of dumbbells, `hardware` and `positions` describe one dumbbell. The other is the same.
 - A dumbbell loading with `uneven: true` has ends of different weights, and `heavier` names the heavier end.
+- A dumbbell loading whose screw `count` is 1 has its one screw on the `heavier` end. The other end has no screw and no plates.
 - `leftover` counts the plates and hardware still free after the recommended loadings.
 
 ### list

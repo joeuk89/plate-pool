@@ -126,16 +126,23 @@ export function listText(response: ListResponse, inventory: Inventory, range: { 
   return `${lines.join("\n")}\n`;
 }
 
+function dumbbellScrews(implement: string, loading: Loading, item: { id: string; count: number }): string {
+  const label = hardwareLabels[item.id] ?? item.id;
+  if (implement !== "dumbbell") return label;
+  if (item.count > 1) return `${label}s`;
+  return `${label} on ${positionLabels[loading.heavier ?? ""] ?? loading.heavier} only`;
+}
+
 function positionLines(implement: string, loading: Loading): string[] {
   const hardware =
     loading.hardware.length === 0
       ? implement === "dumbbell"
         ? "no screws"
         : "no collars"
-      : loading.hardware.map((item) => `${hardwareLabels[item.id] ?? item.id}${implement === "dumbbell" ? "s" : ""}`).join(", ");
+      : loading.hardware.map((item) => dumbbellScrews(implement, loading, item)).join(", ");
   const [first] = loading.positions;
   const plates = (list: number[]) => (list.length === 0 ? "no plates" : list.join(" "));
-  const alike = loading.positions.every((position) => position.plates.join() === first?.plates.join());
+  const alike = !loading.uneven && loading.positions.every((position) => position.plates.join() === first?.plates.join());
   if (implement === "barbell" && first && alike) return [`each side: ${plates(first.plates)} | ${hardware}`];
   if (implement === "vest") return loading.positions.map((position) => `${position.name}: ${blocks(position.plates.length)}`);
   if (implement === "kettlebell" && first) {

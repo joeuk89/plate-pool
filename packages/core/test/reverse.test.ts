@@ -195,6 +195,7 @@ function requestFor(result: LoadResult, loading: Loading): ReverseRequest {
     ...(result.implement === "dumbbell" || result.implement === "kettlebell"
       ? { screws: hardware ? screwsOf[hardware.id]! : "none" }
       : {}),
+    ...(result.implement === "dumbbell" && hardware?.count === 1 ? { screwOn: loading.heavier! } : {}),
   };
 }
 
@@ -378,6 +379,26 @@ describe("Reverse: dumbbell rules (spec 6.2)", () => {
     const result = dumbbell([5], [5], { screws: "none" });
     expect(result).toMatchObject({ total: { lb: 15, kg: 6.8 }, hardware: [] });
     expect(result.warnings).toEqual(["Plates on a dumbbell need two locking screws."]);
+  });
+
+  it("reads one screw on end B with no plates as 7.5 lb, heavier at end B, with no warnings", () => {
+    expect(dumbbell([], [], { screwOn: "end-b" })).toMatchObject({
+      total: { lb: 7.5, kg: 3.4 },
+      hardware: [{ id: "screw-standard", count: 1 }],
+      uneven: true,
+      heavier: "end-b",
+      warnings: [],
+    });
+  });
+
+  it("warns when plates sit on the end with no screw", () => {
+    expect(dumbbell([], [2.5], { screwOn: "end-a" }).warnings).toEqual(["The plates on end B need a locking screw."]);
+  });
+
+  it("warns about one screw when uneven loading is off", () => {
+    expect(dumbbell([], [], { screwOn: "end-a", uneven: false }).warnings).toEqual([
+      "Uneven loading is off, and the ends differ by 2.5 lb.",
+    ]);
   });
 
   it("reads the bare handle with no screws as 5 lb, with no warnings", () => {

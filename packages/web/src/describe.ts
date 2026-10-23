@@ -1,4 +1,5 @@
 import type { Inventory, Loading } from "@plate-pool/core";
+import { used } from "./plate-stack";
 
 export function plateList(plates: number[]): string {
   if (plates.length === 0) return "No plates";
@@ -26,13 +27,18 @@ export function endLabel(position: string): string {
   return letter ? `End ${letter}` : position;
 }
 
-export function unevenNote(label: string, loading: Loading): string {
+export function unevenNote(label: string, loading: Loading, inventory: Inventory): string {
   const heavier = loading.positions.find((position) => position.name === loading.heavier);
   const lighter = loading.positions.find((position) => position.name !== loading.heavier);
+  const [screws] = loading.hardware;
+  const oneScrew = screws !== undefined && screws.count < loading.positions.length;
+  const item = oneScrew ? inventory.hardware.find(({ id }) => id === screws.id) : undefined;
+  const screw = item ? used(item.weight) : 0;
   const weight = (plates: number[] = []) => plates.reduce((sum, plate) => sum + plate, 0);
-  const difference = Math.round((weight(heavier?.plates) - weight(lighter?.plates)) * 1000) / 1000;
+  const difference = Math.round((weight(heavier?.plates) + screw - weight(lighter?.plates)) * 1000) / 1000;
   const inSentence = (name = "") => endLabel(name).replace(/^End /, "end ");
-  return `${label}: ${inSentence(heavier?.name)} is ${difference} lb heavier than ${inSentence(lighter?.name)}.`;
+  const why = oneScrew ? ` It carries the only screw.` : "";
+  return `${label}: ${inSentence(heavier?.name)} is ${difference} lb heavier than ${inSentence(lighter?.name)}.${why}`;
 }
 
 export function hardwareList(loading: Loading, inventory: Inventory): string {

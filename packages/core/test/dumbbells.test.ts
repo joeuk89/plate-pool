@@ -211,6 +211,25 @@ describe("dumbbells Load: uneven ends (spec 6.2)", () => {
 });
 
 describe("dumbbells Load: the bare handle and the limit (spec 4.3, 6.2)", () => {
+  it("example 15: one dumbbell of 7.5 lb is exact and uneven, with one standard screw on one end and no plates", () => {
+    const [result] = loadDumbbells("7.5", { pair: false }).results;
+    expect(result).toMatchObject({
+      exact: true,
+      loading: { total: { lb: 7.5 }, hardware: [{ id: "screw-standard", count: 1 }], positions: ends([]), uneven: true, heavier: "end-a" },
+    });
+  });
+
+  it("uses one screw for each dumbbell in a pair of 7.5 lb", () => {
+    const response = loadDumbbells("7.5");
+    expect(response.results[0]?.loading).toMatchObject({ hardware: [{ id: "screw-standard", count: 1 }] });
+    expect(response.leftover.hardware).toMatchObject({ "screw-standard": 2 });
+  });
+
+  it("gives no one-screw loading when uneven loading is off", () => {
+    const [result] = loadDumbbells("7.5", { pair: false, uneven: false }).results;
+    expect(result).toMatchObject({ exact: false, below: { total: { lb: 5 } }, above: { total: { lb: 10 } } });
+  });
+
   it("counts a handle with no screws and no plates as a valid loading of 5 lb", () => {
     const response = loadDumbbells("5");
     expect(response.results[0]).toMatchObject({ exact: true, loading: { total: { lb: 5 }, hardware: [], positions: ends([]), uneven: false } });
@@ -218,7 +237,7 @@ describe("dumbbells Load: the bare handle and the limit (spec 4.3, 6.2)", () => 
   });
 
   it("recommends the nearer of the bare handle and the handle with screws for a target between them", () => {
-    expect(loadDumbbells("7").results[0]).toMatchObject({
+    expect(loadDumbbells("7", { uneven: false }).results[0]).toMatchObject({
       recommended: "below",
       below: { total: { lb: 5 }, hardware: [] },
       above: { total: { lb: 10 }, hardware: [{ id: "screw-standard", count: 2 }], positions: ends([]) },
@@ -288,19 +307,22 @@ describe("dumbbells Load: rules that hold for every target", () => {
       expect(loadings.length, target).toBeGreaterThan(0);
       for (const loading of loadings) {
         const [endA, endB] = loading.positions.map((position) => position.plates) as [number[], number[]];
-        const difference = sum(endA) - sum(endB);
+        const [screw] = loading.hardware;
+        const oneScrew = screw?.count === 1;
+        const difference = sum(endA) + (oneScrew ? 2.5 : 0) - sum(endB);
         expect(difference, target).toBeGreaterThanOrEqual(0);
         expect(difference, target).toBeLessThanOrEqual(uneven ? 2.5 : 0);
         expect(loading.uneven, target).toBe(difference > 0);
         expect(loading.total.lb, target).toBeLessThanOrEqual(120);
 
-        const [screw] = loading.hardware;
         if (!screw) {
           expect(loading.total.lb, target).toBe(5);
           continue;
         }
-        expect(screw, target).toEqual({ id: loading.total.lb <= 75 ? "screw-standard" : "screw-long", count: 2 });
-        expect(loading.total.lb, target).toBe(10 + sum(endA) + sum(endB));
+        expect(screw.id, target).toBe(loading.total.lb <= 75 ? "screw-standard" : "screw-long");
+        if (oneScrew) expect(endB, target).toEqual([]);
+        else expect(screw.count, target).toBe(2);
+        expect(loading.total.lb, target).toBe(5 + 2.5 * screw.count + sum(endA) + sum(endB));
         for (const end of [endA, endB]) {
           expect(end, target).toEqual([...end].sort((a, b) => b - a));
           expect(end.filter((plate) => plate === 1.25).length, target).toBeLessThanOrEqual(1);

@@ -77,7 +77,7 @@ function clearPlates(positions: Positions): Positions {
 function Notes({ result }: { result: ReverseResult }) {
   const loading = loadingOf(result);
   const notes = [
-    ...(loading.uneven ? [unevenNote("Uneven", loading)] : []),
+    ...(loading.uneven ? [unevenNote("Uneven", loading, inventory)] : []),
     ...result.notes,
     ...(result.unverified.length > 0 ? [`Unverified: ${unverifiedList(result.unverified, inventory)}`] : []),
   ];

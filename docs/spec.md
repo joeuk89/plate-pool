@@ -196,6 +196,7 @@ The build fills in the remaining plates, hardware and implements from section 4.
 
 - A request for dumbbells means a pair unless it asks for one. Both dumbbells in a pair get the same loading.
 - Two screws per dumbbell, both the same kind. Standard screws up to 75 lb per dumbbell, long screws above.
+- A dumbbell may instead take one screw, on one end. The other end has no screw and so no plates. The screw counts toward the ends' difference, so with a 2.5 lb standard screw this gives a bare 7.5 lb dumbbell. It needs uneven loading on.
 - A long screw needs at least 3.0 in of plates on its end to lock (unverified).
 - The two ends may differ in weight by at most 2.5 lb. This is Ironmaster's documented way to make small steps. The result is marked uneven and names the heavier end.
 - If every 2.5 lb and micro plate is in use on another implement, the ends may differ by 5 lb. The result says why.
@@ -275,6 +276,7 @@ These use the inventory in section 4 with the default clamp collars, which weigh
 | 12 | Leg attachment 50 lb | Exact. 2 × 22.5, 1 × 5. |
 | 13 | Vest 12 kg | Exact. 12 blocks: 6 front, 6 back. |
 | 14 | Vest 30 lb | Not exact (13.6 kg). Below: 13 kg. Above: 14 kg. Recommended: 14 kg. |
+| 15 | One dumbbell 7.5 lb | Exact, uneven. One standard screw on one end, no plates. With uneven loading off: not exact, below 5 lb, above 10 lb. |
 
 Properties that must hold for every input:
 

@@ -27,9 +27,11 @@ interface End {
 interface Candidate {
   total: number;
   screw?: Hardware;
+  screws: number;
   heavier: End;
   lighter: End;
   plateCount: number;
+  difference: number;
   uneven: boolean;
 }
 
@@ -57,9 +59,9 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
 
   const handle = thousandths(used(implement.base));
   const candidates: Candidate[] = [];
+  const empty = emptyEnd(options);
   if (implement.hardware?.options.includes("none") ?? true) {
-    const empty = emptyEnd(options);
-    candidates.push({ total: handle, heavier: empty, lighter: empty, plateCount: 0, uneven: false });
+    candidates.push({ total: handle, screws: 0, heavier: empty, lighter: empty, plateCount: 0, difference: 0, uneven: false });
   }
 
   const longestEnd = Math.max(0, ...screws.map((screw) => thousandths(screw.capacityIn ?? 0)));
@@ -74,14 +76,36 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
         const total = withoutScrews + screwsPerDumbbell * convert(thousandths(used(screw.weight)), screw.unit, unit);
         if (screwFor(total) !== screw || screw.count < screwsPerDumbbell * dumbbells || total > maxTotal) continue;
         if (!fitsScrew(screw, heavier) || !fitsScrew(screw, lighter)) continue;
-        candidates.push({ total, screw, heavier, lighter, plateCount: heavier.plateCount + lighter.plateCount, uneven: difference > 0 });
+        candidates.push({
+          total,
+          screw,
+          screws: screwsPerDumbbell,
+          heavier,
+          lighter,
+          plateCount: heavier.plateCount + lighter.plateCount,
+          difference,
+          uneven: difference > 0,
+        });
       }
+    }
+  }
+
+  // One screw on one end and nothing on the other: the screw's own weight makes the ends uneven.
+  for (const heavier of ends) {
+    if (options.some((option, i) => dumbbells * heavier.counts[i]! > option.plate.count)) continue;
+    for (const screw of screws) {
+      const screwWeight = convert(thousandths(used(screw.weight)), screw.unit, unit);
+      const difference = heavier.weight + screwWeight;
+      const total = handle + difference;
+      if (difference > maxDifference || screwFor(total) !== screw || screw.count < dumbbells || total > maxTotal) continue;
+      if (!fitsScrew(screw, heavier)) continue;
+      candidates.push({ total, screw, screws: 1, heavier, lighter: empty, plateCount: heavier.plateCount, difference, uneven: true });
     }
   }
 
   const toLoading = (candidate: Candidate): Loading => ({
     total: display(candidate.total, unit),
-    hardware: candidate.screw ? [{ id: candidate.screw.id, count: screwsPerDumbbell }] : [],
+    hardware: candidate.screw ? [{ id: candidate.screw.id, count: candidate.screws }] : [],
     positions: implement.positions.map((name, index) => ({
       name,
       plates: platesInOrder(options, index === 0 ? candidate.heavier : candidate.lighter),
@@ -102,7 +126,7 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
     }
 
     const shown = [exact, below, above].filter((candidate) => candidate !== undefined);
-    if (shown.some((candidate) => candidate.heavier.weight - candidate.lighter.weight > fromLb(UNEVEN_LB))) {
+    if (shown.some((candidate) => candidate.difference > fromLb(UNEVEN_LB))) {
       warnings.push(`The ends differ by ${UNEVEN_WITHOUT_SMALL_PLATES_LB} lb because no ${SMALL_PLATE_LB} lb or micro plate is free.`);
     }
 
@@ -143,7 +167,7 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
     ...(choice.picks[0] ? { total: choice.picks[0].total } : {}),
     picks: choice.picks.map((candidate) => ({
       plates: new Map(options.map((option, i) => [option.plate.id, dumbbells * (candidate.heavier.counts[i]! + candidate.lighter.counts[i]!)])),
-      hardware: new Map(candidate.screw ? [[candidate.screw.id, screwsPerDumbbell * dumbbells]] : []),
+      hardware: new Map(candidate.screw ? [[candidate.screw.id, candidate.screws * dumbbells]] : []),
       plateCount: dumbbells * candidate.plateCount,
       uneven: candidate.uneven ? dumbbells : 0,
     })),
@@ -219,7 +243,7 @@ function ranked(candidates: Candidate[], options: PlateOption[]): Candidate[] {
 // Two ends of equal weight swapped between end A and end B are the same loading turned round.
 function layoutKey(candidate: Candidate): string {
   const ends = [candidate.heavier.counts.join(), candidate.lighter.counts.join()].sort();
-  return [candidate.screw?.id ?? "", ...ends].join("|");
+  return [candidate.screw?.id ?? "", candidate.screws, ...ends].join("|");
 }
 
 function heavierFirst(a: Candidate, b: Candidate, options: PlateOption[]): number {

@@ -51,6 +51,16 @@ describe("dumbbell drawing: both ends", () => {
     expect(ends[1]!.screw!.x).toBeCloseTo(handle.right);
   });
 
+  it("draws one screw on the heavier end only, with a label naming one screw (example 15)", () => {
+    const { ends, handle, screwLabel, description } = drawDumbbell(loadingFor("7.5lb", false), inventory);
+    expect(ends[0]!.screw!.x + ends[0]!.screw!.width).toBeCloseTo(handle.left);
+    expect(ends[1]!.screw).toBeUndefined();
+    expect(screwLabel?.label.text).toBe("Standard locking screw");
+    expect(description).toBe(
+      "End A, inside to outside: no plates, then a standard locking screw. End B, inside to outside: no plates. End A is heavier",
+    );
+  });
+
   it("draws no screws on a bare handle", () => {
     const drawing = drawDumbbell(loadingFor("5lb", false), inventory);
     expect(drawing.ends.every((end) => end.screw === undefined)).toBe(true);

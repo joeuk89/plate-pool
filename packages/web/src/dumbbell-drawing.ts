@@ -87,7 +87,7 @@ export function drawDumbbell(loading: Loading, inventory: Inventory, options: Dr
     const start = direction === -1 ? left : right;
     const plates = stackPlates(position.plates, inventory, start, direction);
     const edge = start + direction * stackLength(position.plates, inventory);
-    const screw = screwHardware && { x: direction === -1 ? edge - SCREW.width : edge, ...SCREW };
+    const screw = screwHardware && hasScrew(loading, position.name) && { x: direction === -1 ? edge - SCREW.width : edge, ...SCREW };
     return { name: position.name, plates, ...(screw ? { screw } : {}) };
   });
   placeOutsideLabels(
@@ -126,7 +126,7 @@ function screwCallout(text: string, ends: EndDrawing[], centre: number): Callout
     label: { text, x: centre, y: HARDWARE_LABEL_Y },
     leaders: [
       ...screws.map((x) => ({ x1: x, y1: SCREW.height / 2, x2: x, y2: bracketY })),
-      { x1: Math.min(...screws), y1: bracketY, x2: Math.max(...screws), y2: bracketY },
+      { x1: Math.min(...screws, centre), y1: bracketY, x2: Math.max(...screws, centre), y2: bracketY },
       { x1: centre, y1: bracketY, x2: centre, y2: HARDWARE_LEADER_END },
     ],
   };
@@ -145,7 +145,16 @@ function markHeavier(text: string, end: EndDrawing, left: number, right: number,
 
 function screwLabel(loading: Loading, inventory: Inventory): string | undefined {
   const screw = screwFor(loading, inventory);
-  return screw ? `${screw.name}s` : undefined;
+  if (!screw) return undefined;
+  return oneScrew(loading) ? screw.name : `${screw.name}s`;
+}
+
+function oneScrew(loading: Loading): boolean {
+  return (loading.hardware[0]?.count ?? 0) < loading.positions.length;
+}
+
+function hasScrew(loading: Loading, position: string): boolean {
+  return !oneScrew(loading) || position === loading.heavier;
 }
 
 function heavierLabel(loading: Loading): string | undefined {
@@ -166,9 +175,11 @@ function longestEnd(loading: Loading, inventory: Inventory): number {
 }
 
 function describe(loading: Loading, screw: Hardware | undefined): string {
-  const then = screw ? `, then a ${screw.name.toLowerCase()}` : "";
+  const then = (position: string) => (screw && hasScrew(loading, position) ? `, then a ${screw.name.toLowerCase()}` : "");
   const [first] = loading.positions;
-  if (!loading.uneven) return `Each end, inside to outside: ${plateSequence(first?.plates ?? [])}${then}`;
-  const ends = loading.positions.map((position) => `${endLabel(position.name)}, inside to outside: ${plateSequence(position.plates)}${then}`);
+  if (!loading.uneven) return `Each end, inside to outside: ${plateSequence(first?.plates ?? [])}${then(first?.name ?? "")}`;
+  const ends = loading.positions.map(
+    (position) => `${endLabel(position.name)}, inside to outside: ${plateSequence(position.plates)}${then(position.name)}`,
+  );
   return `${ends.join(". ")}. ${endLabel(loading.heavier ?? "")} is heavier`;
 }

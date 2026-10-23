@@ -413,7 +413,7 @@ function Notes({ result }: { result: LoadResult }) {
     { label: "Uneven", loading: result.loading },
     { label: "Below is uneven", loading: result.below },
     { label: "Above is uneven", loading: result.above },
-  ].flatMap(({ label, loading }) => (loading?.uneven ? [unevenNote(label, loading)] : []));
+  ].flatMap(({ label, loading }) => (loading?.uneven ? [unevenNote(label, loading, inventory)] : []));
   const notes = [...uneven, ...warnings];
   if (result.unverified.length > 0) notes.push(`Unverified: ${unverifiedList(result.unverified, inventory)}`);
   if (notes.length === 0) return null;

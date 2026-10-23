@@ -22,6 +22,8 @@ export interface ReverseRequest {
   positions: { name: string; plates: number[] }[];
   collars?: CollarChoice;
   screws?: ScrewChoice;
+  /** A dumbbell with one screw: the end that carries it. */
+  screwOn?: string;
   uneven?: boolean;
 }
 
@@ -47,6 +49,7 @@ interface Position {
   name: string;
   placed: PlacedPlate[];
   weight: number;
+  screwed: boolean;
 }
 
 interface HardwareUsed {
@@ -92,8 +95,14 @@ export function reverse(inventory: Inventory, request: ReverseRequest): ReverseR
   const positions: Position[] = implement.positions.map((name) => {
     const plates = request.positions.find((position) => position.name === name)?.plates ?? [];
     const placed = plates.map((weight) => placedPlate(inventory, implement, weight));
-    return { name, placed, weight: placed.reduce((sum, { weight }) => sum + weight, 0) };
+    return { name, placed, weight: placed.reduce((sum, { weight }) => sum + weight, 0), screwed: true };
   });
+  if (request.screwOn !== undefined) {
+    if (implement.id !== "dumbbell" || !implement.positions.includes(request.screwOn)) {
+      throw new RequestError(`The ${implement.name.toLowerCase()} has no end "${request.screwOn}" to take one screw.`);
+    }
+    for (const position of positions) position.screwed = position.name === request.screwOn;
+  }
   const plateWeight = positions.reduce((sum, { weight }) => sum + weight, 0);
   const withoutHardware = thousandths(used(implement.base)) + plateWeight;
 
@@ -101,7 +110,7 @@ export function reverse(inventory: Inventory, request: ReverseRequest): ReverseR
   const hardware = hardwareFor(inventory, implement, request, screwByRule);
   const total = withoutHardware + hardware.reduce((sum, { item, count }) => sum + count * hardwareWeight(implement, item), 0);
 
-  const heavier = implement.id === "dumbbell" ? heavierOf(positions) : undefined;
+  const heavier = implement.id === "dumbbell" ? heavierOf(implement, positions, hardware) : undefined;
   const pair = implement.id === "dumbbell" ? (request.pair ?? true) : undefined;
   const warnings = warningsFor({
     inventory,
@@ -180,13 +189,19 @@ function hardwareFor(inventory: Inventory, implement: Implement, request: Revers
   if (request.screws !== undefined && !screw) {
     throw new RequestError(`The ${implement.name.toLowerCase()} takes no ${request.screws} screw.`);
   }
-  return screw ? [{ item: screw, count: perImplement(implement) }] : [];
+  return screw ? [{ item: screw, count: request.screwOn === undefined ? perImplement(implement) : 1 }] : [];
 }
 
-function heavierOf(positions: Position[]): string | undefined {
-  const heaviest = Math.max(...positions.map(({ weight }) => weight));
-  if (positions.every(({ weight }) => weight === heaviest)) return undefined;
-  return positions.find(({ weight }) => weight === heaviest)!.name;
+function endWeights(implement: Implement, positions: Position[], hardware: HardwareUsed[]): number[] {
+  const screw = hardware[0]?.item;
+  return positions.map(({ weight, screwed }) => weight + (screw?.kind === "screw" && screwed ? hardwareWeight(implement, screw) : 0));
+}
+
+function heavierOf(implement: Implement, positions: Position[], hardware: HardwareUsed[]): string | undefined {
+  const weights = endWeights(implement, positions, hardware);
+  const heaviest = Math.max(...weights);
+  if (weights.every((weight) => weight === heaviest)) return undefined;
+  return positions[weights.indexOf(heaviest)]!.name;
 }
 
 function warningsFor(checked: Checked): string[] {
@@ -236,6 +251,8 @@ function screwWarnings({ implement, positions, hardware, screwByRule, total }: C
     if (!hasPlates) return [];
     return [implement.id === "dumbbell" ? "Plates on a dumbbell need two locking screws." : "Plates on the kettlebell need a locking screw."];
   }
+  const loose = positions.find(({ placed, screwed }) => !screwed && placed.length > 0);
+  if (loose) return [`The plates on ${label(loose.name)} need a locking screw.`];
   if (!screwByRule || screw === screwByRule) return [];
   const weight = `${amount(total, implement.unit)} ${implement.unit}`;
   const long = screwByRule.id === "screw-long";
@@ -253,8 +270,8 @@ function screwWarnings({ implement, positions, hardware, screwByRule, total }: C
   ];
 }
 
-function unevenWarnings({ inventory, implement, request, positions, dumbbells }: Checked): string[] {
-  const weights = positions.map(({ weight }) => weight);
+function unevenWarnings({ inventory, implement, request, positions, hardware, dumbbells }: Checked): string[] {
+  const weights = endWeights(implement, positions, hardware);
   const difference = Math.max(...weights) - Math.min(...weights);
   if (difference === 0) return [];
   const fromLb = (lb: number) => convert(thousandths(lb), "lb", implement.unit);
