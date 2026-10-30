@@ -1,5 +1,7 @@
 import {
+  type Changes,
   describeWeight,
+  type PositionChanges,
   type Inventory,
   type Leftover,
   type ListResponse,
@@ -65,6 +67,7 @@ function resultText(result: LoadResult, inventory: Inventory): string {
     lines.push(`${recommended ? "*" : " "} ${label}  ${describeWeight(loading.total, unit)}${loading.uneven ? "  uneven" : ""}`);
     const indent = " ".repeat(label.length + 4);
     for (const line of positionLines(result.implement, loading)) lines.push(`${indent}${line}`);
+    if (loading.changes) lines.push(`${indent}${changesLine(result.implement, loading.changes)}`);
   };
   if (result.loading) option("exact", result.loading, false);
   if (result.below) option("below", result.below, result.recommended === "below");
@@ -158,6 +161,34 @@ function positionLines(implement: string, loading: Loading): string[] {
     }),
     hardware,
   ];
+}
+
+function changesLine(implement: string, changes: Changes): string {
+  const plates = (list: number[]) => (implement === "vest" ? blocks(list.length) : list.join(", "));
+  const work = ({ remove, add }: PositionChanges) => {
+    const steps = [...(remove.length > 0 ? [`take off ${plates(remove)}`] : []), ...(add.length > 0 ? [`put on ${plates(add)}`] : [])];
+    return steps.length === 0 ? "unchanged" : steps.join(" · ");
+  };
+  const [first] = changes.positions;
+  const alike = first !== undefined && changes.positions.every((position) => work(position) === work(first));
+  const each = { barbell: "Each side", dumbbell: "Each end" }[implement];
+  const sentences =
+    alike && each
+      ? [`${each}: ${work(first)}.`]
+      : changes.positions.map((position) => `${capitalised(changePositionLabels[position.name] ?? position.name)}: ${work(position)}.`);
+  const hardware = changes.hardware.map(({ from, to, count }) => {
+    const name = (id: string) => `${hardwareLabels[id] ?? id}${count === 1 ? "" : "s"}`;
+    const some = count === 1 ? "" : `${count} `;
+    if (from && to) return `Swap ${some}${name(from)} for ${name(to)}.`;
+    return to ? `Add ${some}${name(to)}.` : `Remove ${some}${name(from!)}.`;
+  });
+  return [`${changes.count} ${changes.count === 1 ? "change" : "changes"}.`, ...sentences, ...hardware].join(" ");
+}
+
+const changePositionLabels: Record<string, string> = { ...positionLabels, stack: "stack" };
+
+function capitalised(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }
 
 function blocks(count: number): string {
