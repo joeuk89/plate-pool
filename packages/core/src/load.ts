@@ -1,13 +1,18 @@
+import { arrange, type Changes, type Resolved } from "./changes.js";
 import type { Hardware, Implement, Inventory, Plate } from "./inventory.js";
 import { RequestError } from "./request-error.js";
+import type { ReverseRequest } from "./reverse.js";
 import { convert, describeWeight, display, parseWeight, thousandths, used, type Display } from "./weight.js";
 
 export type CollarChoice = "clamp" | "spinlock" | "none";
+
+export type CurrentLoading = Pick<ReverseRequest, "positions" | "screws" | "screwOn">;
 
 export interface TargetRequest {
   implement: string;
   target: string;
   pair?: boolean;
+  current?: CurrentLoading;
 }
 
 export interface LoadRequest {
@@ -22,6 +27,7 @@ export interface Loading {
   positions: { name: string; plates: number[] }[];
   uneven: boolean;
   heavier?: string;
+  changes?: Changes;
 }
 
 export interface LoadResult {
@@ -63,6 +69,8 @@ export interface Candidate {
   total: number;
   plates: { option: PlateOption; perPosition: number }[];
   plateCount: number;
+  order?: number[][];
+  changes?: Changes;
 }
 
 export interface Usage {
@@ -70,6 +78,7 @@ export interface Usage {
   hardware: Map<string, number>;
   plateCount: number;
   uneven: number;
+  changes: number;
 }
 
 export interface Outcome {
@@ -87,7 +96,12 @@ export interface Choice<C> {
   recommended?: "below" | "above";
 }
 
-export function choose<C extends { total: number }>(candidates: C[], target: number, rank: (list: C[]) => C[]): Choice<C> {
+export function choose<C extends { total: number }>(
+  candidates: C[],
+  target: number,
+  rank: (list: C[]) => C[],
+  changesOf: (candidate: C) => number = () => 0,
+): Choice<C> {
   const at = (total: number) => rank(candidates.filter((candidate) => candidate.total === total));
   const exact = at(target);
   if (exact.length > 0) return { exact: true, picks: exact };
@@ -95,8 +109,11 @@ export function choose<C extends { total: number }>(candidates: C[], target: num
   const higher = Math.min(...candidates.map((candidate) => candidate.total).filter((total) => total > target));
   const below = Number.isFinite(lower) ? at(lower) : [];
   const above = Number.isFinite(higher) ? at(higher) : [];
-  const recommended =
-    below.length > 0 && (above.length === 0 || target - lower <= higher - target) ? "below" : above.length > 0 ? "above" : undefined;
+  const belowWins = () => {
+    const nearer = higher - target - (target - lower);
+    return nearer !== 0 ? nearer > 0 : changesOf(below[0]!) <= changesOf(above[0]!);
+  };
+  const recommended = below.length > 0 && (above.length === 0 || belowWins()) ? "below" : above.length > 0 ? "above" : undefined;
   return {
     exact: false,
     picks: recommended === "below" ? below : recommended === "above" ? above : [],
@@ -113,7 +130,13 @@ export function sidesFor<C>(choice: Choice<C>, pick: C | undefined): { exact?: C
   return { ...(exact ? { exact } : {}), ...(below ? { below } : {}), ...(above ? { above } : {}) };
 }
 
-export function loadBarbell(inventory: Inventory, implement: Implement, targetText: string, collars: CollarChoice | undefined): Outcome {
+export function loadBarbell(
+  inventory: Inventory,
+  implement: Implement,
+  targetText: string,
+  collars: CollarChoice | undefined,
+  current: Resolved | undefined,
+): Outcome {
   const target = parseWeight(targetText, implement.unit);
   const targetMilli = convert(thousandths(target.amount), target.unit, implement.unit);
   const collar = collarFor(inventory, implement, collars);
@@ -127,16 +150,18 @@ export function loadBarbell(inventory: Inventory, implement: Implement, targetTe
   if (collar && !enoughCollars) {
     collarWarnings.push(`The plate pool holds ${collar.count} ${collar.name}. The ${implement.name.toLowerCase()} needs ${collarsNeeded}.`);
   }
-  const candidates = enoughCollars ? candidatesFor(inventory, implement, collar, baseMilli) : [];
+  const fresh = enoughCollars ? candidatesFor(inventory, implement, collar, baseMilli) : [];
+  const candidates = current ? fresh.map((candidate) => arranged(candidate, implement, current, [])) : fresh;
 
   const toLoading = (candidate: Candidate): Loading => ({
     total: display(candidate.total, implement.unit),
     hardware: collar ? [{ id: collar.id, count: collarsNeeded }] : [],
-    positions: implement.positions.map((name) => ({ name, plates: platesInOrder(candidate) })),
+    positions: positionsOf(implement, candidate),
     uneven: false,
+    ...(candidate.changes ? { changes: candidate.changes } : {}),
   });
 
-  const choice = choose(candidates, targetMilli, ranked);
+  const choice = choose(candidates, targetMilli, ranked, changesOf);
   const refused =
     implement.maxPlateWeight !== undefined && targetMilli - baseMilli > thousandths(implement.maxPlateWeight)
       ? { limit: display(thousandths(implement.maxPlateWeight), implement.unit) }
@@ -185,9 +210,29 @@ export function loadBarbell(inventory: Inventory, implement: Implement, targetTe
       hardware: new Map(collar ? [[collar.id, collarsNeeded]] : []),
       plateCount: candidate.plateCount,
       uneven: 0,
+      changes: changesOf(candidate),
     })),
     result,
   };
+}
+
+export function arranged(candidate: Candidate, implement: Implement, current: Resolved, screws: (string | undefined)[]): Candidate {
+  const { plates, changes } = arrange(current, {
+    positions: implement.positions,
+    fresh: implement.positions.map(() => platesInOrder(candidate)),
+    screws,
+    symmetric: implement.symmetric ?? false,
+    copies: 1,
+  });
+  return { ...candidate, order: plates, changes };
+}
+
+export function positionsOf(implement: Implement, candidate: Candidate): Loading["positions"] {
+  return implement.positions.map((name, i) => ({ name, plates: candidate.order?.[i] ?? platesInOrder(candidate) }));
+}
+
+export function changesOf(candidate: { changes?: Changes }): number {
+  return candidate.changes?.count ?? 0;
 }
 
 export function collarFor(inventory: Inventory, implement: Implement, choice: CollarChoice | undefined): Hardware | undefined {
@@ -246,7 +291,7 @@ export function otherWays(candidates: Candidate[], chosen: Candidate): Candidate
 }
 
 export function ranked(candidates: Candidate[]): Candidate[] {
-  return [...candidates].sort((a, b) => a.plateCount - b.plateCount || heavierFirst(a, b));
+  return [...candidates].sort((a, b) => changesOf(a) - changesOf(b) || a.plateCount - b.plateCount || heavierFirst(a, b));
 }
 
 function heavierFirst(a: Candidate, b: Candidate): number {

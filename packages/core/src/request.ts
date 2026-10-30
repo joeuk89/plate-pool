@@ -1,15 +1,24 @@
+import type { Resolved } from "./changes.js";
 import type { Implement, Inventory, Plate } from "./inventory.js";
 import { loadDumbbells } from "./dumbbells.js";
 import { loadBarbell, type Leftover, type LoadRequest, type LoadResponse, type LoadResult, type Outcome, type TargetRequest, type Usage } from "./load.js";
 import { RequestError } from "./request-error.js";
+import { reverse } from "./reverse.js";
 import { loadKettlebell, loadLeg } from "./stack.js";
 import { loadVest } from "./vest.js";
 import { display } from "./weight.js";
 
+interface Closeness {
+  distance: number;
+  total: number;
+  changes: number;
+}
+
 interface Branch {
   picks: number[];
   outcomes: Outcome[];
-  closeness: number[];
+  closeness: Closeness[];
+  changes: number;
   plateCount: number;
   uneven: number;
 }
@@ -21,22 +30,24 @@ export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
   if (request.targets.length === 0) throw new RequestError("A request holds at least one target.");
   const implementsUsed = request.targets.map((target) => implementFor(inventory, target.implement));
   checkImplementCounts(implementsUsed, request.targets);
+  const currents = request.targets.map((target, index) => resolved(inventory, implementsUsed[index]!, target));
 
   const memo = new Map<string, Branch | undefined>();
   const search = (pool: Inventory, index: number, standardScrewsMustRunOut: boolean): Branch | undefined => {
     const target = request.targets[index];
     if (!target) {
       if (standardScrewsMustRunOut && hasFree(pool, STANDARD_SCREW)) return undefined;
-      return { picks: [], outcomes: [], closeness: [], plateCount: 0, uneven: 0 };
+      return { picks: [], outcomes: [], closeness: [], changes: 0, plateCount: 0, uneven: 0 };
     }
     const key = `${index}|${standardScrewsMustRunOut}|${poolKey(pool)}`;
     if (memo.has(key)) return memo.get(key);
 
     const implement = implementsUsed[index]!;
-    const options = [{ outcome: loadOne(pool, implement, target, request), standardScrewsMustRunOut }];
+    const current = currents[index];
+    const options = [{ outcome: loadOne(pool, implement, target, request, current), standardScrewsMustRunOut }];
     // A light kettlebell may take a long screw only if no standard screw is left free, for example because later dumbbells hold them all.
     if (implement.id === "kettlebell" && hasFree(pool, STANDARD_SCREW)) {
-      options.push({ outcome: loadOne(withNoFree(pool, STANDARD_SCREW), implement, target, request), standardScrewsMustRunOut: true });
+      options.push({ outcome: loadOne(withNoFree(pool, STANDARD_SCREW), implement, target, request, current), standardScrewsMustRunOut: true });
     }
 
     let best: Branch | undefined;
@@ -45,7 +56,8 @@ export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
       const branch: Branch = {
         picks: [pick, ...tail.picks],
         outcomes: [outcome, ...tail.outcomes],
-        closeness: [...closenessOf(outcome), ...tail.closeness],
+        closeness: [closenessOf(outcome, usage), ...tail.closeness],
+        changes: (usage?.changes ?? 0) + tail.changes,
         plateCount: (usage?.plateCount ?? 0) + tail.plateCount,
         uneven: (usage?.uneven ?? 0) + tail.uneven,
       };
@@ -77,7 +89,7 @@ export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
     const result = outcome.result(pick);
     const label = labelOf(implement, target);
     if (index > 0) {
-      const alone = loadOne(inventory, implement, target, request);
+      const alone = loadOne(inventory, implement, target, request, currents[index]);
       const miss = missWarning(implement, label, outcome, alone, pool, earlier);
       if (miss) result.warnings.unshift(miss);
     }
@@ -90,15 +102,32 @@ export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
 
 function beats(a: Branch, b: Branch): boolean {
   for (let i = 0; i < a.closeness.length; i++) {
-    if (a.closeness[i] !== b.closeness[i]) return a.closeness[i]! < b.closeness[i]!;
+    const left = a.closeness[i]!;
+    const right = b.closeness[i]!;
+    if (left.distance !== right.distance) return left.distance < right.distance;
+    if (left.total !== right.total) {
+      return left.changes !== right.changes ? left.changes < right.changes : left.total < right.total;
+    }
   }
+  if (a.changes !== b.changes) return a.changes < b.changes;
   if (a.plateCount !== b.plateCount) return a.plateCount < b.plateCount;
   return a.uneven < b.uneven;
 }
 
-function closenessOf(outcome: Outcome): [distance: number, total: number] {
-  if (outcome.total === undefined) return [Infinity, Infinity];
-  return [Math.abs(outcome.total - outcome.target), outcome.total];
+function closenessOf(outcome: Outcome, usage?: Usage): Closeness {
+  if (outcome.total === undefined) return { distance: Infinity, total: Infinity, changes: 0 };
+  return { distance: Math.abs(outcome.total - outcome.target), total: outcome.total, changes: usage?.changes ?? 0 };
+}
+
+function resolved(inventory: Inventory, implement: Implement, target: TargetRequest): Resolved | undefined {
+  if (!target.current) return undefined;
+  const { positions, hardware } = reverse(inventory, { implement: implement.id, ...target.current });
+  const screw = hardware.find(({ id }) => inventory.hardware.find((item) => item.id === id)?.kind === "screw")?.id;
+  const screwOn = target.current.screwOn;
+  return {
+    plates: positions.map(({ plates }) => plates),
+    screws: positions.map(({ name }) => (screwOn === undefined || screwOn === name ? screw : undefined)),
+  };
 }
 
 function implementFor(inventory: Inventory, id: string): Implement {
@@ -120,18 +149,24 @@ function checkImplementCounts(implementsUsed: Implement[], targets: TargetReques
   }
 }
 
-function loadOne(pool: Inventory, implement: Implement, target: TargetRequest, request: LoadRequest): Outcome {
+function loadOne(
+  pool: Inventory,
+  implement: Implement,
+  target: TargetRequest,
+  request: LoadRequest,
+  current: Resolved | undefined,
+): Outcome {
   switch (implement.id) {
     case "barbell":
-      return loadBarbell(pool, implement, target.target, request.collars);
+      return loadBarbell(pool, implement, target.target, request.collars, current);
     case "dumbbell":
-      return loadDumbbells(pool, implement, target, request.uneven ?? true);
+      return loadDumbbells(pool, implement, target, request.uneven ?? true, current);
     case "kettlebell":
-      return loadKettlebell(pool, implement, target.target);
+      return loadKettlebell(pool, implement, target.target, current);
     case "leg":
-      return loadLeg(pool, implement, target.target);
+      return loadLeg(pool, implement, target.target, current);
     case "vest":
-      return loadVest(pool, implement, target.target);
+      return loadVest(pool, implement, target.target, current);
     default:
       throw new RequestError(`Load for the ${implement.name.toLowerCase()} is not built yet.`);
   }
@@ -187,7 +222,7 @@ function missWarning(
   pool: Inventory,
   earlier: { label: string; usage: Usage | undefined }[],
 ): string | undefined {
-  if (closenessOf(outcome)[0] <= closenessOf(alone)[0]) return undefined;
+  if (closenessOf(outcome).distance <= closenessOf(alone).distance) return undefined;
   const needed = alone.picks[0];
   const short = (items: { id: string; count: number }[], counts: Map<string, number> | undefined) =>
     items.filter((item) => (counts?.get(item.id) ?? 0) > item.count).map((item) => item.id);
