@@ -26,7 +26,8 @@ function platePool(...args: string[]): unknown {
 
 beforeAll(() => {
   workDirectory = mkdtempSync(join(tmpdir(), "plate-pool-pack-"));
-  const [packed] = JSON.parse(npm(["pack", "--json", "--pack-destination", workDirectory], packageDirectory));
+  const packResult = JSON.parse(npm(["pack", "--json", "--pack-destination", workDirectory], packageDirectory));
+  const packed = Object.values(packResult)[0] as { filename: string };
   installDirectory = join(workDirectory, "empty");
   mkdirSync(installDirectory);
   npm(["init", "--yes"], installDirectory);

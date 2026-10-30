@@ -213,7 +213,6 @@ function warningsFor(checked: Checked): string[] {
     ...(implement.id === "dumbbell" ? unevenWarnings(checked) : []),
     ...(MICRO_LIMITED.includes(implement.id) ? microWarnings(checked) : []),
     ...(implement.id === "kettlebell" ? largePlateWarnings(checked) : []),
-    ...(implement.accepts.includes("quick-lock") ? orderWarnings(checked) : []),
     ...capacityWarnings(checked),
     ...(implement.id === "vest" ? splitWarnings(checked) : []),
     ...poolWarnings(checked),
@@ -297,16 +296,6 @@ function largePlateWarnings({ positions }: Checked): string[] {
   return first && large.length > 1
     ? [`The kettlebell holds ${large.length} × ${plateLabel(first.plate)}. It takes at most one.`]
     : [];
-}
-
-function orderWarnings({ positions }: Checked): string[] {
-  const isMicro = ({ plate }: PlacedPlate) => Number(plate.id === MICRO_PLATE);
-  return positions.flatMap(({ name, placed }) => {
-    const ordered = [...placed].sort((a, b) => isMicro(a) - isMicro(b) || b.weight - a.weight);
-    return ordered.every((item, i) => item.plate === placed[i]!.plate)
-      ? []
-      : [`The plates on ${label(name)} are out of order. Put the heaviest plate innermost and the micro plate outermost.`];
-  });
 }
 
 function capacityWarnings({ implement, positions, hardware }: Checked): string[] {

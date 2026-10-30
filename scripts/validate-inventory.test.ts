@@ -12,6 +12,7 @@ function validate(path: string) {
   return spawnSync("npx", ["tsx", "scripts/validate-inventory.ts", path], {
     cwd: repoRoot,
     encoding: "utf8",
+    env: { ...process.env, npm_config_loglevel: "warn" },
   });
 }
 

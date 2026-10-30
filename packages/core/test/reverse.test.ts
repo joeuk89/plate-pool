@@ -284,12 +284,10 @@ describe("Reverse: barbell rules (spec 6.2)", () => {
     ]);
   });
 
-  it("warns when the plates on a side are out of order", () => {
+  it("does not warn about plate order, since a heavier plate may sit outside a lighter one (spec 16.3 rule 4)", () => {
     const result = barbell(eachSide(5, 22.5));
-    expect(result.warnings).toEqual([
-      "The plates on the left side are out of order. Put the heaviest plate innermost and the micro plate outermost.",
-      "The plates on the right side are out of order. Put the heaviest plate innermost and the micro plate outermost.",
-    ]);
+    expect(result.total).toEqual({ lb: 73, kg: 33.1 });
+    expect(result.warnings).toEqual([]);
   });
 
   it("warns when the plates on a side are longer than the side holds with the collar", () => {
@@ -340,10 +338,8 @@ describe("Reverse: dumbbell rules (spec 6.2)", () => {
     expect(dumbbell([5, 1.25, 1.25], [5, 2.5]).warnings).toEqual(["End A holds 2 micro plates. It takes at most one."]);
   });
 
-  it("warns when an end's plates are out of order", () => {
-    expect(dumbbell([5], [2.5, 5]).warnings).toEqual([
-      "The plates on end B are out of order. Put the heaviest plate innermost and the micro plate outermost.",
-    ]);
+  it("does not warn about the order of an end's plates (spec 16.3 rule 4)", () => {
+    expect(dumbbell([5], [2.5, 5]).warnings).toEqual([]);
   });
 
   it("warns when standard screws hold a dumbbell over 75 lb, and names the screws used", () => {

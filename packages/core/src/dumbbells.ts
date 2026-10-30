@@ -1,5 +1,6 @@
+import { arrange, type Changes, type Resolved } from "./changes.js";
 import type { Hardware, Implement, Inventory, Plate } from "./inventory.js";
-import { choose, sidesFor, type Loading, type LoadResult, type Outcome, type TargetRequest } from "./load.js";
+import { changesOf, choose, sidesFor, type Loading, type LoadResult, type Outcome, type TargetRequest } from "./load.js";
 import { convert, describeWeight, display, parseWeight, thousandths, used } from "./weight.js";
 
 const MICRO_PLATE = "ql-micro";
@@ -33,9 +34,19 @@ interface Candidate {
   plateCount: number;
   difference: number;
   uneven: boolean;
+  /** The heavier end sits on the second position. */
+  flipped?: boolean;
+  order?: number[][];
+  changes?: Changes;
 }
 
-export function loadDumbbells(inventory: Inventory, implement: Implement, request: TargetRequest, unevenAllowed: boolean): Outcome {
+export function loadDumbbells(
+  inventory: Inventory,
+  implement: Implement,
+  request: TargetRequest,
+  unevenAllowed: boolean,
+  current: Resolved | undefined,
+): Outcome {
   const pair = request.pair ?? true;
   const dumbbells = pair ? 2 : 1;
   const unit = implement.unit;
@@ -58,10 +69,10 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
   };
 
   const handle = thousandths(used(implement.base));
-  const candidates: Candidate[] = [];
+  const fresh: Candidate[] = [];
   const empty = emptyEnd(options);
   if (implement.hardware?.options.includes("none") ?? true) {
-    candidates.push({ total: handle, screws: 0, heavier: empty, lighter: empty, plateCount: 0, difference: 0, uneven: false });
+    fresh.push({ total: handle, screws: 0, heavier: empty, lighter: empty, plateCount: 0, difference: 0, uneven: false });
   }
 
   const longestEnd = Math.max(0, ...screws.map((screw) => thousandths(screw.capacityIn ?? 0)));
@@ -76,7 +87,7 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
         const total = withoutScrews + screwsPerDumbbell * convert(thousandths(used(screw.weight)), screw.unit, unit);
         if (screwFor(total) !== screw || screw.count < screwsPerDumbbell * dumbbells || total > maxTotal) continue;
         if (!fitsScrew(screw, heavier) || !fitsScrew(screw, lighter)) continue;
-        candidates.push({
+        fresh.push({
           total,
           screw,
           screws: screwsPerDumbbell,
@@ -99,22 +110,44 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
       const total = handle + difference;
       if (difference > maxDifference || screwFor(total) !== screw || screw.count < dumbbells || total > maxTotal) continue;
       if (!fitsScrew(screw, heavier)) continue;
-      candidates.push({ total, screw, screws: 1, heavier, lighter: empty, plateCount: heavier.plateCount, difference, uneven: true });
+      fresh.push({ total, screw, screws: 1, heavier, lighter: empty, plateCount: heavier.plateCount, difference, uneven: true });
     }
   }
+
+  const placed = (candidate: Candidate) => (candidate.flipped ? [candidate.lighter, candidate.heavier] : [candidate.heavier, candidate.lighter]);
+  const screwsOn = (candidate: Candidate) =>
+    placed(candidate).map((end) =>
+      candidate.screws === 2 || (candidate.screws === 1 && end === candidate.heavier) ? candidate.screw?.id : undefined,
+    );
+  const withChanges = (candidate: Candidate, flipped: boolean): Candidate => {
+    const turned = { ...candidate, flipped };
+    const { plates, changes } = arrange(current!, {
+      positions: implement.positions,
+      fresh: placed(turned).map((end) => platesInOrder(options, end)),
+      screws: screwsOn(turned),
+      symmetric: false,
+      copies: dumbbells,
+    });
+    return { ...turned, order: plates, changes };
+  };
+  const turnable = (candidate: Candidate) => candidate.screws === 1 || candidate.heavier.counts.join() !== candidate.lighter.counts.join();
+  const ranking = current
+    ? fresh.flatMap((candidate) => [withChanges(candidate, false), ...(turnable(candidate) ? [withChanges(candidate, true)] : [])])
+    : fresh;
 
   const toLoading = (candidate: Candidate): Loading => ({
     total: display(candidate.total, unit),
     hardware: candidate.screw ? [{ id: candidate.screw.id, count: candidate.screws }] : [],
     positions: implement.positions.map((name, index) => ({
       name,
-      plates: platesInOrder(options, index === 0 ? candidate.heavier : candidate.lighter),
+      plates: candidate.order?.[index] ?? platesInOrder(options, placed(candidate)[index]!),
     })),
     uneven: candidate.uneven,
-    ...(candidate.uneven ? { heavier: implement.positions[0] } : {}),
+    ...(candidate.uneven ? { heavier: implement.positions[candidate.flipped ? 1 : 0] } : {}),
+    ...(candidate.changes ? { changes: candidate.changes } : {}),
   });
 
-  const choice = choose(candidates, targetMilli, (list) => ranked(list, options));
+  const choice = choose(ranking, targetMilli, (list) => ranked(list, options), changesOf);
   const refused = targetMilli > maxTotal ? { limit: display(maxTotal, unit) } : undefined;
 
   const result = (pick: number): LoadResult => {
@@ -170,6 +203,7 @@ export function loadDumbbells(inventory: Inventory, implement: Implement, reques
       hardware: new Map(candidate.screw ? [[candidate.screw.id, candidate.screws * dumbbells]] : []),
       plateCount: dumbbells * candidate.plateCount,
       uneven: candidate.uneven ? dumbbells : 0,
+      changes: changesOf(candidate),
     })),
     result,
   };
@@ -236,7 +270,11 @@ function otherWays(candidates: Candidate[], chosen: Candidate, options: PlateOpt
 
 function ranked(candidates: Candidate[], options: PlateOption[]): Candidate[] {
   return [...candidates].sort(
-    (a, b) => a.plateCount - b.plateCount || Number(a.uneven) - Number(b.uneven) || heavierFirst(a, b, options),
+    (a, b) =>
+      changesOf(a) - changesOf(b) ||
+      a.plateCount - b.plateCount ||
+      Number(a.uneven) - Number(b.uneven) ||
+      heavierFirst(a, b, options),
   );
 }
 

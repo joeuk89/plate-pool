@@ -1,5 +1,19 @@
+import type { Resolved } from "./changes.js";
 import type { Hardware, Implement, Inventory } from "./inventory.js";
-import { candidatesFor, choose, otherWays, platesInOrder, ranked, sidesFor, type Candidate, type Loading, type LoadResult, type Outcome } from "./load.js";
+import {
+  arranged,
+  candidatesFor,
+  changesOf,
+  choose,
+  otherWays,
+  positionsOf,
+  ranked,
+  sidesFor,
+  type Candidate,
+  type Loading,
+  type LoadResult,
+  type Outcome,
+} from "./load.js";
 import { convert, describeWeight, display, parseWeight, thousandths, used } from "./weight.js";
 
 export const STANDARD_SCREW_MAX_TOTAL_LB = 57.5;
@@ -17,7 +31,7 @@ interface StackOption {
   sticksOut?: boolean;
 }
 
-export function loadKettlebell(inventory: Inventory, implement: Implement, targetText: string): Outcome {
+export function loadKettlebell(inventory: Inventory, implement: Implement, targetText: string, current: Resolved | undefined): Outcome {
   const screw = (id: string) => inventory.hardware.find((item) => item.id === id && implement.hardware?.options.includes(id));
   const standard = screw("screw-standard");
   const long = screw("screw-long");
@@ -40,23 +54,27 @@ export function loadKettlebell(inventory: Inventory, implement: Implement, targe
   }
 
   const warnings = isFree(standard) || isFree(long) ? [] : ["No locking screw is free, so the kettlebell can only be the bare handle."];
-  return stackResult(inventory, implement, targetText, options, warnings);
+  return stackResult(inventory, implement, targetText, options, warnings, current);
 }
 
-export function loadLeg(inventory: Inventory, implement: Implement, targetText: string): Outcome {
+export function loadLeg(inventory: Inventory, implement: Implement, targetText: string, current: Resolved | undefined): Outcome {
   const options = candidatesFor(inventory, implement, undefined, thousandths(used(implement.base))).map((candidate) => ({ candidate }));
-  return stackResult(inventory, implement, targetText, options, [LEG_NOTE]);
+  return stackResult(inventory, implement, targetText, options, [LEG_NOTE], current);
 }
 
 function stackResult(
   inventory: Inventory,
   implement: Implement,
   targetText: string,
-  options: StackOption[],
+  fresh: StackOption[],
   notes: string[],
+  current: Resolved | undefined,
 ): Outcome {
   const target = parseWeight(targetText, implement.unit);
   const targetMilli = convert(thousandths(target.amount), target.unit, implement.unit);
+  const options = current
+    ? fresh.map((option) => ({ ...option, candidate: arranged(option.candidate, implement, current, [option.screw?.id]) }))
+    : fresh;
   const candidates = options.map((option) => option.candidate);
   const optionOf = (candidate: Candidate) => options.find((option) => option.candidate === candidate)!;
 
@@ -65,12 +83,13 @@ function stackResult(
     return {
       total: display(candidate.total, implement.unit),
       hardware: screw ? [{ id: screw.id, count: 1 }] : [],
-      positions: implement.positions.map((name) => ({ name, plates: platesInOrder(candidate) })),
+      positions: positionsOf(implement, candidate),
       uneven: false,
+      ...(candidate.changes ? { changes: candidate.changes } : {}),
     };
   };
 
-  const choice = choose(candidates, targetMilli, ranked);
+  const choice = choose(candidates, targetMilli, ranked, changesOf);
   const limit = limitOf(implement);
   const refused = limit && targetMilli > limit.total ? { limit: display(limit.amount, implement.unit) } : undefined;
 
@@ -122,6 +141,7 @@ function stackResult(
         hardware: new Map(screw ? [[screw.id, 1]] : []),
         plateCount: candidate.plateCount,
         uneven: 0,
+        changes: changesOf(candidate),
       };
     }),
     result,
