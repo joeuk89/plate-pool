@@ -152,7 +152,7 @@ describe("Load with a current loading: worked examples (spec section 16.6)", () 
 });
 
 describe("Load with a current loading: properties (spec 16.6)", () => {
-  it("with no current loading, every result equals the version 1 result and carries no changes block", () => {
+  it("with no current loading, no result carries a changes block (the version 1 suites check the rest of the result)", () => {
     for (const { implement, pair, targets } of sweeps) {
       for (const target of targets) {
         const fresh = load(inventory, { targets: [{ implement, target, ...pair }] });
@@ -318,5 +318,17 @@ describe("Load with a current loading: rules (spec 16.3)", () => {
     const without = load(inventory, { targets: [{ implement: "barbell", target: "173" }, later] });
     expect(withCurrent.results[1]).toEqual(without.results[1]);
     expect(withCurrent.leftover).toEqual(without.leftover);
+  });
+
+  it("across several implements ranks closeness first, then total changes before total plates", () => {
+    const later = { implement: "dumbbell", target: "75" };
+    const without = load(inventory, { targets: [{ implement: "barbell", target: "98" }, later] });
+    expect(without.results[0]!.loading!.positions).toEqual(eachSide(5, 5, 5, 5, 5, 5, 5, 5));
+
+    const current = { positions: eachSide(22.5, 5, 5, 2.5) };
+    const [bar, dumbbells] = load(inventory, { targets: [{ implement: "barbell", target: "98", current }, later] }).results;
+    expect(bar!.loading).toMatchObject({ positions: eachSide(22.5, 5, 5, 2.5, 5), changes: { count: 2 } });
+    expect(dumbbells!.exact).toBe(true);
+    expect(dumbbells!.loading!.total.lb).toBe(75);
   });
 });
