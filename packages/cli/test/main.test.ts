@@ -470,7 +470,7 @@ describe("plate-pool load --from", () => {
 
     const end = "22.5,5,2.5";
     expect(runWith(["load", "dumbbells=80", "--from", "dumbbells", "--end-a", end, "--end-b", end]).stdout).toContain(
-      "12 changes. Each end: put on 5. Swap 2 standard screws for long screws.",
+      "12 changes. Each end: put on 5. Swap 2 standard screws for long screws on each dumbbell.",
     );
     expect(runWith(["load", "dumbbell=45", "--from", "dumbbell", "--end-a", "5,5,5,2.5", "--end-b", "5,5,5"]).stdout).toContain(
       "1 change. End A: unchanged. End B: put on 2.5.",

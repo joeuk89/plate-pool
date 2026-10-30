@@ -175,11 +175,12 @@ npx plate-pool load barbell=175 --from barbell --side 22.5,22.5,5,5,5,5,5,5,2.5 
 
 The `changes` block:
 
-- `count` is the number of changes from the current loading. A change is one plate put on or taken off one position, or one locking screw added, removed or swapped for the other kind; a swap counts two. Collars never count. For a pair of dumbbells, `count` covers both dumbbells.
+- `count` is the number of changes from the current loading. A change is one plate put on or taken off one position, or one locking screw added, removed or swapped for the other kind; a swap counts two. Collars never count. For a pair of dumbbells, `count` covers both dumbbells, while `positions` and `hardware` describe one dumbbell: do the same on the other.
 - `positions` holds one entry per position. `keep` is the plates that stay on, innermost first. `remove` is the plates to take off, from the current loading. `add` is the plates to put on, outside the kept plates.
 - `hardware` lists screw changes: `{ "from": "screw-standard", "to": "screw-long", "count": 2 }` is a swap on two positions. An entry with only `to` adds screws, and one with only `from` removes them.
 - `positions[].plates` still lists the whole new loading, innermost first. Plates put on go outside the kept ones, so a heavier plate can sit outside a lighter one.
 - A current loading affects its own implement only. Its plates stay free for the other implements in the request.
+- `--from` takes no screw option. The current loading gets the screw `reverse` picks for the same plates.
 
 ### list
 

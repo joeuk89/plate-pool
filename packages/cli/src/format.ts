@@ -67,7 +67,7 @@ function resultText(result: LoadResult, inventory: Inventory): string {
     lines.push(`${recommended ? "*" : " "} ${label}  ${describeWeight(loading.total, unit)}${loading.uneven ? "  uneven" : ""}`);
     const indent = " ".repeat(label.length + 4);
     for (const line of positionLines(result.implement, loading)) lines.push(`${indent}${line}`);
-    if (loading.changes) lines.push(`${indent}${changesLine(result.implement, loading.changes)}`);
+    if (loading.changes) lines.push(`${indent}${changesLine(result.implement, loading.changes, result.pair === true)}`);
   };
   if (result.loading) option("exact", result.loading, false);
   if (result.below) option("below", result.below, result.recommended === "below");
@@ -163,7 +163,7 @@ function positionLines(implement: string, loading: Loading): string[] {
   ];
 }
 
-function changesLine(implement: string, changes: Changes): string {
+function changesLine(implement: string, changes: Changes, pair: boolean): string {
   const plates = (list: number[]) => (implement === "vest" ? blocks(list.length) : list.join(", "));
   const work = ({ remove, add }: PositionChanges) => {
     const steps = [...(remove.length > 0 ? [`take off ${plates(remove)}`] : []), ...(add.length > 0 ? [`put on ${plates(add)}`] : [])];
@@ -179,8 +179,9 @@ function changesLine(implement: string, changes: Changes): string {
   const hardware = changes.hardware.map(({ from, to, count }) => {
     const name = (id: string) => `${hardwareLabels[id] ?? id}${count === 1 ? "" : "s"}`;
     const some = count === 1 ? "" : `${count} `;
-    if (from && to) return `Swap ${some}${name(from)} for ${name(to)}.`;
-    return to ? `Add ${some}${name(to)}.` : `Remove ${some}${name(from!)}.`;
+    const where = pair ? " on each dumbbell" : "";
+    if (from && to) return `Swap ${some}${name(from)} for ${name(to)}${where}.`;
+    return to ? `Add ${some}${name(to)}${where}.` : `Remove ${some}${name(from!)}${where}.`;
   });
   return [`${changes.count} ${changes.count === 1 ? "change" : "changes"}.`, ...sentences, ...hardware].join(" ");
 }
