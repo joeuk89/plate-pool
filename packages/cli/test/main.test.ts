@@ -415,6 +415,144 @@ describe("plate-pool load with several targets", () => {
   });
 });
 
+describe("plate-pool load --from", () => {
+  const side173 = [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5];
+  const eachSide = (plates: number[]) => [
+    { name: "left", plates },
+    { name: "right", plates },
+  ];
+
+  it("prints the same JSON as the library's result for a current loading (spec 12.3)", () => {
+    const result = runWith(["load", "barbell=175", "--from", "barbell", "--side", side173.join(","), "--json"]);
+    expect(result.stderr).toBe("");
+    expect(result.code).toBe(0);
+    const response = JSON.parse(result.stdout);
+    expect(response).toEqual(
+      load(inventory, { targets: [{ implement: "barbell", target: "175", current: { positions: eachSide(side173) } }] }),
+    );
+    expect(response.results[0].below.changes.count).toBe(0);
+    expect(response.results[0].above.changes).toEqual({
+      count: 2,
+      positions: [
+        { name: "left", keep: side173, remove: [], add: [1.25] },
+        { name: "right", keep: side173, remove: [], add: [1.25] },
+      ],
+      hardware: [],
+    });
+  });
+
+  it("prints a changes line under each loading (spec 16.6 example 18)", () => {
+    expect(runWith(["load", "barbell=175", "--from", "barbell", "--side", side173.join(",")]).stdout).toBe(
+      [
+        "Barbell  target 175 lb (79.4 kg)  no exact loading",
+        "",
+        "  below  173 lb (78.5 kg)",
+        "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
+        "         0 changes. Each side: unchanged.",
+        "* above  175.5 lb (79.6 kg)",
+        "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | clamp collar",
+        "         2 changes. Each side: put on 1.25.",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("prints plates taken off and put on, and a screw swap, in the changes line", () => {
+    expect(runWith(["load", "barbell=58", "--from", "barbell", "--side", "5,5,5,5,2.5"]).stdout).toContain(
+      "each side: 5 5 5 5 | clamp collar\n         2 changes. Each side: take off 2.5.",
+    );
+    expect(runWith(["load", "barbell=70.5", "--from", "barbell", "--side", "5,5,5,5,2.5,2.5"]).stdout).toContain(
+      "each side: 5 5 5 5 2.5 2.5 1.25 | clamp collar\n         2 changes. Each side: put on 1.25.",
+    );
+    expect(runWith(["load", "barbell=63", "--from", "barbell", "--side", "5,5,5,5,1.25"]).stdout).toContain(
+      "each side: 5 5 5 5 2.5 | clamp collar\n         4 changes. Each side: take off 1.25 · put on 2.5.",
+    );
+
+    const end = "22.5,5,2.5";
+    expect(runWith(["load", "dumbbells=80", "--from", "dumbbells", "--end-a", end, "--end-b", end]).stdout).toContain(
+      "12 changes. Each end: put on 5. Swap 2 standard screws for long screws on each dumbbell.",
+    );
+    expect(runWith(["load", "dumbbell=45", "--from", "dumbbell", "--end-a", "5,5,5,2.5", "--end-b", "5,5,5"]).stdout).toContain(
+      "1 change. End A: unchanged. End B: put on 2.5.",
+    );
+  });
+
+  it("counts vest blocks in the changes line", () => {
+    expect(runWith(["load", "vest=10", "--from", "vest", "--blocks", "8"]).stdout).toContain(
+      "2 changes. Front: put on 1 block. Back: put on 1 block.",
+    );
+    expect(runWith(["load", "kettlebell=40", "--from", "kettlebell", "--stack", "5,5"]).stdout).toContain("1 change. Stack: put on 5.");
+  });
+
+  it("gives a dumbbell pair's current loading with --end-a and --end-b (spec 16.6 example 19)", () => {
+    const end = "22.5,5,2.5";
+    const result = runWith(["load", "dumbbells=80", "--from", "dumbbells", "--end-a", end, "--end-b", end, "--json"]);
+    expect(result.stderr).toBe("");
+    const [dumbbells] = JSON.parse(result.stdout).results;
+    expect(dumbbells.loading.changes.count).toBe(12);
+    expect(dumbbells.loading.changes.hardware).toEqual([{ from: "screw-standard", to: "screw-long", count: 2 }]);
+  });
+
+  it("gives each implement its own current loading, matched by name", () => {
+    const args = ["load", "barbell=98", "dumbbells=40", "--from", "dumbbells", "--end-a", "5,5", "--end-b", "5,5"];
+    const response = JSON.parse(runWith([...args, "--from", "barbell", "--side", "5,5,5,5,5,5,5", "--json"]).stdout);
+    expect(response).toEqual(
+      load(inventory, {
+        targets: [
+          { implement: "barbell", target: "98", current: { positions: eachSide([5, 5, 5, 5, 5, 5, 5]) } },
+          {
+            implement: "dumbbell",
+            target: "40",
+            current: {
+              positions: [
+                { name: "end-a", plates: [5, 5] },
+                { name: "end-b", plates: [5, 5] },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    expect(response.results[1].loading.changes.count).toBe(4);
+  });
+
+  it("reads --blocks and --stack after --from", () => {
+    const vest = JSON.parse(runWith(["load", "vest=10", "--from", "vest", "--blocks", "8", "--json"]).stdout);
+    const blocks = [
+      { name: "front", plates: [1, 1, 1, 1] },
+      { name: "back", plates: [1, 1, 1, 1] },
+    ];
+    expect(vest).toEqual(load(inventory, { targets: [{ implement: "vest", target: "10", current: { positions: blocks } }] }));
+    expect(vest.results[0].loading.changes).toBeDefined();
+
+    const leg = JSON.parse(runWith(["load", "leg=12.5", "--from", "leg", "--stack", "5,5", "--json"]).stdout);
+    expect(leg.results[0].loading.changes.count).toBe(1);
+  });
+
+  it("leaves out the changes block for an implement with no --from (spec 16.6 example 20)", () => {
+    const [barbell, dumbbells] = JSON.parse(runWith(["load", "barbell=98", "dumbbells=40", "--from", "barbell", "--json"]).stdout).results;
+    expect(barbell.loading).toHaveProperty("changes");
+    expect(dumbbells.loading).not.toHaveProperty("changes");
+  });
+
+  it.each([
+    [["load", "barbell=175", "--from"], "--from takes an implement"],
+    [["load", "barbell=175", "--from", "--side", "5"], "--from takes an implement"],
+    [["load", "barbell=175", "--from", "rowing"], 'Unknown implement "rowing" after --from'],
+    [["load", "barbell=175", "--from", "dumbbells", "--end-a", "5"], "--from dumbbells needs a dumbbells= target"],
+    [["load", "barbell=175", "--from", "barbell", "--from", "barbell"], "One --from per implement"],
+    [["load", "barbell=175", "--from", "barbell", "--stack", "5"], "--stack is for the kettlebell and leg attachment"],
+    [["load", "barbell=175", "--from", "barbell", "--side", "10"], "The straight bar takes no 10 lb plate"],
+    [["load", "barbell=175", "--to", "200"], "--to works with list only"],
+    [["reverse", "barbell", "--from", "100"], "--from works with list and load only"],
+  ])("exits 1 with the reason on standard error for %j", (args, reason) => {
+    const result = runWith(args);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain(reason);
+  });
+});
+
 describe("plate-pool reverse", () => {
   it("prints the same JSON as the library's result (spec 12.3)", () => {
     const result = runWith(["reverse", "barbell", "--side", "22.5,22.5,5,5", "--json"]);
@@ -536,7 +674,8 @@ describe("plate-pool reverse", () => {
     [["reverse", "barbell", "--side"], "--side takes a list of plate weights"],
     [["reverse", "barbell", "--side", "10"], "The straight bar takes no 10 lb plate"],
     [["reverse", "vest", "--blocks", "2.5"], "--blocks takes a whole number of blocks"],
-    [["load", "barbell=175", "--side", "5"], "--side is for the reverse command"],
+    [["load", "barbell=175", "--side", "5"], "In load, --side follows --from <implement>"],
+    [["inventory", "--side", "5"], "--side is for the reverse command"],
   ])("exits 1 with the reason on standard error for %j", (args, reason) => {
     const result = runWith(args);
     expect(result.code).toBe(1);

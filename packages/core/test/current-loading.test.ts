@@ -151,7 +151,8 @@ describe("Load with a current loading: worked examples (spec section 16.6)", () 
   });
 });
 
-describe("Load with a current loading: properties (spec 16.6)", () => {
+// Each sweep runs thousands of loads; shared CI runners can take over 5 s.
+describe("Load with a current loading: properties (spec 16.6)", { timeout: 30_000 }, () => {
   it("with no current loading, no result carries a changes block (the version 1 suites check the rest of the result)", () => {
     for (const { implement, pair, targets } of sweeps) {
       for (const target of targets) {

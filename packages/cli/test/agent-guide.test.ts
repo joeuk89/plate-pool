@@ -36,8 +36,13 @@ function firstOfEachList(inventory: Record<string, unknown>) {
 }
 
 describe("the agent guide", () => {
-  it("shows one JSON example for each command", () => {
-    expect(examples().map(({ args }) => args[0])).toEqual(["load", "list", "reverse", "inventory"]);
+  it("shows one JSON example for each command, and one for load --from", () => {
+    expect(examples().map(({ args }) => args[0])).toEqual(["load", "load", "list", "reverse", "inventory"]);
+    expect(examples()[1]!.args).toContain("--from");
+  });
+
+  it("documents the changes block", () => {
+    expect(guide).toMatch(/`changes`[\s\S]*`keep`[\s\S]*`remove`[\s\S]*`add`/);
   });
 
   it.each(examples().map((example) => [example.args.join(" "), example] as const))("prints the documented JSON for %s", (_, example) => {
