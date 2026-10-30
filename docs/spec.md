@@ -36,6 +36,9 @@ Code, documents and agents use these words with these meanings.
 | **Measured weight** | A weight the owner has measured. It overrides the listed weight. |
 | **Unverified** | A value no reliable source or measurement confirms. |
 | **Uneven** | A dumbbell whose two ends carry different weights. |
+| **Current loading** | The loading that is on an implement right now, as the owner has told the app. |
+| **Change** | One plate put on or taken off one position, or one locking screw added, removed or swapped for the other kind (a swap counts two: one off, one on). Taking hardware off to reach the plates and putting the same piece back does not count. Collars never count. |
+| **Changes** | The number of changes to get from the current loading to another loading. |
 
 ## 3. Scope
 
@@ -53,7 +56,7 @@ Code, documents and agents use these words with these meanings.
 - Workout logging, rest timers, and any link to Hevy.
 - Accounts, sync, or any server.
 - Editing the inventory inside the app.
-- Remembering what is loaded now, or working out the fewest plate changes between two loadings.
+- Remembering what is loaded now, or working out the fewest plate changes between two loadings. Version 2 adds this: see section 16.
 - One-rep-max and percentage calculators.
 - The rack. Mirafit publishes no load rating for the M130, so there is nothing to check against.
 - Typed or spoken sentences as input.
@@ -240,6 +243,8 @@ Several loadings often reach the same weight. For a request with implements 1 to
 
 The result also holds up to five other loadings per implement that reach the same weight, for the "other ways to make this" list.
 
+With a current loading, rule 3 changes: see section 16.3.
+
 The search space is small: 37 plates of 4 sizes. The library may search it exhaustively.
 
 ### 6.4 Impossible targets
@@ -248,13 +253,15 @@ When no loading reaches a target exactly, the result holds two loadings: the clo
 
 In a request with several implements, each later implement uses the plates left by the recommended loadings before it. A later implement that misses its target because of plates used earlier gets a warning that names the cause.
 
+With a current loading, the tie-break changes: see section 16.3.
+
 ### 6.5 List
 
 List returns every achievable total for one implement within a range, in ascending order. It assumes the whole pool is free. Each row holds the total, the recommended loading, and flags: uneven, micro plates used, screw kind.
 
 ### 6.6 Reverse
 
-Reverse takes a loading and returns its total. It also checks the loading against the pool and the rules in 6.2, and returns a warning for each rule broken. It returns the total even when a rule is broken.
+Reverse takes a loading and returns its total. It also checks the loading against the pool and the rules in 6.2, and returns a warning for each rule broken. It returns the total even when a rule is broken. Plate order on a position is a preference, not a rule, and gets no warning: see section 16.3.
 
 ## 7. Worked examples
 
@@ -306,6 +313,7 @@ This is the main screen.
 - **Impossible target**: two results side by side, below and above, with the recommended one highlighted.
 - **Notes**: uneven loading, warnings, and unverified values, in small text under the result.
 - **Other ways to make this**: a collapsed list.
+- **Current loading**: a "Loaded" button, a strip and a changes block. See section 16.4.
 
 ### 8.3 Several implements
 
@@ -550,6 +558,88 @@ The research file lists further checks. They affect drawing scale only.
 Not agreed, and not part of version 1. Recorded so they are not lost.
 
 - List with some plates reserved for another implement ("what can the dumbbells make while the barbell is at 173?").
-- Remembering what is loaded, and the fewest plate changes to the next loading.
+- Remembering what is loaded, and the fewest plate changes to the next loading. Now version 2: see section 16.
 - Olympic plates and bar.
 - Bodyweight plus vest totals for chin-ups and dips.
+
+## 16. Version 2: current loading
+
+Agreed 2026-10-30. The first feature after version 1. Everything in sections 1 to 15 stands unless this section says otherwise.
+
+### 16.1 Purpose
+
+Between sets the owner often moves from one weight to the next without stripping the implement. The app learns what is on the implement now (the **current loading**) and, for the next target, shows the loading that takes the fewest **changes** to reach, whether that means adding to what is on or unloading and starting again.
+
+### 16.2 Terms
+
+See the glossary in section 2: **current loading**, **change**, **changes**.
+
+### 16.3 Calculation rules
+
+1. **A current loading is per implement and optional.** Load accepts one current loading for each implement in the request. An implement with none behaves exactly as version 1.
+2. **Kept plates are the shared innermost run.** Quick-Lock plates stack, so a plate comes off only after everything outside it. On each position the plates kept are the longest run, from the innermost plate outward, that the current loading and the new loading share. Everything outside that run on the current loading is taken off; everything outside it on the new loading is put on.
+3. **Changes are counted as the glossary defines them.** A dumbbell pair counts both dumbbells. A vest change is one block put on or taken off; blocks do not stack, and front and back follow 6.2.
+4. **Plate order is relaxed.** Added plates go outside the kept plates, heaviest first among themselves, micro plate outermost. A position may therefore carry a heavier plate outside a lighter one. Fresh loadings keep heaviest innermost. Reverse no longer warns about order.
+5. **Fewest changes replaces fewest plates.** With a current loading, 6.3 rule 3 becomes "the fewest changes in total across all implements", and "the fewest plates" follows it as rule 4, then fewest uneven dumbbells as rule 5. Closeness to the target still comes first: a loading that misses the target never beats one that hits it, however few changes it needs.
+6. **Impossible targets.** Both the below and the above loading carry their changes. The nearer one is recommended. On a tie the one with fewer changes wins, then the lower.
+7. **Other ways.** The alternatives list is ordered by changes, fewest first.
+8. **Everything else holds.** The pool limit, per-implement rules in 6.2, screw choice by weight and the List and Reverse behaviour are unchanged. List ignores current loadings.
+
+### 16.4 Web app
+
+- **Loaded button.** Every loading the Load screen shows has a "Loaded" button: the exact result, each of below and above, and each row under "Other ways to make this". Tapping it pins that loading as the implement's current loading and promotes it to the main result. The Reverse screen has the same button, so the owner can record a loading the app never suggested; pinning there switches to the Load screen.
+- **Strip.** Between the number field and the result, when a current loading exists: "On the bar · 173 lb · each side 2 × 22.5, 6 × 5, 1 × 2.5" with an "Unload" button that clears it. Wording per implement: "On the bar", "On the dumbbells" or "On the dumbbell", "On the kettlebell", "On the attachment", "In the vest". Nothing shows without a current loading.
+- **Changes block.** With a current loading, the text under the picture becomes a changes block: a count, then one line per position. Example: "4 changes. Each side: take off 2.5 · put on 5, 5." A position with nothing to do reads "unchanged". A screw swap reads "swap standard screw for long screw". Below and above each carry their own block. Rows under "Other ways" are prefixed with their count.
+- **Picture.** Kept plates draw as today. Added plates draw with a highlight. Taken-off plates are not drawn. Plates draw in their real order.
+- **Step buttons** are unchanged: they move to the next achievable weight.
+- **Storage.** Each implement's current loading is kept on the device like the settings in 8.8, so a reload or a locked phone mid-workout keeps it. Only "Unload" or pinning another loading replaces it. The app works with storage empty or blocked.
+- **Links** carry no current loading. A result's URL describes the target only; opening it shows the fresh result.
+- **Several implements.** A current loading affects its own implement only. Plates on the bar stay available to the dumbbells. "List with some plates reserved" remains a later candidate (section 15).
+- **List screen** is unchanged.
+
+### 16.5 Command-line tool and JSON
+
+- `load` takes `--from <implement> <loading>` using the position options of `reverse`, for example `plate-pool load barbell=175 --from barbell --side 22.5,22.5,5,5,5,5,5,5,2.5`. One `--from` per implement.
+- Text output adds a changes line per loading.
+- Each loading in the JSON output gains an optional `changes` block, present only when a current loading was given:
+
+```json
+"changes": {
+  "count": 4,
+  "positions": [
+    { "name": "left", "keep": [22.5, 22.5, 5, 5, 5, 5, 5, 5], "remove": [2.5], "add": [5, 5] },
+    { "name": "right", "keep": [22.5, 22.5, 5, 5, 5, 5, 5, 5], "remove": [2.5], "add": [5, 5] }
+  ],
+  "hardware": [{ "from": "screw-standard", "to": "screw-long", "count": 2 }]
+}
+```
+
+- `positions[].plates` still lists the whole new loading, innermost first.
+- `api/achievable.json` is unchanged.
+- The agent guide gains `--from` and the `changes` shape.
+
+### 16.6 Worked examples
+
+Default clamp collars. These are acceptance tests for the library.
+
+| # | Current loading | Target | Result |
+| --- | --- | --- | --- |
+| 16 | Barbell 88 lb (each side 7 × 5) | 98 lb | Exact. Put on 1 × 5 per side. 2 changes. Beats the 4-plate fresh loading. |
+| 17 | Barbell 68 lb (each side 5 × 5) | 113 lb | Exact. Put on 1 × 22.5 per side, outside the 5s. 2 changes. |
+| 18 | Barbell 173 lb | 175 lb | Not exact. Below 173 lb: 0 changes. Above 175.5 lb: put on 1 micro per side, 2 changes. Recommended: 175.5 lb, as nearer. |
+| 19 | Dumbbells 70 lb pair (each end 1 × 22.5, 1 × 5, 1 × 2.5, standard screws) | 80 lb pair | Exact. Swap to long screws and put on 1 × 5 per end, outside the 2.5. 8 screw changes + 4 plate changes = 12 changes. |
+| 20 | None | any | No `changes` block. Identical to version 1. |
+
+Properties:
+
+- With no current loading, every result equals the version 1 result.
+- Reverse of a loading with `changes` returns the same total as the loading.
+- Changes on a position equals plates taken off plus plates put on plus screw changes, and never counts a kept plate.
+
+### 16.7 Tickets
+
+Three, each shippable alone, built unattended as described in CLAUDE.md.
+
+1. **Library.** Current loading on Load, ranking by changes, relaxed order, Reverse order warning removed, `changes` in the result, examples 16 to 20 as tests.
+2. **Web app.** Loaded and Unload, the strip, the changes block, picture highlight, interactive "other ways", Loaded on Reverse, device storage. The ticket ends with a full check in a real browser, phone-sized and desktop, that every screen looks right and works well.
+3. **Command-line tool and agent guide.** `--from`, JSON `changes`, guide update.
