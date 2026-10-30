@@ -1,8 +1,9 @@
 import { reverse, type CollarChoice, type Loading, type ReverseRequest, type ReverseResult, type Unit } from "@plate-pool/core";
 import { useState, type CSSProperties } from "react";
+import { pinnedFrom, type PinnedLoading } from "./current";
 import { unevenNote, unverifiedList } from "./describe";
 import { inventory } from "./inventory";
-import { collarOptions, dumbbellOptions, Total, unitOf, type DumbbellChoice } from "./LoadScreen";
+import { collarOptions, dumbbellOptions, Total, unitOf, type DumbbellChoice, type LoadChoice } from "./LoadScreen";
 import { Picture } from "./Picture";
 import type { Editing } from "./picture-parts";
 import { plateColour } from "./plate-colours";
@@ -23,6 +24,7 @@ interface ReverseScreenProps {
   collars: CollarChoice;
   onCollarsChange: (collars: CollarChoice) => void;
   uneven: boolean;
+  onPin: (pinned: PinnedLoading, choice: LoadChoice) => void;
 }
 
 const positionWords: Record<string, { label: string; phrase: string }> = {
@@ -96,7 +98,7 @@ function loadingOf(result: ReverseResult): Loading {
   return { total, hardware, positions, uneven, ...(heavier ? { heavier } : {}) };
 }
 
-export function ReverseScreen({ implement, collars, onCollarsChange, uneven }: ReverseScreenProps) {
+export function ReverseScreen({ implement, collars, onCollarsChange, uneven, onPin }: ReverseScreenProps) {
   const [positions, setPositions] = useState<Positions>(() => positionNames(implement).map((name) => ({ name, plates: [] })));
   const [mirrorEnds, setMirrorEnds] = useState(true);
   const [dumbbells, setDumbbells] = useState<DumbbellChoice>("pair");
@@ -115,6 +117,8 @@ export function ReverseScreen({ implement, collars, onCollarsChange, uneven }: R
   };
   const result = reverse(inventory, request);
 
+  const pin = () =>
+    onPin(pinnedFrom(implement, loadingOf(result), dumbbells === "pair"), { target: String(result.total[unit]), dumbbells });
   const phraseFor = (position: string) => (mirrored ? rows[0]!.phrase : (positionWords[position]?.phrase ?? position));
   const editing: Editing = {
     remove: (position, index) => setPositions(removePlate(positions, position, index, mirrored)),
@@ -174,9 +178,14 @@ export function ReverseScreen({ implement, collars, onCollarsChange, uneven }: R
             <Switch label="Mirror ends" checked={mirrorEnds} onChange={setMirrorEnds} />
           </>
         )}
-        <button type="button" className="clear" disabled={empty} onClick={() => setPositions(clearPlates(positions))}>
-          Clear
-        </button>
+        <div className="reverse-actions">
+          <button type="button" className="clear" disabled={empty} onClick={() => setPositions(clearPlates(positions))}>
+            Clear
+          </button>
+          <button type="button" className="loaded" onClick={pin}>
+            Loaded
+          </button>
+        </div>
       </div>
     </div>
   );

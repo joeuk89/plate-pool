@@ -1,9 +1,16 @@
 import type { Loading, LoadResult } from "@plate-pool/core";
+import { countText } from "./changes-text";
 import { endLabel, plateList } from "./describe";
+import { LoadedButton } from "./LoadedButton";
 
 const positionNouns: Record<string, string> = { barbell: "side", dumbbell: "end" };
 
-export function OtherWays({ result }: { result: LoadResult }) {
+interface Props {
+  result: LoadResult;
+  onPin?: (loading: Loading) => void;
+}
+
+export function OtherWays({ result, onPin }: Props) {
   if (result.alternatives.length === 0) return null;
   return (
     <details className="other-ways" aria-label="Other ways to make this">
@@ -11,6 +18,9 @@ export function OtherWays({ result }: { result: LoadResult }) {
       <ul>
         {result.alternatives.map((loading) => (
           <li key={JSON.stringify(loading.positions)}>
+            {loading.changes && (
+              <p className="changes-count">{countText(loading.changes.count, result.implement === "dumbbell" && result.pair !== false)}</p>
+            )}
             <dl className="details">
               {positionRows(result.implement, loading).map(({ label, plates, heavier }) => (
                 <div key={label}>
@@ -23,6 +33,7 @@ export function OtherWays({ result }: { result: LoadResult }) {
               ))}
             </dl>
             {loading.uneven && <p className="uneven">Uneven</p>}
+            {onPin && <LoadedButton loading={loading} onPin={onPin} />}
           </li>
         ))}
       </ul>

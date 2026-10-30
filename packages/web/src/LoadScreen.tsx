@@ -10,6 +10,10 @@ import {
   type Unit,
 } from "@plate-pool/core";
 import { useId, useMemo, useRef } from "react";
+import { changesText, type ChangesText } from "./changes-text";
+import { CurrentStrip } from "./CurrentStrip";
+import { LoadedButton } from "./LoadedButton";
+import { pinnedFrom, type CurrentLoadings, type PinnedLoading } from "./current";
 import { OtherWays } from "./OtherWays";
 import { Picture } from "./Picture";
 import { Segmented } from "./Segmented";
@@ -18,7 +22,7 @@ import { blockList, endLabel, hardwareList, plateList, unevenNote, unverifiedLis
 import { inventory } from "./inventory";
 import { AddImplement } from "./AddImplement";
 import { LeftoverLine } from "./LeftoverLine";
-import { cardLabel, newCard, plan, targetWithUnit, unitOf, type Card, type DumbbellChoice, type Outcome } from "./plan";
+import { cardLabel, newCard, pinnedFor, plan, targetWithUnit, unitOf, type Card, type DumbbellChoice, type Outcome } from "./plan";
 import { useReorder } from "./reorder";
 
 export { unitOf, type DumbbellChoice } from "./plan";
@@ -77,10 +81,14 @@ interface LoadScreenProps {
   onCollarsChange: (collars: CollarChoice) => void;
   uneven: boolean;
   onUnevenChange: (uneven: boolean) => void;
+  current: CurrentLoadings;
+  onPin: (implement: string, pinned: PinnedLoading | undefined) => void;
 }
 
-export function LoadScreen({ cards, onCardsChange, collars, onCollarsChange, uneven, onUnevenChange }: LoadScreenProps) {
-  const { outcomes, leftover } = useMemo(() => plan(cards, { collars, uneven }), [cards, collars, uneven]);
+export function LoadScreen(props: LoadScreenProps) {
+  const { cards, onCardsChange, collars, onCollarsChange, uneven, onUnevenChange, current, onPin } = props;
+  const { outcomes, leftover } = useMemo(() => plan(cards, { collars, uneven, current }), [cards, collars, uneven, current]);
+  const pinned = pinnedFor(cards, current);
   const { reordering, listProps, itemProps, gripProps } = useReorder(cards, onCardsChange);
   const several = cards.length > 1;
   const update = (id: number, change: Partial<Card>) => onCardsChange(cards.map((card) => (card.id === id ? { ...card, ...change } : card)));
@@ -110,6 +118,8 @@ export function LoadScreen({ cards, onCardsChange, collars, onCollarsChange, une
               onCollarsChange={onCollarsChange}
               uneven={uneven}
               onUnevenChange={onUnevenChange}
+              pinned={pinned[index]}
+              onPin={(next) => onPin(card.implement, next)}
               onChange={(change) => update(card.id, change)}
               onRemove={() => remove(card.id)}
               grip={gripProps(card.id, index)}
@@ -133,6 +143,8 @@ interface LoadCardProps {
   onCollarsChange: (collars: CollarChoice) => void;
   uneven: boolean;
   onUnevenChange: (uneven: boolean) => void;
+  pinned: PinnedLoading | undefined;
+  onPin: (pinned: PinnedLoading | undefined) => void;
   onChange: (change: Partial<Card>) => void;
   onRemove: () => void;
   grip: ReturnType<ReturnType<typeof useReorder>["gripProps"]>;
@@ -140,7 +152,22 @@ interface LoadCardProps {
 }
 
 function LoadCard(props: LoadCardProps) {
-  const { card, priority, several, outcome, collars, onCollarsChange, uneven, onUnevenChange, onChange, onRemove, grip, autoFocus } = props;
+  const {
+    card,
+    priority,
+    several,
+    outcome,
+    collars,
+    onCollarsChange,
+    uneven,
+    onUnevenChange,
+    pinned,
+    onPin,
+    onChange,
+    onRemove,
+    grip,
+    autoFocus,
+  } = props;
   const { implement, target, unit, dumbbells } = card;
   const targetId = useId();
   const label = cardLabel(card);
@@ -151,6 +178,10 @@ function LoadCard(props: LoadCardProps) {
   const moveTo = (weight: Display) => {
     const own = unitOf(implement);
     onChange({ unit: own, target: String(weight[own]) });
+  };
+  const pin = (loading: Loading) => {
+    onPin(pinnedFrom(implement, loading, dumbbells === "pair"));
+    moveTo(loading.total);
   };
 
   return (
@@ -236,8 +267,9 @@ function LoadCard(props: LoadCardProps) {
             </>
           )}
         </div>
+        {pinned && <CurrentStrip implement={implement} pinned={pinned} collars={collars} onUnload={() => onPin(undefined)} />}
         <section aria-label="Result" aria-live="polite" className="result">
-          {outcome && "result" in outcome && <ResultView result={outcome.result} />}
+          {outcome && "result" in outcome && <ResultView result={outcome.result} pinned={pinned} onPin={pin} />}
           {outcome && "error" in outcome && <p className="error">{outcome.error}</p>}
         </section>
       </div>
@@ -254,22 +286,27 @@ function summary(card: Card, outcome: Outcome): string {
   return loading ? `${loading.total[unit]} ${unit}` : "";
 }
 
-function ResultView({ result }: { result: LoadResult }) {
+interface Pinning {
+  pinned: PinnedLoading | undefined;
+  onPin: (loading: Loading) => void;
+}
+
+function ResultView({ result, ...pinning }: { result: LoadResult } & Pinning) {
   return (
     <>
-      <Loadings result={result} />
+      <Loadings result={result} {...pinning} />
       <Notes result={result} />
-      <OtherWays result={result} />
+      <OtherWays result={result} onPin={pinning.onPin} />
     </>
   );
 }
 
-function Loadings({ result }: { result: LoadResult }) {
+function Loadings({ result, ...pinning }: { result: LoadResult } & Pinning) {
   const unit = unitOf(result.implement);
   if (result.loading) {
     return (
       <div className="choices single">
-        <LoadingView heading="Exact" result={result} loading={result.loading} unit={unit} />
+        <LoadingView heading="Exact" result={result} loading={result.loading} unit={unit} {...pinning} />
       </div>
     );
   }
@@ -278,7 +315,7 @@ function Loadings({ result }: { result: LoadResult }) {
       <>
         <p className="status">{refusal(result)}</p>
         <div className="choices single">
-          {result.below && <LoadingView heading="Heaviest allowed" result={result} loading={result.below} unit={unit} />}
+          {result.below && <LoadingView heading="Heaviest allowed" result={result} loading={result.below} unit={unit} {...pinning} />}
         </div>
       </>
     );
@@ -290,10 +327,26 @@ function Loadings({ result }: { result: LoadResult }) {
       <p className="status">{`No exact loading for ${describeWeight(result.target, unit)}`}</p>
       <div className={sideBySide ? "choices" : "choices single"}>
         {result.below && (
-          <LoadingView heading="Below" result={result} loading={result.below} unit={unit} recommended={result.recommended === "below"} {...pair} />
+          <LoadingView
+            heading="Below"
+            result={result}
+            loading={result.below}
+            unit={unit}
+            recommended={result.recommended === "below"}
+            {...pair}
+            {...pinning}
+          />
         )}
         {result.above && (
-          <LoadingView heading="Above" result={result} loading={result.above} unit={unit} recommended={result.recommended === "above"} {...pair} />
+          <LoadingView
+            heading="Above"
+            result={result}
+            loading={result.above}
+            unit={unit}
+            recommended={result.recommended === "above"}
+            {...pair}
+            {...pinning}
+          />
         )}
       </div>
     </>
@@ -305,7 +358,7 @@ function refusal(result: LoadResult): string {
   return warning.split(". ")[0]!.replace(/\.$/, "");
 }
 
-interface LoadingViewProps {
+interface LoadingViewProps extends Pinning {
   heading: string;
   result: LoadResult;
   loading: Loading;
@@ -314,8 +367,9 @@ interface LoadingViewProps {
   sideBySide?: Loading[];
 }
 
-function LoadingView({ heading, result, loading, unit, recommended = false, sideBySide }: LoadingViewProps) {
+function LoadingView({ heading, result, loading, unit, recommended = false, sideBySide, pinned, onPin }: LoadingViewProps) {
   const headingId = useId();
+  const changes = pinned && changesText(result.implement, loading, pinned, inventory);
   return (
     <article aria-labelledby={headingId} className={recommended ? "loading recommended" : "loading"}>
       <header className="loading-head">
@@ -324,19 +378,44 @@ function LoadingView({ heading, result, loading, unit, recommended = false, side
       </header>
       <Total weight={loading.total} unit={unit} />
       <Picture implement={result.implement} loading={loading} inventory={inventory} {...(sideBySide ? { sideBySide } : {})} />
-      <dl className="details">
-        {result.implement === "dumbbell" ? (
-          <DumbbellDetails pair={result.pair !== false} loading={loading} />
-        ) : (
-          details(result.implement, loading).map(([term, description]) => (
-            <div key={term}>
-              <dt>{term}</dt>
-              <dd>{description}</dd>
-            </div>
-          ))
-        )}
-      </dl>
+      {changes ? <ChangesBlock changes={changes} /> : <PlateDetails result={result} loading={loading} />}
+      <LoadedButton loading={loading} onPin={onPin} />
     </article>
+  );
+}
+
+function ChangesBlock({ changes }: { changes: ChangesText }) {
+  return (
+    <div role="group" aria-label="Changes" className="changes">
+      <p className="changes-count">{changes.count}</p>
+      {changes.lines.length > 0 && (
+        <dl className="details">
+          {changes.lines.map(({ label, text }) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{text}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
+function PlateDetails({ result, loading }: { result: LoadResult; loading: Loading }) {
+  return (
+    <dl className="details">
+      {result.implement === "dumbbell" ? (
+        <DumbbellDetails pair={result.pair !== false} loading={loading} />
+      ) : (
+        details(result.implement, loading).map(([term, description]) => (
+          <div key={term}>
+            <dt>{term}</dt>
+            <dd>{description}</dd>
+          </div>
+        ))
+      )}
+    </dl>
   );
 }
 
