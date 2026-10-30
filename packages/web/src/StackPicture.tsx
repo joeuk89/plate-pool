@@ -1,5 +1,5 @@
 import type { Inventory, Loading } from "@plate-pool/core";
-import { HardwarePart, pictureRole, Plates, type Editing } from "./picture-parts";
+import { addedFrom, HardwarePart, pictureRole, Plates, type Editing } from "./picture-parts";
 import type { DrawOptions } from "./plate-stack";
 import { drawStack } from "./stack-drawing";
 
@@ -28,7 +28,7 @@ export function StackPicture({ implement, loading, inventory, editing, ...option
         <rect className="bar" x={holder.x} y={-holder.diameter / 2} width={holder.length} height={holder.diameter} rx={0.08} />
       )}
       <rect className="bar" x={base.x} y={-base.height / 2} width={base.width} height={base.height} rx={0.12} />
-      <Plates plates={drawing.plates} position={loading.positions[0]?.name} editing={editing} />
+      <Plates plates={drawing.plates} position={loading.positions[0]?.name} editing={editing} added={addedFrom(loading, loading.positions[0]?.name)} />
       {screw && <HardwarePart hardware={screw} className="screw" radius={0.15} />}
     </svg>
   );
