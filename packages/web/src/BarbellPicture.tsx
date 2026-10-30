@@ -1,7 +1,7 @@
 import type { Inventory, Loading } from "@plate-pool/core";
 import { useId } from "react";
 import { drawBarbell } from "./barbell-drawing";
-import { HardwarePart, pictureRole, Plates, type Editing } from "./picture-parts";
+import { addedFrom, HardwarePart, pictureRole, Plates, type Editing } from "./picture-parts";
 import type { DrawOptions } from "./plate-stack";
 
 interface Props extends DrawOptions {
@@ -31,7 +31,7 @@ export function BarbellPicture({ loading, inventory, editing, ...options }: Prop
       <rect x={handle.x} y={-barDiameter / 2 + 0.12} width={handle.length} height={barDiameter - 0.24} fill={`url(#${fadeId})`} />
       <rect className="bar" x={sleeve.x} y={-barDiameter / 2} width={barEnd - sleeve.x} height={barDiameter} rx={0.08} />
       <rect className="bar" x={stop.x} y={-stop.height / 2} width={stop.width} height={stop.height} rx={0.08} />
-      <Plates plates={drawing.plates} position={loading.positions[0]?.name} editing={editing} />
+      <Plates plates={drawing.plates} position={loading.positions[0]?.name} editing={editing} added={addedFrom(loading, loading.positions[0]?.name)} />
       {collar && <HardwarePart hardware={collar} className="collar" radius={0.18} />}
     </svg>
   );

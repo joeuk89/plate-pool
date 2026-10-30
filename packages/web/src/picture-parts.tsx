@@ -1,12 +1,19 @@
+import type { Loading } from "@plate-pool/core";
 import type { KeyboardEvent } from "react";
 import type { Callout, HardwareDrawing, Line, PlateDrawing } from "./plate-stack";
 import { FONT_SIZE, HARDWARE_FONT_SIZE } from "./plate-stack";
 
 const PLATE_GAP = 0.05;
+const ADDED_RING = 0.12;
 
 export interface Editing {
   remove: (position: string, index: number) => void;
   removeLabel: (position: string, weight: number) => string;
+}
+
+/** The index of the first plate put on at a position: plates from there outward are highlighted as added. */
+export function addedFrom(loading: Loading, position: string | undefined): number | undefined {
+  return loading.changes?.positions.find(({ name }) => name === position)?.keep.length;
 }
 
 export function pictureRole(description: string, editing: Editing | undefined) {
@@ -34,15 +41,31 @@ interface PlatesProps {
   plates: PlateDrawing[];
   position?: string | undefined;
   editing?: Editing | undefined;
+  added?: number | undefined;
 }
 
-export function Plates({ plates, position, editing }: PlatesProps) {
+export function Plates({ plates, position, editing, added }: PlatesProps) {
   return (
     <>
       {plates.map((plate, index) => {
         const width = plate.width - PLATE_GAP;
+        const isAdded = added !== undefined && index >= added;
         return (
-          <g key={index} {...removable(editing, position, index, plate.weight)}>
+          <g
+            key={index}
+            {...removable(editing, position, index, plate.weight)}
+            {...(isAdded ? { className: "added", "data-weight": plate.weight } : {})}
+          >
+            {isAdded && (
+              <rect
+                className="added-ring"
+                x={plate.x + PLATE_GAP / 2 - ADDED_RING}
+                y={-plate.height / 2 - ADDED_RING}
+                width={width + 2 * ADDED_RING}
+                height={plate.height + 2 * ADDED_RING}
+                rx={plate.round ? width / 2 + ADDED_RING : 0.1 + ADDED_RING}
+              />
+            )}
             <rect
               x={plate.x + PLATE_GAP / 2}
               y={-plate.height / 2}

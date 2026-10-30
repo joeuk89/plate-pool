@@ -1,6 +1,6 @@
 import type { Inventory, Loading } from "@plate-pool/core";
 import { drawDumbbell, heavierTicks } from "./dumbbell-drawing";
-import { CalloutLabel, pictureRole, Plates, type Editing } from "./picture-parts";
+import { addedFrom, CalloutLabel, pictureRole, Plates, type Editing } from "./picture-parts";
 import { HARDWARE_FONT_SIZE, type DrawOptions } from "./plate-stack";
 
 interface Props extends DrawOptions {
@@ -32,7 +32,7 @@ export function DumbbellPicture({ loading, inventory, editing, ...options }: Pro
       ))}
       {drawing.ends.map((end) => (
         <g key={end.name}>
-          <Plates plates={end.plates} position={end.name} editing={editing} />
+          <Plates plates={end.plates} position={end.name} editing={editing} added={addedFrom(loading, end.name)} />
           {end.screw && (
             <rect className="screw" x={end.screw.x + 0.025} y={-end.screw.height / 2} width={end.screw.width - 0.05} height={end.screw.height} rx={0.15} />
           )}

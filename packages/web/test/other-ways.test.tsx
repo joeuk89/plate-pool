@@ -29,7 +29,7 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
     expect(text(list!.querySelector("summary")!)).toBe("Other ways to make this (2)");
 
     const items = within(list!).getAllByRole("listitem");
-    expect(items.map(text)).toEqual(["Each side 7 × 5", "Each side 6 × 5, 2 × 2.5"]);
+    expect(items.map(text)).toEqual(["Each side 7 × 5 Loaded", "Each side 6 × 5, 2 × 2.5 Loaded"]);
   });
 
   it("opens when the owner taps it", () => {
@@ -72,8 +72,8 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
     typeTarget("40");
     expect(within(otherWays()!).getAllByRole("listitem").map(text)).toEqual([
-      "End A 3 × 5 End B 2 × 5, 2 × 2.5",
-      "End A heavier 3 × 5, 1 × 1.25 End B 2 × 5, 1 × 2.5, 1 × 1.25 Uneven",
+      "End A 3 × 5 End B 2 × 5, 2 × 2.5 Loaded",
+      "End A heavier 3 × 5, 1 × 1.25 End B 2 × 5, 1 × 2.5, 1 × 1.25 Uneven Loaded",
     ]);
   });
 
@@ -82,9 +82,9 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
     typeTarget("50");
     expect(within(otherWays()!).getAllByRole("listitem").map(text)).toEqual([
-      "Stack 5 × 5",
-      "Stack 4 × 5, 2 × 2.5",
-      "Stack 3 × 5, 4 × 2.5",
+      "Stack 5 × 5 Loaded",
+      "Stack 4 × 5, 2 × 2.5 Loaded",
+      "Stack 3 × 5, 4 × 2.5 Loaded",
     ]);
 
     fireEvent.click(screen.getByRole("tab", { name: "Leg attachment" }));

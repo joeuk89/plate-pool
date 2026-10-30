@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { useCurrentLoadings, type PinnedLoading } from "./current";
 import { linkQuery, readLink, type View } from "./links";
 import { ListScreen } from "./ListScreen";
 import { LoadScreen, type LoadChoice } from "./LoadScreen";
@@ -23,6 +24,7 @@ export function App() {
   const [cards, setCards] = useState<Card[]>(() => (link.cards.length > 0 ? link.cards : [newCard(settings.implement)]));
   const selected = cards[0]?.implement ?? settings.implement;
   const [view, setView] = useState<View>(link.view);
+  const [current, pin] = useCurrentLoadings();
   useEffect(() => {
     const query = linkQuery({ cards, settings, view });
     window.history.replaceState(window.history.state, "", `${window.location.pathname}?${query}${window.location.hash}`);
@@ -43,6 +45,10 @@ export function App() {
   const openInLoad = (choice: LoadChoice) => {
     changeCards([{ ...newCard(selected, choice.dumbbells), target: choice.target }, ...cards.slice(1)]);
     setView("load");
+  };
+  const pinFromReverse = (pinned: PinnedLoading, choice: LoadChoice) => {
+    pin(selected, pinned);
+    openInLoad(choice);
   };
   const sharedOptions = {
     collars: settings.collars,
@@ -86,7 +92,7 @@ export function App() {
       </nav>
       <div role="tabpanel" aria-labelledby={tabId(selected)}>
         {view === "load" ? (
-          <LoadScreen cards={cards} onCardsChange={changeCards} {...sharedOptions} />
+          <LoadScreen cards={cards} onCardsChange={changeCards} {...sharedOptions} current={current} onPin={pin} />
         ) : view === "list" ? (
           <ListScreen
             key={selected}
@@ -97,7 +103,7 @@ export function App() {
             onOpen={openInLoad}
           />
         ) : (
-          <ReverseScreen key={selected} implement={selected} {...sharedOptions} />
+          <ReverseScreen key={selected} implement={selected} {...sharedOptions} onPin={pinFromReverse} />
         )}
       </div>
     </main>

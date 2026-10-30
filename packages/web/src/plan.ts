@@ -1,4 +1,5 @@
 import { load, RequestError, type CollarChoice, type Leftover, type LoadResult, type TargetRequest, type Unit } from "@plate-pool/core";
+import { currentLoading, type CurrentLoadings, type PinnedLoading } from "./current";
 import { inventory } from "./inventory";
 
 export type DumbbellChoice = "pair" | "one";
@@ -21,6 +22,7 @@ export interface Plan {
 interface Options {
   collars: CollarChoice;
   uneven: boolean;
+  current?: CurrentLoadings;
 }
 
 export function unitOf(implement: string): Unit {
@@ -52,9 +54,24 @@ export function freeCount(cards: Card[], implement: string): number {
   return (inventory.implements.find((item) => item.id === implement)?.count ?? 0) - held;
 }
 
-function targetOf(card: Card): TargetRequest {
+function targetFor(card: Card, pinned: PinnedLoading | undefined): TargetRequest {
   const target = targetWithUnit(card.target, card.unit);
-  return card.implement === "dumbbell" ? { implement: card.implement, target, pair: card.dumbbells === "pair" } : { implement: card.implement, target };
+  const current = pinned ? { current: currentLoading(pinned) } : {};
+  return card.implement === "dumbbell"
+    ? { implement: card.implement, target, pair: card.dumbbells === "pair", ...current }
+    : { implement: card.implement, target, ...current };
+}
+
+/** The current loading each card starts from: an implement's current loading belongs to its first card, and a dumbbell's only to a card for the same pair or one. */
+export function pinnedFor(cards: Card[], current: CurrentLoadings = {}): (PinnedLoading | undefined)[] {
+  const claimed = new Set<string>();
+  return cards.map((card) => {
+    const pinned = current[card.implement];
+    if (!pinned || claimed.has(card.implement)) return undefined;
+    if (card.implement === "dumbbell" && (pinned.pair !== false) !== (card.dumbbells === "pair")) return undefined;
+    claimed.add(card.implement);
+    return pinned;
+  });
 }
 
 function errorOf(error: unknown, card: Card): { error: string } {
@@ -62,7 +79,9 @@ function errorOf(error: unknown, card: Card): { error: string } {
   throw error;
 }
 
-export function plan(cards: Card[], { collars, uneven }: Options): Plan {
+export function plan(cards: Card[], { collars, uneven, current }: Options): Plan {
+  const pinned = pinnedFor(cards, current);
+  const targetOf = (card: Card) => targetFor(card, pinned[cards.indexOf(card)]);
   const outcomes: Outcome[] = cards.map(() => undefined);
   const requested: number[] = [];
   cards.forEach((card, index) => {
