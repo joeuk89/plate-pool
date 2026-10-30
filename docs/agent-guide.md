@@ -109,6 +109,78 @@ npx plate-pool load barbell=175 dumbbells=40 --json
 - A dumbbell loading whose screw `count` is 1 has its one screw on the `heavier` end. The other end has no screw and no plates.
 - `leftover` counts the plates and hardware still free after the recommended loadings.
 
+#### Current loading: `--from`
+
+If an implement already carries plates, tell `load` what is on it now: its current loading. Each loading in the result then gains a `changes` block, and the fewest changes breaks ties between loadings equally close to the target. Closeness to the target still comes first.
+
+Write `--from <implement>` followed by the plate options of `reverse`: `--side`, `--end-a` and `--end-b`, `--stack` or `--blocks`. The implement name matches a target's name, such as `dumbbells` for `dumbbells=80`. Give one `--from` per implement; an implement without one gets the same answer as with no `--from` at all, and no `changes` block.
+
+```sh
+npx plate-pool load barbell=175 --from barbell --side 22.5,22.5,5,5,5,5,5,5,2.5 --json
+```
+
+```json
+{
+  "results": [
+    {
+      "implement": "barbell",
+      "target": { "lb": 175, "kg": 79.4 },
+      "exact": false,
+      "recommended": "above",
+      "below": {
+        "total": { "lb": 173, "kg": 78.5 },
+        "hardware": [{ "id": "collar-clamp", "count": 2 }],
+        "positions": [
+          { "name": "left", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5] },
+          { "name": "right", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5] }
+        ],
+        "uneven": false,
+        "changes": {
+          "count": 0,
+          "positions": [
+            { "name": "left", "keep": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5], "remove": [], "add": [] },
+            { "name": "right", "keep": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5], "remove": [], "add": [] }
+          ],
+          "hardware": []
+        }
+      },
+      "above": {
+        "total": { "lb": 175.5, "kg": 79.6 },
+        "hardware": [{ "id": "collar-clamp", "count": 2 }],
+        "positions": [
+          { "name": "left", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, 1.25] },
+          { "name": "right", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, 1.25] }
+        ],
+        "uneven": false,
+        "changes": {
+          "count": 2,
+          "positions": [
+            { "name": "left", "keep": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5], "remove": [], "add": [1.25] },
+            { "name": "right", "keep": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5], "remove": [], "add": [1.25] }
+          ],
+          "hardware": []
+        }
+      },
+      "alternatives": [],
+      "warnings": [],
+      "unverified": []
+    }
+  ],
+  "leftover": {
+    "plates": { "ql-22.5": 1, "ql-5": 12, "ql-2.5": 2, "ql-micro": 2 },
+    "hardware": { "screw-standard": 4, "screw-long": 5, "collar-spinlock": 2, "collar-clamp": 2 }
+  }
+}
+```
+
+The `changes` block:
+
+- `count` is the number of changes from the current loading. A change is one plate put on or taken off one position, or one locking screw added, removed or swapped for the other kind; a swap counts two. Collars never count. For a pair of dumbbells, `count` covers both dumbbells.
+- `positions` holds one entry per position. `keep` is the plates that stay on, innermost first. `remove` is the plates to take off, from the current loading. `add` is the plates to put on, outside the kept plates.
+- `hardware` lists screw changes: `{ "from": "screw-standard", "to": "screw-long", "count": 2 }` is a swap on two positions. An entry with only `to` adds screws, and one with only `from` removes them.
+- `positions[].plates` still lists the whole new loading, innermost first. Plates put on go outside the kept ones, so a heavier plate can sit outside a lighter one.
+- A current loading affects its own implement only. Its plates stay free for the other implements in the request.
+
 ### list
 
 Every total one implement can reach from `--from` to `--to`, with the whole pool free. Leave both out for the implement's full range.
@@ -277,6 +349,7 @@ Paste this into another repo's agent instructions, such as its `CLAUDE.md` or `A
 Use plate-pool for any weight on the owner's barbell, dumbbells, kettlebell, leg attachment or vest. Never work out plates by hand. Guide: https://github.com/joeuk89/plate-pool/blob/main/docs/agent-guide.md
 
 - Load: `npx plate-pool load barbell=173 dumbbells=40 --json`
+- Load from what is on the bar now: `npx plate-pool load barbell=175 --from barbell --side 22.5,22.5,5,5,5,5,5,5,2.5 --json`
 - List: `npx plate-pool list barbell --from 100 --to 200 --json`
 - Reverse: `npx plate-pool reverse barbell --side 22.5,22.5,5,5 --json`
 - Without a shell, read https://joeuk89.github.io/plate-pool/api/achievable.json
