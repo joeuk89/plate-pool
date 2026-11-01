@@ -6,13 +6,17 @@ import "./styles.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { PicturePrototype } from "./picture-prototype/PicturePrototype";
+
+// PROTOTYPE, throwaway: ?variant= mounts the picture prototype instead of the app.
+const prototype = !import.meta.env.PROD && new URLSearchParams(window.location.search).has("variant");
 
 const root = document.getElementById("root");
 if (!root) throw new Error("The page has no #root element");
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    {prototype ? <PicturePrototype /> : <App />}
   </StrictMode>,
 );
 

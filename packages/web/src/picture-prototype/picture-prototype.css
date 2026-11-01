@@ -1,0 +1,211 @@
+/* PROTOTYPE, throwaway. Styles for the picture prototype (issue #60). Never ships. */
+
+.pp {
+  padding-bottom: 11rem;
+}
+
+.pp-card {
+  margin-top: 1rem;
+}
+
+.pp .result {
+  margin-top: 1rem;
+}
+
+.pp-note {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.pp-sheet {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--rule);
+  border-radius: 0.5rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.pp-sheet code {
+  color: var(--ink);
+}
+
+.pp-picture .pp-fade {
+  fill: url(#pp-fade);
+}
+
+.pp-picture .pp-shaft {
+  fill: none;
+  stroke: var(--steel);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.pp-picture .pp-frame {
+  fill: none;
+  stroke: var(--steel);
+  stroke-width: 0.5;
+  stroke-linejoin: round;
+}
+
+.pp-picture .pp-pad {
+  fill: var(--ink);
+  opacity: 0.75;
+}
+
+.pp-picture .pp-belt {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 0.45;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+.pp-picture .pp-link {
+  fill: none;
+  stroke: var(--steel);
+  stroke-width: 0.12;
+}
+
+.pp-picture .pp-chain {
+  stroke: var(--steel);
+  stroke-width: 0.12;
+}
+
+.pp-picture .pp-floor {
+  stroke: var(--ink);
+  stroke-width: 0.1;
+  stroke-linecap: round;
+}
+
+.pp-picture .pp-tube {
+  fill: var(--steel);
+}
+
+.pp-picture .pp-stub {
+  fill: var(--rule);
+}
+
+.pp-picture rect[fill="#e9e9e9"] {
+  stroke: var(--steel);
+  stroke-width: 0.06;
+}
+
+.pp-picture .pp-wire {
+  stroke: var(--ink);
+  stroke-width: 0.16;
+  stroke-linecap: round;
+}
+
+.pp-picture .pp-facet {
+  stroke: var(--paper);
+  stroke-width: 0.08;
+}
+
+.pp-picture .pp-ring {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 0.16;
+}
+
+.pp-picture .pp-icon path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 0.13;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pp-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  width: min(28rem, calc(100vw - 2rem));
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  background: #1b1d21;
+  color: #f3f4f6;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font: 500 0.875rem/1.2 var(--body);
+  z-index: 10;
+}
+
+.pp-bar-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pp-bar-row > span {
+  flex: 1;
+  text-align: center;
+  font: 600 1rem/1.2 var(--display);
+}
+
+.pp-bar button {
+  appearance: none;
+  border: 1px solid #4a4f57;
+  background: #2a2d33;
+  color: inherit;
+  border-radius: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pp-bar button[aria-pressed="true"] {
+  background: #ffc72c;
+  color: #16191d;
+  border-color: #ffc72c;
+}
+
+.pp-bar label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.pp-bar select {
+  flex: 1;
+  font: inherit;
+  color: inherit;
+  background: #2a2d33;
+  border: 1px solid #4a4f57;
+  border-radius: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  min-width: 0;
+}
+
+.pp-gallery {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.pp-gallery figure {
+  margin: 0;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+
+.pp-gallery figcaption {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.pp-gallery .picture {
+  max-width: 100%;
+}
