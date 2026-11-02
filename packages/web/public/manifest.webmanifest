@@ -2,7 +2,7 @@
   "id": "/plate-pool/",
   "name": "plate-pool",
   "short_name": "plate-pool",
-  "description": "Which plates to load for a target weight, from one home gym's plate pool.",
+  "description": "A calculator for any plate-loaded gym: which plates to load for a target weight.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
