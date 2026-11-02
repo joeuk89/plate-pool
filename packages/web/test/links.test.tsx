@@ -30,7 +30,7 @@ function expectSameAsCommandLine(targets: string[], options: string[] = []) {
   const code = run(["load", ...targets, ...options, "--json"], {
     stdout: (output) => (stdout += output),
     stderr: () => {},
-    defaultInventoryPath: join(dirname(fileURLToPath(import.meta.url)), "../../../inventory/inventory.json"),
+    variables: { PLATE_POOL_INVENTORY: join(dirname(fileURLToPath(import.meta.url)), "../../../inventory/inventory.json") },
   });
   expect(code).toBe(0);
   const response = JSON.parse(stdout) as LoadResponse;
@@ -104,7 +104,7 @@ describe("links: targets (spec 8.7)", () => {
   it("reads the implement names and target syntax the command-line tool takes", () => {
     open("/plate-pool/?barbell=173lb&dumbbells=40&leg=50&vest=12kg");
     expect(cardNames()).toEqual(["1. Barbell", "2. Dumbbells", "3. Leg attachment", "4. Vest"]);
-    expectSameAsCommandLine(["barbell=173lb", "dumbbells=40", "leg=50", "vest=12kg"]);
+    expectSameAsCommandLine(["barbell=173lb", "dumbbell=40", "leg=50", "vest=12kg"]);
   });
 
   it("ignores parameters it does not know", () => {
@@ -255,7 +255,7 @@ describe("links: a parameter wins over a remembered setting", () => {
     open("/plate-pool/?dumbbell=11.25&uneven=0");
     expect(unevenSwitch().getAttribute("aria-checked")).toBe("false");
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain("No exact loading for 11.25 lb");
-    expectSameAsCommandLine(["dumbbell=11.25"], ["--no-uneven"]);
+    expectSameAsCommandLine(["dumbbell.single=11.25"], ["--no-uneven"]);
   });
 
   it("turns uneven loading on with uneven=1, over the remembered switch", () => {

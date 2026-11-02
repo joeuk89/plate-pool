@@ -1,24 +1,47 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { list, load, readInventory, reverse } from "@plate-pool/core";
+import { achievable, list, load, readInventory, reverse, type AchievableTable, type Inventory } from "@plate-pool/core";
 import { describe, expect, it } from "vitest";
+import packageJson from "../package.json" with { type: "json" };
 import { run } from "../src/main.js";
 
 const inventoryPath = fileURLToPath(new URL("../../../inventory/inventory.json", import.meta.url));
-const inventoryFile = JSON.parse(readFileSync(inventoryPath, "utf8"));
-const inventory = readInventory(JSON.stringify(inventoryFile));
+const olympicPath = fileURLToPath(new URL("../../core/test/fixtures/olympic-kit.json", import.meta.url));
+const inventoryText = readFileSync(inventoryPath, "utf8");
+const inventoryFile = JSON.parse(inventoryText);
+const inventory = readInventory(inventoryText);
+const olympic = readInventory(readFileSync(olympicPath, "utf8"));
 
-function runWith(args: string[]) {
+const noInventory = "No inventory given. Pass --inventory <path> or set PLATE_POOL_INVENTORY.\n";
+
+function runWith(args: string[], variables: Record<string, string | undefined> = { PLATE_POOL_INVENTORY: inventoryPath }) {
   const output = { stdout: "", stderr: "" };
   const code = run(args, {
     stdout: (text) => (output.stdout += text),
     stderr: (text) => (output.stderr += text),
-    defaultInventoryPath: inventoryPath,
+    variables,
   });
   return { code, ...output };
 }
+
+function jsonOf(args: string[], variables?: Record<string, string | undefined>) {
+  const result = runWith([...args, "--json"], variables);
+  expect(result.stderr).toBe("");
+  expect(result.code).toBe(0);
+  return JSON.parse(result.stdout);
+}
+
+function writeInventory(file: unknown): string {
+  const path = join(mkdtempSync(join(tmpdir(), "plate-pool-")), "inventory.json");
+  writeFileSync(path, typeof file === "string" ? file : JSON.stringify(file));
+  return path;
+}
+
+const side173 = [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5];
+const example2 = load(inventory, { targets: [{ implement: "barbell", target: "173" }] });
 
 describe("plate-pool command-line tool", () => {
   it("exits 1 with the reason on standard error for an unknown command", () => {
@@ -33,62 +56,119 @@ describe("plate-pool command-line tool", () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("Usage: plate-pool <command>");
   });
+
+  it("prints usage on standard output for --help, and exits 0 without an inventory", () => {
+    const result = runWith(["--help"], {});
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("Usage: plate-pool <command>");
+  });
+
+  it("names no implement, plate or hardware id in its usage", () => {
+    const usage = runWith([]).stderr;
+    const kinds = ["bar", "handle", "stack", "vest"];
+    const ids = [...inventory.implements, ...inventory.plates, ...inventory.hardware].map((item) => item.id).filter((id) => !kinds.includes(id));
+    for (const id of ids) expect(usage).not.toMatch(new RegExp(`(^|[^a-z0-9.-])${id.replace(".", "\\.")}([^a-z0-9.-]|$)`, "m"));
+    expect(usage).toContain("--inventory <path>");
+    expect(usage).toContain("PLATE_POOL_INVENTORY");
+    expect(usage).toContain("achievable");
+  });
+
+  it("names no implement, plate or hardware id in its source", () => {
+    const kinds = ["bar", "handle", "stack", "vest"];
+    const ids = [...inventory.implements, ...inventory.plates, ...inventory.hardware].map((item) => item.id).filter((id) => !kinds.includes(id));
+    for (const file of readdirSync(fileURLToPath(new URL("../src", import.meta.url)))) {
+      const source = readFileSync(fileURLToPath(new URL(`../src/${file}`, import.meta.url)), "utf8");
+      for (const id of ids) expect(source, `${file} names ${id}`).not.toMatch(new RegExp(`\\b${id.replace(".", "\\.")}\\b`));
+    }
+  });
+});
+
+describe("naming the inventory file (spec 17.8)", () => {
+  it("reads the file named by --inventory (spec 7 example 2)", () => {
+    expect(jsonOf(["load", "barbell=173", "--inventory", inventoryPath], {})).toEqual(example2);
+    expect(jsonOf(["load", `--inventory=${inventoryPath}`, "barbell=173"], {})).toEqual(example2);
+  });
+
+  it("reads the file named by PLATE_POOL_INVENTORY when no --inventory is given", () => {
+    expect(jsonOf(["load", "barbell=173"], { PLATE_POOL_INVENTORY: inventoryPath })).toEqual(example2);
+  });
+
+  it("lets --inventory win over PLATE_POOL_INVENTORY", () => {
+    const response = jsonOf(["load", "bar=95.5", "--inventory", olympicPath], { PLATE_POOL_INVENTORY: inventoryPath });
+    expect(response.results[0].exact).toBe(true);
+  });
+
+  it.each([["load", "barbell=173"], ["list", "barbell"], ["reverse", "barbell"], ["inventory"], ["achievable"]])(
+    "exits 1 with the missing-inventory sentence for %s with neither given",
+    (...args) => {
+      for (const variables of [{}, { PLATE_POOL_INVENTORY: "" }]) {
+        const result = runWith(args, variables);
+        expect(result.code).toBe(1);
+        expect(result.stdout).toBe("");
+        expect(result.stderr).toBe(noInventory);
+      }
+    },
+  );
+
+  it.each([
+    [["load", "barbell=175", "--inventory", "/no/such/inventory.json"], "Cannot read /no/such/inventory.json"],
+    [["load", "barbell=175", "--inventory"], "--inventory takes the path of an inventory file"],
+  ])("exits 1 with the reason on standard error for %j", (args, reason) => {
+    const result = runWith(args);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain(reason);
+  });
+
+  it("exits 1 naming the JSON path for a file the reader refuses", () => {
+    const result = runWith(["load", "barbell=175", "--inventory", writeInventory({ format: 1, plates: [] })]);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("plateTypes: required");
+  });
+
+  it("refuses another format by name (spec 17.11 example 21)", () => {
+    const result = runWith(["inventory", "--inventory", writeInventory({ ...inventoryFile, format: 2 })]);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("Inventory format 2 is not supported. This version reads format 1.");
+  });
+
+  it("refuses a reserved implement id, naming its path (spec 17.11 example 22)", () => {
+    const file = structuredClone(inventoryFile);
+    file.implements[0].id = "kit";
+    const result = runWith(["load", "kit=100", "--inventory", writeInventory(file)]);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("implements[0].id");
+  });
 });
 
 describe("plate-pool load", () => {
-  it("prints the same JSON as the library's result (spec 12.3)", () => {
-    const result = runWith(["load", "barbell=175", "--json"]);
-    expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual(load(inventory, { targets: [{ implement: "barbell", target: "175" }] }));
-  });
-
-  it("lists the other loadings that reach the target under alternatives", () => {
-    const [result] = JSON.parse(runWith(["load", "barbell=88", "--json"]).stdout).results;
-    const [expected] = load(inventory, { targets: [{ implement: "barbell", target: "88" }] }).results;
-    expect(result.alternatives).toHaveLength(2);
-    expect(result.alternatives).toEqual(expected!.alternatives);
-    expect(result.alternatives[0].positions[0]).toEqual({ name: "left", plates: [5, 5, 5, 5, 5, 5, 5], ids: Array(7).fill("ql-5") });
+  it("prints the same JSON as the library's result", () => {
+    expect(jsonOf(["load", "barbell=175"])).toEqual(load(inventory, { targets: [{ implement: "barbell", target: "175" }] }));
   });
 
   it("orders each result's fields as the JSON example in spec section 9 does", () => {
-    const [result] = JSON.parse(runWith(["load", "barbell=175", "--json"]).stdout).results;
-    expect(Object.keys(result)).toEqual([
-      "implement",
-      "target",
-      "exact",
-      "recommended",
-      "below",
-      "above",
-      "alternatives",
-      "warnings",
-      "unverified",
-    ]);
+    const [result] = jsonOf(["load", "barbell=175"]).results;
+    expect(Object.keys(result)).toEqual(["implement", "target", "exact", "recommended", "below", "above", "alternatives", "warnings", "unverified"]);
   });
 
-  it("prints text in the layout of spec section 9 when no loading is exact", () => {
+  it("gives every position its plate ids", () => {
+    const [result] = jsonOf(["load", "barbell=88"]).results;
+    expect(result.alternatives[0].positions[0]).toEqual({ name: "left", plates: [5, 5, 5, 5, 5, 5, 5], ids: Array(7).fill("ql-5") });
+  });
+
+  it("heads text with the implement's name and names the hardware (spec 9 layout)", () => {
     const result = runWith(["load", "barbell=175"]);
     expect(result.code).toBe(0);
     expect(result.stderr).toBe("");
     expect(result.stdout).toBe(
       [
-        "Barbell  target 175 lb (79.4 kg)  no exact loading",
+        "Straight bar  target 175 lb (79.4 kg)  no exact loading",
         "",
         "  below  173 lb (78.5 kg)",
-        "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
+        '         each side: 22.5 22.5 5 5 5 5 5 5 2.5 | Mirafit 1" clamp collar',
         "* above  175.5 lb (79.6 kg)",
-        "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | clamp collar",
-        "",
-      ].join("\n"),
-    );
-  });
-
-  it("prints one loading when it is exact", () => {
-    expect(runWith(["load", "barbell=173"]).stdout).toBe(
-      [
-        "Barbell  target 173 lb (78.5 kg)  exact",
-        "",
-        "  exact  173 lb (78.5 kg)",
-        "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
+        '         each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | Mirafit 1" clamp collar',
         "",
       ].join("\n"),
     );
@@ -97,241 +177,176 @@ describe("plate-pool load", () => {
   it("states the limit and the heaviest allowed loading for a refused target, and exits 0", () => {
     const result = runWith(["load", "barbell=230"]);
     expect(result.code).toBe(0);
-    expect(result.stdout).toBe(
-      [
-        "Barbell  target 230 lb (104.3 kg)  refused",
-        "",
-        "* below  228 lb (103.4 kg)",
-        "         each side: 22.5 22.5 5 5 5 5 5 5 5 5 5 5 5 5 | clamp collar",
-        "",
-        "Refused: over the 210 lb plate limit. Heaviest allowed: 228 lb (103.4 kg).",
-        "",
-      ].join("\n"),
-    );
+    expect(result.stdout).toContain("Straight bar  target 230 lb (104.3 kg)  refused");
+    expect(result.stdout).toContain("Refused: over the 210 lb plate limit. Heaviest allowed: 228 lb (103.4 kg).");
   });
 
-  it("accepts a target in kilograms", () => {
+  it("reads a bare value in the implement's unit and a suffix as an override", () => {
     expect(runWith(["load", "barbell=80kg"]).stdout).toContain("target 176.37 lb (80 kg)");
-  });
-
-  it.each([
-    ["spinlock", "each side: 22.5 22.5 5 5 5 5 5 5 2.5 | spin-lock collar"],
-    ["none", "each side: 22.5 22.5 5 5 5 5 5 5 2.5 | no collars"],
-  ])("takes --collars %s", (collars, line) => {
-    expect(runWith(["load", "barbell=173", "--collars", collars]).stdout).toContain(line);
-    expect(runWith(["load", `--collars=${collars}`, "barbell=173"]).stdout).toContain(line);
+    expect(runWith(["load", "vest=12"]).stdout).toContain("Weighted vest  target 12 kg (26.46 lb)  exact");
   });
 
   it("shows an empty side as no plates", () => {
-    expect(runWith(["load", "barbell=18"]).stdout).toContain("each side: no plates | clamp collar");
-  });
-
-  it("uses a different inventory file with --inventory", () => {
-    const measuredBar = structuredClone(inventoryFile);
-    measuredBar.implements[0].base = { listed: 18, measured: 20, status: "owner" };
-    const path = join(mkdtempSync(join(tmpdir(), "plate-pool-")), "inventory.json");
-    writeFileSync(path, JSON.stringify(measuredBar));
-
-    const result = runWith(["load", "barbell=175", "--inventory", path]);
-    expect(result.code).toBe(0);
-    expect(result.stdout).toContain("Barbell  target 175 lb (79.4 kg)  exact");
-    expect(result.stdout).not.toContain("Unverified:");
+    expect(runWith(["load", "barbell=18"]).stdout).toContain('each side: no plates | Mirafit 1" clamp collar');
   });
 
   it.each([
-    [["load"], "Name a target"],
-    [["load", "barbell"], 'Write "barbell" as implement=target'],
+    [["load"], "Name a target, such as barbell="],
+    [["load", "barbell"], 'Write "barbell" as <id>=<target>'],
     [["load", "barbell=heavy"], '"heavy" is not a weight'],
-    [["load", "rowing=40"], 'Unknown implement "rowing"'],
-    [["load", "barbell=175", "--collars", "magnetic"], "--collars takes clamp, spinlock or none"],
-    [["load", "barbell=175", "--collars"], "--collars takes clamp, spinlock or none"],
+    [["load", "rowing=40"], 'Unknown implement "rowing". The kit\'s implements: barbell, dumbbell, kettlebell, leg, vest.'],
+    [["load", "dumbbells=40"], 'Unknown implement "dumbbells"'],
+    [["load", "barbell=175", "--collars", "none"], 'Unknown option "--collars"'],
     [["load", "barbell=175", "--fast"], 'Unknown option "--fast"'],
-    [["load", "barbell=175", "--inventory", "/no/such/inventory.json"], "Cannot read /no/such/inventory.json"],
+    [["load", "barbell=100", "barbell=120"], "The request needs 2 × straight bar. The inventory holds 1."],
   ])("exits 1 with the reason on standard error for %j", (args, reason) => {
     const result = runWith(args);
     expect(result.code).toBe(1);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain(reason);
   });
-
-  it("exits 1 for an inventory file that does not match the inventory's shape", () => {
-    const path = join(mkdtempSync(join(tmpdir(), "plate-pool-")), "inventory.json");
-    writeFileSync(path, JSON.stringify({ format: 1, plates: [] }));
-    const result = runWith(["load", "barbell=175", "--inventory", path]);
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain("plateTypes: required");
-  });
 });
 
-describe("plate-pool load for dumbbells", () => {
-  it("reads dumbbells= as a pair and prints the same JSON as the library's result", () => {
-    const result = runWith(["load", "dumbbells=40", "--json"]);
-    expect(result.code).toBe(0);
-    const response = JSON.parse(result.stdout);
-    expect(response).toEqual(load(inventory, { targets: [{ implement: "dumbbell", target: "40" }] }));
-    expect(response.results[0].pair).toBe(true);
+describe("plate-pool load: pair and single by key suffix (spec 17.8)", () => {
+  it("reads <id>= as a pair on a handle the kit has two of (spec 17.11 example 24)", () => {
+    const response = jsonOf(["load", "dumbbell=80"]);
+    expect(response).toEqual(load(inventory, { targets: [{ implement: "dumbbell", target: "80" }] }));
+    const [result] = response.results;
+    expect(result.pair).toBe(true);
+    expect(result.exact).toBe(true);
+    expect(result.loading.hardware).toEqual([{ id: "screw-standard", count: 2 }]);
+    expect(result.loading.positions.map((position: { plates: number[] }) => position.plates)).toEqual([
+      [22.5, 5, 5, 2.5],
+      [22.5, 5, 5, 2.5],
+    ]);
   });
 
-  it("reads dumbbell= as one dumbbell", () => {
-    const response = JSON.parse(runWith(["load", "dumbbell=12.5", "--json"]).stdout);
+  it("reads <id>.single= as one (spec 7 example 5)", () => {
+    const response = jsonOf(["load", "dumbbell.single=12.5"]);
     expect(response).toEqual(load(inventory, { targets: [{ implement: "dumbbell", target: "12.5", pair: false }] }));
     expect(response.results[0].pair).toBe(false);
+    expect(response.results[0].exact).toBe(true);
   });
 
-  it("turns uneven loading off with --no-uneven", () => {
-    const response = JSON.parse(runWith(["load", "dumbbell=11.25", "--no-uneven", "--json"]).stdout);
-    expect(response).toEqual(
-      load(inventory, { targets: [{ implement: "dumbbell", target: "11.25", pair: false }], uneven: false }),
-    );
-    expect(response.results[0].exact).toBe(false);
+  it("reads <id>.pair= as the explicit pair", () => {
+    expect(jsonOf(["load", "dumbbell.pair=40"])).toEqual(jsonOf(["load", "dumbbell=40"]));
   });
 
-  it("prints a pair with the plates on each end and the screws to use", () => {
-    expect(runWith(["load", "dumbbells=40"]).stdout).toBe(
+  it("exits 1 for <id>.pair= on a handle the kit has one of", () => {
+    const file = structuredClone(inventoryFile);
+    file.implements[1].count = 1;
+    const result = runWith(["load", "dumbbell.pair=40", "--inventory", writeInventory(file)]);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("The inventory holds 1 dumbbell, so it cannot be loaded as a pair.");
+  });
+
+  it.each([
+    [["load", "barbell.single=100"], '"barbell.single": the straight bar is not a handle, so it has no pair or single.'],
+    [["load", "dumbbell.both=40"], 'Unknown implement "dumbbell.both"'],
+  ])("exits 1 with the reason on standard error for %j", (args, reason) => {
+    const result = runWith(args);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(reason);
+  });
+
+  it("heads text with pair or single after a handle's name", () => {
+    expect(runWith(["load", "dumbbell=40"]).stdout).toBe(
       [
-        "Dumbbells (pair)  target 40 lb (18.1 kg) each  exact",
+        "Dumbbell pair  target 40 lb (18.1 kg) each  exact",
         "",
         "  exact  40 lb (18.1 kg)",
-        "         each end: 5 5 5 | standard screws",
+        "         each end: 5 5 5 | Standard locking screw",
         "",
       ].join("\n"),
     );
-  });
-
-  it("prints an uneven dumbbell with each end and marks the heavier end", () => {
-    expect(runWith(["load", "dumbbell=47.5"]).stdout).toBe(
+    expect(runWith(["load", "dumbbell.single=47.5"]).stdout).toBe(
       [
-        "One dumbbell  target 47.5 lb (21.5 kg)  exact",
+        "Dumbbell single  target 47.5 lb (21.5 kg)  exact",
         "",
         "  exact  47.5 lb (21.5 kg)  uneven",
         "         end A: 5 5 5 5 (heavier)",
         "         end B: 5 5 5 2.5",
-        "         standard screws",
+        "         Standard locking screw on each end",
         "",
       ].join("\n"),
     );
   });
 
-  it("names the long screw's shortest stack as unverified", () => {
-    const output = runWith(["load", "dumbbells=120"]).stdout;
-    expect(output).toContain("each end: 22.5 5 5 5 5 5 5 2.5 | long screws");
+  it("turns uneven loading off for every handle with --no-uneven", () => {
+    const response = jsonOf(["load", "dumbbell.single=11.25", "--no-uneven"]);
+    expect(response).toEqual(load(inventory, { targets: [{ implement: "dumbbell", target: "11.25", pair: false }], uneven: false }));
+    expect(response.results[0].exact).toBe(false);
+  });
+
+  it("names unverified values by their item's name", () => {
+    const output = runWith(["load", "dumbbell=120"]).stdout;
+    expect(output).toContain("each end: 22.5 5 5 5 5 5 5 2.5 | Long locking screw");
     expect(output).toContain("Unverified: shortest stack on a long locking screw");
   });
 
-  it("prints the bare handle with no screws", () => {
-    expect(runWith(["load", "dumbbell=5"]).stdout).toContain("each end: no plates | no screws");
-  });
-
-  it("states the limit per dumbbell for a refused target", () => {
-    const output = runWith(["load", "dumbbells=130"]).stdout;
-    expect(output).toContain("Dumbbells (pair)  target 130 lb (59 kg) each  refused");
-    expect(output).toContain("Refused: over the 120 lb limit per dumbbell. Heaviest allowed: 120 lb (54.4 kg).");
+  it("names the bare handle's lack of hardware", () => {
+    expect(runWith(["load", "dumbbell.single=5"]).stdout).toContain("each end: no plates | no hardware");
   });
 });
 
-describe("plate-pool load vest=", () => {
-  it.each(["12kg", "30lb", "35"])("prints the same JSON as the library's result for vest=%s", (target) => {
-    const result = runWith(["load", `vest=${target}`, "--json"]);
-    expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual(load(inventory, { targets: [{ implement: "vest", target }] }));
+describe("plate-pool load: hardware by <id>.hardware (spec 17.8)", () => {
+  it("adds a spin-lock collar's 1 lb per side to the barbell's base", () => {
+    const response = jsonOf(["load", "barbell=20", "barbell.hardware=collar-spinlock"]);
+    expect(response).toEqual(load(inventory, { targets: [{ implement: "barbell", target: "20" }], hardware: { barbell: "collar-spinlock" } }));
+    expect(response.results[0].exact).toBe(true);
+    expect(response.results[0].loading.positions[0].plates).toEqual([]);
+    expect(runWith(["load", "barbell=173", "barbell.hardware=collar-spinlock"]).stdout).toContain("no exact loading");
   });
 
-  it("prints kilograms first and the blocks on the front and back", () => {
+  it("takes none from the implement's options", () => {
+    expect(runWith(["load", "barbell=173", "barbell.hardware=none"]).stdout).toContain("each side: 22.5 22.5 5 5 5 5 5 5 2.5 | no hardware");
+  });
+
+  it("does not count .hardware toward priority order", () => {
+    expect(jsonOf(["load", "barbell.hardware=none", "dumbbell=40", "barbell=173"])).toEqual(
+      load(inventory, {
+        targets: [
+          { implement: "dumbbell", target: "40" },
+          { implement: "barbell", target: "173" },
+        ],
+        hardware: { barbell: "none" },
+      }),
+    );
+  });
+
+  it.each([
+    [["load", "barbell=173", "barbell.hardware=screw-long"], 'The straight bar takes no "screw-long" hardware. It takes collar-clamp, collar-spinlock or none.'],
+    [["load", "leg=50", "leg.hardware=none"], "The leg attachment has no hardware to choose."],
+    [["load", "vest=12", "vest.hardware=none"], "The weighted vest has no hardware to choose."],
+    [["load", "barbell=173", "barbell.hardware=none", "barbell.hardware=collar-clamp"], "One barbell.hardware per implement."],
+    [["load", "rowing.hardware=none", "barbell=173"], 'Unknown implement "rowing"'],
+  ])("exits 1 with the reason on standard error for %j", (args, reason) => {
+    const result = runWith(args);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain(reason);
+  });
+});
+
+describe("plate-pool load for every kind", () => {
+  it("prints a vest's front and back by weight (spec 17.4 labels)", () => {
     expect(runWith(["load", "vest=12kg"]).stdout).toBe(
       [
-        "Vest  target 12 kg (26.46 lb)  exact",
+        "Weighted vest  target 12 kg (26.46 lb)  exact",
         "",
         "  exact  12 kg (26.46 lb)",
-        "         front: 6 blocks",
-        "         back: 6 blocks",
+        "         front: 1 1 1 1 1 1",
+        "         back: 1 1 1 1 1 1",
         "",
-        "Unverified: empty vest weight, 1 kg plate count",
-        "",
-      ].join("\n"),
-    );
-  });
-
-  it("converts a target in pounds, and recommends the nearer number of blocks", () => {
-    expect(runWith(["load", "vest=30lb"]).stdout).toBe(
-      [
-        "Vest  target 13.6 kg (30 lb)  no exact loading",
-        "",
-        "  below  13 kg (28.66 lb)",
-        "         front: 6 blocks",
-        "         back: 7 blocks",
-        "* above  14 kg (30.86 lb)",
-        "         front: 7 blocks",
-        "         back: 7 blocks",
-        "",
-        "Unverified: empty vest weight, 1 kg plate count",
+        "Unverified: weighted vest base weight, 1 kg plate count",
         "",
       ].join("\n"),
     );
   });
 
-  it("reads a bare number as kilograms", () => {
-    expect(runWith(["load", "vest=12"]).stdout).toContain("Vest  target 12 kg (26.46 lb)  exact");
-  });
-
-  it("states the 30 block limit and the heaviest allowed loading for a refused target", () => {
-    const result = runWith(["load", "vest=35"]);
-    expect(result.code).toBe(0);
-    expect(result.stdout).toBe(
-      [
-        "Vest  target 35 kg (77.16 lb)  refused",
-        "",
-        "* below  30 kg (66.14 lb)",
-        "         front: 15 blocks",
-        "         back: 15 blocks",
-        "",
-        "Refused: over the 30 kg plate limit. Heaviest allowed: 30 kg (66.14 lb).",
-        "Unverified: empty vest weight, 1 kg plate count",
-        "",
-      ].join("\n"),
-    );
-  });
-
-  it("names one block in the singular and an empty position as no blocks", () => {
-    const text = runWith(["load", "vest=1"]).stdout;
-    expect(text).toContain("front: no blocks\n");
-    expect(text).toContain("back: 1 block\n");
-  });
-});
-
-describe("plate-pool load kettlebell= and leg=", () => {
-  it.each(["kettlebell", "leg"])("prints the same JSON as the library's result for %s", (implement) => {
-    const result = runWith(["load", `${implement}=80`, "--json"]);
-    expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual(load(inventory, { targets: [{ implement, target: "80" }] }));
-  });
-
-  it("prints the kettlebell's stack and locking screw", () => {
-    expect(runWith(["load", "kettlebell=80"]).stdout).toBe(
-      [
-        "Kettlebell  target 80 lb (36.3 kg)  exact",
-        "",
-        "  exact  80 lb (36.3 kg)",
-        "         stack: 22.5 5 5 5 5 5 5 2.5 | long screw",
-        "",
-        "Unverified: shortest stack on a long locking screw",
-        "",
-      ].join("\n"),
-    );
-    expect(runWith(["load", "kettlebell=40"]).stdout).toContain("stack: 5 5 5 | standard screw");
-  });
-
-  it("prints the bare kettlebell handle as no plates and no screw", () => {
-    expect(runWith(["load", "kettlebell=22.5"]).stdout).toContain("stack: no plates | no screw");
-  });
-
-  it("refuses a kettlebell target over the 80 lb limit, and exits 0", () => {
-    const result = runWith(["load", "kettlebell=85"]);
-    expect(result.code).toBe(0);
-    expect(result.stdout).toContain("Kettlebell  target 85 lb (38.6 kg)  refused");
-    expect(result.stdout).toContain("Refused: over the 80 lb limit. Heaviest allowed: 80 lb (36.3 kg).");
-  });
-
-  it("prints the leg attachment's stack with its fixed note", () => {
+  it("prints a stack with its hardware, and a stack with no hardware without it", () => {
+    expect(runWith(["load", "kettlebell=40"]).stdout).toContain("stack: 5 5 5 | Standard locking screw");
+    expect(runWith(["load", "kettlebell=22.5"]).stdout).toContain("stack: no plates | no hardware");
     expect(runWith(["load", "leg=50"]).stdout).toBe(
       [
         "Leg attachment  target 50 lb (22.7 kg)  exact",
@@ -344,160 +359,145 @@ describe("plate-pool load kettlebell= and leg=", () => {
       ].join("\n"),
     );
   });
+
+  it("loads a kilogram kit, with lengths in millimetres (spec 17.11 example 25)", () => {
+    const response = jsonOf(["load", "bar=95.5", "--inventory", olympicPath], {});
+    expect(response).toEqual(load(olympic, { targets: [{ implement: "bar", target: "95.5" }] }));
+    const [result] = response.results;
+    expect(result.exact).toBe(true);
+    expect(result.loading.hardware).toEqual([{ id: "collar", count: 2 }]);
+    expect(result.loading.positions[0].plates).toEqual([20, 10, 5, 2.5]);
+    expect(runWith(["load", "bar=95.5", "--inventory", olympicPath], {}).stdout).toContain(
+      "Olympic bar  target 95.5 kg (210.54 lb)  exact\n\n  exact  95.5 kg (210.54 lb)\n         each side: 20 10 5 2.5 | Spring collar\n",
+    );
+  });
 });
 
 describe("plate-pool load with several targets", () => {
-  it("prints the same JSON as the library's result, leftover included (spec 12.3)", () => {
-    const result = runWith(["load", "barbell=173", "dumbbells=40", "--json"]);
-    expect(result.code).toBe(0);
-    const expected = load(inventory, {
-      targets: [
-        { implement: "barbell", target: "173" },
-        { implement: "dumbbell", target: "40" },
-      ],
-    });
-    expect(JSON.parse(result.stdout)).toEqual(expected);
-    expect(expected.leftover).toEqual({
-      plates: { "ql-22.5": 1, "ql-5": 0, "ql-2.5": 2, "ql-micro": 4 },
-      hardware: { "screw-standard": 0, "screw-long": 5, "collar-spinlock": 2, "collar-clamp": 2 },
-    });
+  it("prints the same JSON as the library's result, leftover included", () => {
+    expect(jsonOf(["load", "barbell=173", "dumbbell=40"])).toEqual(
+      load(inventory, {
+        targets: [
+          { implement: "barbell", target: "173" },
+          { implement: "dumbbell", target: "40" },
+        ],
+      }),
+    );
   });
 
   it("reads argument order as priority order", () => {
-    const first = JSON.parse(runWith(["load", "dumbbells=120", "kettlebell=40", "--json"]).stdout);
-    const second = JSON.parse(runWith(["load", "kettlebell=40", "dumbbells=120", "--json"]).stdout);
-    expect(first.results.map((result: { implement: string; exact: boolean }) => [result.implement, result.exact])).toEqual([
+    const outcome = (args: string[]) => jsonOf(["load", ...args]).results.map((result: { implement: string; exact: boolean }) => [result.implement, result.exact]);
+    expect(outcome(["dumbbell=120", "kettlebell=40"])).toEqual([
       ["dumbbell", true],
       ["kettlebell", false],
     ]);
-    expect(second.results.map((result: { implement: string; exact: boolean }) => [result.implement, result.exact])).toEqual([
+    expect(outcome(["kettlebell=40", "dumbbell=120"])).toEqual([
       ["kettlebell", true],
       ["dumbbell", false],
     ]);
   });
 
-  it("prints each result in order, then what is left over", () => {
-    expect(runWith(["load", "barbell=173", "dumbbells=40"]).stdout).toBe(
+  it("prints each result in order, then what is left over by weight and hardware name", () => {
+    expect(runWith(["load", "barbell=173", "dumbbell=40"]).stdout).toBe(
       [
-        "Barbell  target 173 lb (78.5 kg)  exact",
+        "Straight bar  target 173 lb (78.5 kg)  exact",
         "",
         "  exact  173 lb (78.5 kg)",
-        "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
+        '         each side: 22.5 22.5 5 5 5 5 5 5 2.5 | Mirafit 1" clamp collar',
         "",
-        "Dumbbells (pair)  target 40 lb (18.1 kg) each  exact",
+        "Dumbbell pair  target 40 lb (18.1 kg) each  exact",
         "",
         "  exact  40 lb (18.1 kg)",
-        "         each end: 5 5 5 | standard screws",
+        "         each end: 5 5 5 | Standard locking screw",
         "",
         "Left over",
-        "  plates: 1 × 22.5, 2 × 2.5, 4 × 1.25",
-        "  locking hardware: 5 long screws, 2 spin-lock collars, 2 clamp collars",
+        "  plates: 1 × 22.5 lb, 2 × 2.5 lb, 4 × 1.25 lb",
+        '  locking hardware: 5 × Long locking screw, 2 × Ironmaster spin-lock collar, 2 × Mirafit 1" clamp collar',
         "",
       ].join("\n"),
     );
   });
 
   it("prints the warning for a later implement that misses its target", () => {
-    const result = runWith(["load", "dumbbells=120", "kettlebell=40"]);
-    expect(result.code).toBe(0);
-    expect(result.stdout).toContain("Not exact because the dumbbells use the 5 lb plates the kettlebell needs to reach 40 lb.");
-  });
-
-  it("counts vest blocks left over", () => {
-    expect(runWith(["load", "vest=12", "leg=50"]).stdout).toContain(
-      ["Left over", "  plates: 3 × 22.5, 23 × 5, 4 × 2.5, 4 × 1.25, 18 blocks", ""].join("\n"),
+    expect(runWith(["load", "dumbbell=120", "kettlebell=40"]).stdout).toContain(
+      "Not exact because the dumbbells use the 5 lb plates the kettlebell needs to reach 40 lb.",
     );
-  });
-
-  it("exits 1 when the request needs more of an implement than the inventory holds", () => {
-    const result = runWith(["load", "barbell=100", "barbell=120"]);
-    expect(result.code).toBe(1);
-    expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("The request needs 2 × straight bar. The inventory holds 1.\n");
   });
 });
 
 describe("plate-pool load --from", () => {
-  const side173 = [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5];
   const eachSide = (plates: number[]) => [
     { name: "left", plates },
     { name: "right", plates },
   ];
 
-  it("prints the same JSON as the library's result for a current loading (spec 12.3)", () => {
-    const result = runWith(["load", "barbell=175", "--from", "barbell", "--side", side173.join(","), "--json"]);
-    expect(result.stderr).toBe("");
-    expect(result.code).toBe(0);
-    const response = JSON.parse(result.stdout);
-    expect(response).toEqual(
-      load(inventory, { targets: [{ implement: "barbell", target: "175", current: { positions: eachSide(side173) } }] }),
-    );
+  it("prints the same JSON as the library's result for a current loading (spec 16.6 example 18)", () => {
+    const response = jsonOf(["load", "barbell=175", "--from", "barbell", "--side", "2x22.5,6x5,2.5"]);
+    expect(response).toEqual(load(inventory, { targets: [{ implement: "barbell", target: "175", current: { positions: eachSide(side173) } }] }));
     expect(response.results[0].below.changes.count).toBe(0);
-    expect(response.results[0].above.changes).toEqual({
-      count: 2,
-      positions: [
-        { name: "left", keep: side173, remove: [], add: [1.25] },
-        { name: "right", keep: side173, remove: [], add: [1.25] },
-      ],
-      hardware: [],
-    });
+    expect(response.results[0].above.changes.count).toBe(2);
   });
 
-  it("prints a changes line under each loading (spec 16.6 example 18)", () => {
+  it("prints a changes line under each loading", () => {
     expect(runWith(["load", "barbell=175", "--from", "barbell", "--side", side173.join(",")]).stdout).toBe(
       [
-        "Barbell  target 175 lb (79.4 kg)  no exact loading",
+        "Straight bar  target 175 lb (79.4 kg)  no exact loading",
         "",
         "  below  173 lb (78.5 kg)",
-        "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
+        '         each side: 22.5 22.5 5 5 5 5 5 5 2.5 | Mirafit 1" clamp collar',
         "         0 changes. Each side: unchanged.",
         "* above  175.5 lb (79.6 kg)",
-        "         each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | clamp collar",
+        '         each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | Mirafit 1" clamp collar',
         "         2 changes. Each side: put on 1.25.",
         "",
       ].join("\n"),
     );
   });
 
-  it("prints plates taken off and put on, and a screw swap, in the changes line", () => {
-    expect(runWith(["load", "barbell=58", "--from", "barbell", "--side", "5,5,5,5,2.5"]).stdout).toContain(
-      "each side: 5 5 5 5 | clamp collar\n         2 changes. Each side: take off 2.5.",
-    );
-    expect(runWith(["load", "barbell=70.5", "--from", "barbell", "--side", "5,5,5,5,2.5,2.5"]).stdout).toContain(
-      "each side: 5 5 5 5 2.5 2.5 1.25 | clamp collar\n         2 changes. Each side: put on 1.25.",
-    );
-    expect(runWith(["load", "barbell=63", "--from", "barbell", "--side", "5,5,5,5,1.25"]).stdout).toContain(
-      "each side: 5 5 5 5 2.5 | clamp collar\n         4 changes. Each side: take off 1.25 · put on 2.5.",
-    );
+  it("keeps standard screws for a pair at 80 lb (spec 17.11 example 19)", () => {
+    const [result] = jsonOf(["load", "dumbbell=80", "--from", "dumbbell", "--end-a", "22.5,5,2.5", "--end-b", "22.5,5,2.5"]).results;
+    expect(result.loading.changes.count).toBe(4);
+    expect(result.loading.changes.hardware).toEqual([]);
+    expect(result.loading.hardware).toEqual([{ id: "screw-standard", count: 2 }]);
+  });
 
+  it("names a screw swap by the hardware's names", () => {
     const end = "22.5,5,2.5";
-    expect(runWith(["load", "dumbbells=85", "--from", "dumbbells", "--end-a", end, "--end-b", end]).stdout).toContain(
-      "Swap 2 standard screws for long screws on each dumbbell.",
+    expect(runWith(["load", "dumbbell=85", "--from", "dumbbell", "--end-a", end, "--end-b", end]).stdout).toContain(
+      "Swap 2 × Standard locking screw for Long locking screw on each dumbbell.",
     );
-    expect(runWith(["load", "dumbbell=45", "--from", "dumbbell", "--end-a", "5,5,5,2.5", "--end-b", "5,5,5"]).stdout).toContain(
+    expect(runWith(["load", "dumbbell.single=45", "--from", "dumbbell", "--end-a", "5,5,5,2.5", "--end-b", "5,5,5"]).stdout).toContain(
       "1 change. End A: unchanged. End B: put on 2.5.",
     );
   });
 
-  it("counts vest blocks in the changes line", () => {
-    expect(runWith(["load", "vest=10", "--from", "vest", "--blocks", "8"]).stdout).toContain(
-      "2 changes. Front: put on 1 block. Back: put on 1 block.",
+  it("takes --front and --back for a vest and --stack for a stack", () => {
+    const vest = jsonOf(["load", "vest=10", "--from", "vest", "--front", "4x1", "--back", "4x1"]);
+    const four = [1, 1, 1, 1];
+    expect(vest).toEqual(
+      load(inventory, {
+        targets: [
+          {
+            implement: "vest",
+            target: "10",
+            current: {
+              positions: [
+                { name: "front", plates: four },
+                { name: "back", plates: four },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    expect(runWith(["load", "vest=10", "--from", "vest", "--front", "4x1", "--back", "4x1"]).stdout).toContain(
+      "2 changes. Front: put on 1. Back: put on 1.",
     );
     expect(runWith(["load", "kettlebell=40", "--from", "kettlebell", "--stack", "5,5"]).stdout).toContain("1 change. Stack: put on 5.");
   });
 
-  it("gives a dumbbell pair's current loading with --end-a and --end-b (spec 17.11 example 19)", () => {
-    const end = "22.5,5,2.5";
-    const result = runWith(["load", "dumbbells=80", "--from", "dumbbells", "--end-a", end, "--end-b", end, "--json"]);
-    expect(result.stderr).toBe("");
-    const [dumbbells] = JSON.parse(result.stdout).results;
-    expect(dumbbells.loading.changes.count).toBe(4);
-    expect(dumbbells.loading.changes.hardware).toEqual([]);
-  });
-
-  it("gives each implement its own current loading, matched by name", () => {
-    const args = ["load", "barbell=98", "dumbbells=40", "--from", "dumbbells", "--end-a", "5,5", "--end-b", "5,5"];
-    const response = JSON.parse(runWith([...args, "--from", "barbell", "--side", "5,5,5,5,5,5,5", "--json"]).stdout);
+  it("gives each implement its own current loading, matched by id", () => {
+    const response = jsonOf(["load", "barbell=98", "dumbbell=40", "--from", "dumbbell", "--end-a", "5,5", "--end-b", "5,5", "--from", "barbell", "--side", "7x5"]);
     expect(response).toEqual(
       load(inventory, {
         targets: [
@@ -515,38 +515,30 @@ describe("plate-pool load --from", () => {
         ],
       }),
     );
-    expect(response.results[1].loading.changes.count).toBe(4);
   });
 
-  it("reads --blocks and --stack after --from", () => {
-    const vest = JSON.parse(runWith(["load", "vest=10", "--from", "vest", "--blocks", "8", "--json"]).stdout);
-    const blocks = [
-      { name: "front", plates: [1, 1, 1, 1] },
-      { name: "back", plates: [1, 1, 1, 1] },
-    ];
-    expect(vest).toEqual(load(inventory, { targets: [{ implement: "vest", target: "10", current: { positions: blocks } }] }));
-    expect(vest.results[0].loading.changes).toBeDefined();
-
-    const leg = JSON.parse(runWith(["load", "leg=12.5", "--from", "leg", "--stack", "5,5", "--json"]).stdout);
-    expect(leg.results[0].loading.changes.count).toBe(1);
+  it("matches --from <id> to a single as well as a pair", () => {
+    const [result] = jsonOf(["load", "dumbbell.single=17.5", "--from", "dumbbell", "--end-a", "5", "--end-b", "5"]).results;
+    expect(result.loading.changes).toBeDefined();
   });
 
   it("leaves out the changes block for an implement with no --from (spec 16.6 example 20)", () => {
-    const [barbell, dumbbells] = JSON.parse(runWith(["load", "barbell=98", "dumbbells=40", "--from", "barbell", "--json"]).stdout).results;
+    const [barbell, dumbbell] = jsonOf(["load", "barbell=98", "dumbbell=40", "--from", "barbell"]).results;
     expect(barbell.loading).toHaveProperty("changes");
-    expect(dumbbells.loading).not.toHaveProperty("changes");
+    expect(dumbbell.loading).not.toHaveProperty("changes");
   });
 
   it.each([
-    [["load", "barbell=175", "--from"], "--from takes an implement"],
-    [["load", "barbell=175", "--from", "--side", "5"], "--from takes an implement"],
-    [["load", "barbell=175", "--from", "rowing"], 'Unknown implement "rowing" after --from'],
-    [["load", "barbell=175", "--from", "dumbbells", "--end-a", "5"], "--from dumbbells needs a dumbbells= target"],
+    [["load", "barbell=175", "--from"], "--from takes an implement id"],
+    [["load", "barbell=175", "--from", "--side", "5"], "--from takes an implement id"],
+    [["load", "barbell=175", "--from", "rowing"], 'Unknown implement "rowing"'],
+    [["load", "barbell=175", "--from", "dumbbell.single"], 'Unknown implement "dumbbell.single"'],
+    [["load", "barbell=175", "--from", "dumbbell", "--end-a", "5"], "--from dumbbell needs a dumbbell target"],
     [["load", "barbell=175", "--from", "barbell", "--from", "barbell"], "One --from per implement"],
-    [["load", "barbell=175", "--from", "barbell", "--stack", "5"], "--stack is for the kettlebell and leg attachment"],
+    [["load", "barbell=175", "--from", "barbell", "--stack", "5"], "--stack is for a stack. The straight bar is a bar: use --side."],
     [["load", "barbell=175", "--from", "barbell", "--side", "10"], "The straight bar takes no 10 lb plate"],
+    [["load", "barbell=175", "--side", "5"], "In load, --side follows --from <id>"],
     [["load", "barbell=175", "--to", "200"], "--to works with list only"],
-    [["reverse", "barbell", "--from", "100"], "--from works with list and load only"],
   ])("exits 1 with the reason on standard error for %j", (args, reason) => {
     const result = runWith(args);
     expect(result.code).toBe(1);
@@ -556,134 +548,90 @@ describe("plate-pool load --from", () => {
 });
 
 describe("plate-pool reverse", () => {
-  it("prints the same JSON as the library's result (spec 12.3)", () => {
-    const result = runWith(["reverse", "barbell", "--side", "22.5,22.5,5,5", "--json"]);
-    expect(result.code).toBe(0);
-    const side = [22.5, 22.5, 5, 5];
-    expect(JSON.parse(result.stdout)).toEqual(
-      reverse(inventory, {
-        implement: "barbell",
-        positions: [
-          { name: "left", plates: side },
-          { name: "right", plates: side },
-        ],
-      }),
+  it("prints the same JSON as the library's result, reading count x weight", () => {
+    const response = jsonOf(["reverse", "barbell", "--side", "2x22.5,6x5,2.5"]);
+    expect(response).toEqual(reverse(inventory, { implement: "barbell", positions: [{ name: "left", plates: side173 }, { name: "right", plates: side173 }] }));
+    expect(response.total).toEqual({ lb: 173, kg: 78.5 });
+  });
+
+  it("prints the total and each side as text", () => {
+    expect(runWith(["reverse", "barbell", "--side", "2x22.5,6x5,2.5"]).stdout).toBe(
+      ["Straight bar  total 173 lb (78.5 kg)", "", '  each side: 22.5 22.5 5 5 5 5 5 5 2.5 | Mirafit 1" clamp collar', ""].join("\n"),
     );
   });
 
-  it("prints the barbell's total, each side and the unverified values as text", () => {
-    expect(runWith(["reverse", "barbell", "--side", "22.5,22.5,5,5,5,5,5,5,2.5"]).stdout).toBe(
+  it("totals a vest's front and back (12 kg)", () => {
+    const response = jsonOf(["reverse", "vest", "--front", "6x1", "--back", "6x1"]);
+    expect(response.total).toEqual({ kg: 12, lb: 26.46 });
+    expect(runWith(["reverse", "vest", "--front", "6x1", "--back", "7x1"]).stdout).toBe(
       [
-        "Barbell  total 173 lb (78.5 kg)",
+        "Weighted vest  total 13 kg (28.66 lb)",
         "",
-        "  each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
+        "  front: 1 1 1 1 1 1",
+        "  back: 1 1 1 1 1 1 1",
+        "",
+        "Unverified: weighted vest base weight, 1 kg plate count",
         "",
       ].join("\n"),
     );
   });
 
-  it("takes --collars for the barbell", () => {
-    expect(runWith(["reverse", "barbell", "--side=5", "--collars", "none"]).stdout).toContain("each side: 5 | no collars");
+  it("takes .hardware for the implement", () => {
+    expect(runWith(["reverse", "barbell", "--side=5", "barbell.hardware=none"]).stdout).toContain("each side: 5 | no hardware");
+    expect(jsonOf(["reverse", "barbell", "barbell.hardware=collar-spinlock"]).total.lb).toBe(20);
   });
 
-  it("reads --end-a and --end-b for one dumbbell, names the screws and marks the heavier end", () => {
-    expect(runWith(["reverse", "dumbbell", "--end-a", "5,5,5,2.5", "--end-b", "5,5,5,5"]).stdout).toBe(
+  it("reads a handle as a pair and <id>.single as one", () => {
+    expect(jsonOf(["reverse", "dumbbell", "--end-a", "5,5,5", "--end-b", "5,5,5"])).toMatchObject({ pair: true, total: { lb: 40, kg: 18.1 } });
+    expect(jsonOf(["reverse", "dumbbell.single", "--end-a", "5,5,5", "--end-b", "5,5,5"])).toMatchObject({ pair: false });
+    expect(runWith(["reverse", "dumbbell.single", "--end-a", "5,5,5,2.5", "--end-b", "5,5,5,5"]).stdout).toBe(
       [
-        "One dumbbell  total 47.5 lb (21.5 kg)  uneven",
+        "Dumbbell single  total 47.5 lb (21.5 kg)  uneven",
         "",
         "  end A: 5 5 5 2.5",
         "  end B: 5 5 5 5 (heavier)",
-        "  standard screws",
+        "  Standard locking screw on each end",
         "",
       ].join("\n"),
     );
   });
 
-  it("reads dumbbells as a pair and prints the total for each", () => {
-    const result = runWith(["reverse", "dumbbells", "--end-a", "5,5,5", "--end-b", "5,5,5", "--json"]);
-    expect(JSON.parse(result.stdout)).toMatchObject({ pair: true, total: { lb: 40, kg: 18.1 } });
-    expect(runWith(["reverse", "dumbbells", "--end-a", "5,5,5", "--end-b", "5,5,5"]).stdout).toBe(
-      ["Dumbbells (pair)  total 40 lb (18.1 kg) each", "", "  each end: 5 5 5 | standard screws", ""].join("\n"),
-    );
-  });
-
-  it("lists both ends when they weigh the same but carry different plates", () => {
-    const output = runWith(["reverse", "dumbbell", "--end-a", "5", "--end-b", "2.5,2.5"]).stdout;
-    expect(output).toContain("  end A: 5\n  end B: 2.5 2.5\n  standard screws\n");
+  it("reads weight:id to name a plate", () => {
+    const response = jsonOf(["reverse", "barbell", "--side", "2x22.5:ql-22.5,1.25:ql-micro"]);
+    expect(response.positions[0].ids).toEqual(["ql-22.5", "ql-22.5", "ql-micro"]);
   });
 
   it("prints each rule the loading breaks, and still prints the total", () => {
-    const result = runWith(["reverse", "dumbbell", "--end-a", "5", "--no-uneven"]);
+    const result = runWith(["reverse", "dumbbell.single", "--end-a", "5", "--no-uneven"]);
     expect(result.code).toBe(0);
-    expect(result.stdout).toBe(
-      [
-        "One dumbbell  total 15 lb (6.8 kg)  uneven",
-        "",
-        "  end A: 5 (heavier)",
-        "  end B: no plates",
-        "  standard screws",
-        "",
-        "Uneven loading is off, and the ends differ by 5 lb.",
-        "",
-      ].join("\n"),
-    );
+    expect(result.stdout).toContain("Uneven loading is off, and the ends differ by 5 lb.");
   });
 
-  it("reads --stack for the kettlebell and the leg attachment", () => {
-    expect(runWith(["reverse", "kettlebell", "--stack", "22.5,5,5,5,5,5,5,2.5"]).stdout).toBe(
-      [
-        "Kettlebell  total 80 lb (36.3 kg)",
-        "",
-        "  stack: 22.5 5 5 5 5 5 5 2.5 | long screw",
-        "",
-        "Unverified: shortest stack on a long locking screw",
-        "",
-      ].join("\n"),
-    );
+  it("reads --stack for a stack, with the implement's note", () => {
     expect(runWith(["reverse", "leg", "--stack", "22.5,22.5,5"]).stdout).toBe(
-      [
-        "Leg attachment  total 50 lb (22.7 kg)",
-        "",
-        "  stack: 22.5 22.5 5",
-        "",
-        "Plate weight only. The lever changes the resistance you feel.",
-        "",
-      ].join("\n"),
-    );
-  });
-
-  it("reads --blocks for the vest and splits them with the extra block on the back", () => {
-    expect(runWith(["reverse", "vest", "--blocks", "13"]).stdout).toBe(
-      [
-        "Vest  total 13 kg (28.66 lb)",
-        "",
-        "  front: 6 blocks",
-        "  back: 7 blocks",
-        "",
-        "Unverified: empty vest weight, 1 kg plate count",
-        "",
-      ].join("\n"),
+      ["Leg attachment  total 50 lb (22.7 kg)", "", "  stack: 22.5 22.5 5", "", "Plate weight only. The lever changes the resistance you feel.", ""].join("\n"),
     );
   });
 
   it("reads a missing position as empty", () => {
-    expect(runWith(["reverse", "barbell"]).stdout).toContain("Barbell  total 18 lb (8.2 kg)");
+    expect(runWith(["reverse", "barbell"]).stdout).toContain("Straight bar  total 18 lb (8.2 kg)");
   });
 
   it.each([
-    [["reverse"], "Name an implement"],
+    [["reverse"], "Name an implement, such as reverse barbell"],
     [["reverse", "rowing"], 'Unknown implement "rowing"'],
     [["reverse", "barbell", "vest"], "reverse takes one implement"],
-    [["reverse", "barbell=175"], 'Unknown implement "barbell=175"'],
-    [["reverse", "barbell", "--stack", "5"], "--stack is for the kettlebell and leg attachment"],
-    [["reverse", "dumbbell", "--side", "5"], "--side is for the barbell"],
-    [["reverse", "vest", "--end-a", "5"], "--end-a is for a dumbbell"],
-    [["reverse", "kettlebell", "--blocks", "5"], "--blocks is for the vest"],
-    [["reverse", "barbell", "--side", "22.5,heavy"], '"heavy" is not a plate weight'],
-    [["reverse", "barbell", "--side"], "--side takes a list of plate weights"],
+    [["reverse", "barbell=175"], "reverse takes an implement id, not a target"],
+    [["reverse", "barbell", "--stack", "5"], "--stack is for a stack. The straight bar is a bar: use --side."],
+    [["reverse", "dumbbell", "--side", "5"], "--side is for a bar. The dumbbell is a handle: use --end-a and --end-b."],
+    [["reverse", "vest", "--end-a", "5"], "--end-a is for a handle. The weighted vest is a vest: use --front and --back."],
+    [["reverse", "kettlebell", "--blocks", "5"], 'Unknown option "--blocks"'],
+    [["reverse", "barbell", "--side", "22.5,heavy"], '"heavy" is not a plate'],
+    [["reverse", "barbell", "--side", "0x5"], '"0x5" is not a plate'],
+    [["reverse", "barbell", "--side"], "--side takes a list of plates"],
     [["reverse", "barbell", "--side", "10"], "The straight bar takes no 10 lb plate"],
-    [["reverse", "vest", "--blocks", "2.5"], "--blocks takes a whole number of blocks"],
-    [["load", "barbell=175", "--side", "5"], "In load, --side follows --from <implement>"],
+    [["reverse", "barbell", "--side", "5:ql-6"], 'The straight bar takes no plate "ql-6"'],
+    [["reverse", "barbell", "--from", "100"], "--from works with list and load only"],
     [["inventory", "--side", "5"], "--side is for the reverse command"],
   ])("exits 1 with the reason on standard error for %j", (args, reason) => {
     const result = runWith(args);
@@ -694,78 +642,58 @@ describe("plate-pool reverse", () => {
 });
 
 describe("plate-pool list", () => {
-  it("prints the same JSON as the library's result (spec 12.3)", () => {
-    const result = runWith(["list", "barbell", "--from", "100", "--to", "200", "--json"]);
-    expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual(list(inventory, { implement: "barbell", from: "100", to: "200" }));
+  it("prints the same JSON as the library's result", () => {
+    expect(jsonOf(["list", "barbell", "--from", "100", "--to", "200"])).toEqual(list(inventory, { implement: "barbell", from: "100", to: "200" }));
   });
 
-  it("reads dumbbells as a pair and dumbbell as one dumbbell", () => {
-    const pair = JSON.parse(runWith(["list", "dumbbells", "--from", "10", "--to", "15", "--json"]).stdout);
-    expect(pair).toEqual(list(inventory, { implement: "dumbbell", from: "10", to: "15" }));
-    expect(pair.pair).toBe(true);
-
-    const single = JSON.parse(runWith(["list", "dumbbell", "--from", "10", "--to", "15", "--json"]).stdout);
-    expect(single).toEqual(list(inventory, { implement: "dumbbell", pair: false, from: "10", to: "15" }));
-    expect(single.pair).toBe(false);
+  it("reads a handle as a pair and <id>.single as one", () => {
+    expect(jsonOf(["list", "dumbbell", "--from", "10", "--to", "15"])).toEqual(list(inventory, { implement: "dumbbell", from: "10", to: "15" }));
+    expect(jsonOf(["list", "dumbbell.single", "--from", "10", "--to", "60"])).toEqual(
+      list(inventory, { implement: "dumbbell", pair: false, from: "10", to: "60" }),
+    );
   });
 
-  it("changes the list with --collars and --no-uneven the way they change Load", () => {
-    const spinlock = JSON.parse(runWith(["list", "barbell", "--from", "18", "--to", "20.5", "--collars", "spinlock", "--json"]).stdout);
-    expect(spinlock).toEqual(list(inventory, { implement: "barbell", hardware: "collar-spinlock", from: "18", to: "20.5" }));
-
-    const even = JSON.parse(runWith(["list", "dumbbell", "--from=10", "--to=15", "--no-uneven", "--json"]).stdout);
-    expect(even).toEqual(list(inventory, { implement: "dumbbell", pair: false, uneven: false, from: "10", to: "15" }));
+  it("changes the list with .hardware and --no-uneven the way they change Load", () => {
+    expect(jsonOf(["list", "barbell", "barbell.hardware=collar-spinlock", "--from", "18", "--to", "20.5"])).toEqual(
+      list(inventory, { implement: "barbell", hardware: "collar-spinlock", from: "18", to: "20.5" }),
+    );
+    expect(jsonOf(["list", "dumbbell.single", "--from=10", "--to=15", "--no-uneven"])).toEqual(
+      list(inventory, { implement: "dumbbell", pair: false, uneven: false, from: "10", to: "15" }),
+    );
   });
 
-  it("lists the full range when --from and --to are left out", () => {
-    const { rows } = JSON.parse(runWith(["list", "kettlebell", "--json"]).stdout);
+  it("gives rows smallest and no screw", () => {
+    const { rows } = jsonOf(["list", "kettlebell"]);
     expect(rows[0].total.lb).toBe(22.5);
     expect(rows.at(-1).total.lb).toBe(80);
+    expect(Object.keys(rows[0])).toEqual(["total", "loading", "uneven", "smallest"]);
   });
 
   it("prints one line per weight with a one-line plate layout per position", () => {
     expect(runWith(["list", "barbell", "--from", "170", "--to", "176"]).stdout).toBe(
       [
-        "Barbell  3 weights from 170 lb to 176 lb",
+        "Straight bar  3 weights from 170 lb to 176 lb",
         "",
         "  170.5 lb (77.3 kg)  smallest",
-        "      each side: 22.5 22.5 5 5 5 5 5 5 1.25 | clamp collar",
+        '      each side: 22.5 22.5 5 5 5 5 5 5 1.25 | Mirafit 1" clamp collar',
         "  173 lb (78.5 kg)",
-        "      each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
+        '      each side: 22.5 22.5 5 5 5 5 5 5 2.5 | Mirafit 1" clamp collar',
         "  175.5 lb (79.6 kg)  smallest",
-        "      each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | clamp collar",
-        "",
-      ].join("\n"),
-    );
-  });
-
-  it("marks uneven dumbbells and shows each end", () => {
-    const output = runWith(["list", "dumbbell", "--from", "12.5", "--to", "12.5"]).stdout;
-    expect(output).toBe(
-      [
-        "One dumbbell  1 weight from 12.5 lb to 12.5 lb",
-        "",
-        "  12.5 lb (5.7 kg)  uneven",
-        "      end A: 2.5 (heavier)",
-        "      end B: no plates",
-        "      standard screws",
+        '      each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | Mirafit 1" clamp collar',
         "",
       ].join("\n"),
     );
   });
 
   it("says so when no weight falls in the range", () => {
-    expect(runWith(["list", "barbell", "--from", "19", "--to", "20"]).stdout).toBe(
-      "Barbell  no achievable weight from 19 lb to 20 lb\n",
-    );
+    expect(runWith(["list", "barbell", "--from", "19", "--to", "20"]).stdout).toBe("Straight bar  no achievable weight from 19 lb to 20 lb\n");
   });
 
   it.each([
-    [["list"], "Name an implement"],
+    [["list"], "Name an implement, such as list barbell"],
     [["list", "barbell", "kettlebell"], "list takes one implement"],
     [["list", "rowing"], 'Unknown implement "rowing"'],
-    [["list", "barbell=175"], 'Unknown implement "barbell=175"'],
+    [["list", "barbell=175"], "list takes an implement id, not a target"],
     [["list", "barbell", "--from"], "--from takes a weight"],
     [["list", "barbell", "--to", "heavy"], '"heavy" is not a weight'],
     [["list", "barbell", "--from", "200", "--to", "100"], "Its start must not be above its end"],
@@ -778,32 +706,114 @@ describe("plate-pool list", () => {
 });
 
 describe("plate-pool inventory", () => {
-  it("prints the same JSON as the library's result (spec 12.3)", () => {
+  it("prints the file as read with --json", () => {
     const result = runWith(["inventory", "--json"]);
     expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual(inventory);
+    expect(result.stdout).toBe(inventoryText);
   });
 
-  it("prints what the owner has as text", () => {
+  it("adds nothing to the file with --json, not even a final newline", () => {
+    const unterminated = inventoryText.trimEnd();
+    expect(runWith(["inventory", "--json", "--inventory", writeInventory(unterminated)], {}).stdout).toBe(unterminated);
+  });
+
+  it("prints the kit's name and length unit, then its plates, hardware and implements", () => {
     const result = runWith(["inventory"]);
     expect(result.code).toBe(0);
     const lines = result.stdout.split("\n");
+    expect(lines.slice(0, 3)).toEqual(["Home gym", "Lengths in in", ""]);
     expect(lines).toContain("Plates");
     expect(lines).toContain("Locking hardware");
     expect(lines).toContain("Implements");
-    expect(result.stdout).toMatch(/22\.5 lb +× 5 +22\.5 lb each\n/);
-    expect(result.stdout).toMatch(/Micro +× 4 +1\.25 lb each\n/);
-    expect(result.stdout).toMatch(/1 kg +× 30 +1 kg each, count unverified\n/);
-    expect(result.stdout).toMatch(/Ironmaster spin-lock collar +× 2 +1 lb each, measured\n/);
-    expect(result.stdout).toMatch(/Mirafit 1" clamp collar +× 4 +0 lb each\n/);
-    expect(result.stdout).toMatch(/Straight bar +× 1 +base 18 lb\n/);
+    expect(result.stdout).toContain("  5 × 22.5 lb  Ironmaster Quick-Lock, quick-lock bore\n");
+    expect(result.stdout).toContain("  4 × 1.25 lb  Micro, Ironmaster Quick-Lock, quick-lock bore\n");
+    expect(result.stdout).toContain("  30 × 1 kg    Mirafit vest block, block bore, count unverified\n");
+    expect(result.stdout).toContain("  4 × Standard locking screw  screw, 2.5 lb each, capacity 3.25 in\n");
+    expect(result.stdout).toContain("  2 × Ironmaster spin-lock collar  collar, 1 lb each, measured\n");
+    expect(result.stdout).toContain(
+      '  barbell  Straight bar × 1: bar, two sides, base 18 lb, hardware collar-clamp, collar-spinlock or none, position length 11.5 in, plates at most 210 lb, at most 1 × ql-micro per position\n',
+    );
+    expect(result.stdout).toContain("  vest  Weighted vest × 1: vest, front and back, base 0 kg unverified, plates at most 30 kg\n");
   });
 
   it("marks a measured weight", () => {
-    const measuredBar = structuredClone(inventoryFile);
-    measuredBar.implements[0].base = { listed: 18, measured: 20, status: "owner" };
-    const path = join(mkdtempSync(join(tmpdir(), "plate-pool-")), "inventory.json");
-    writeFileSync(path, JSON.stringify(measuredBar));
-    expect(runWith(["inventory", "--inventory", path]).stdout).toMatch(/Straight bar +× 1 +base 20 lb, measured\n/);
+    const file = structuredClone(inventoryFile);
+    file.implements[0].base = { listed: 18, measured: 20, status: "owner" };
+    expect(runWith(["inventory", "--inventory", writeInventory(file)]).stdout).toContain("base 20 lb measured,");
+  });
+
+  it("takes no arguments", () => {
+    expect(runWith(["inventory", "barbell"]).stderr).toContain("inventory takes no arguments.");
+  });
+});
+
+describe("plate-pool achievable (spec 17.8)", () => {
+  const document = () => {
+    const result = runWith(["achievable", "--inventory", inventoryPath], {});
+    expect(result.stderr).toBe("");
+    expect(result.code).toBe(0);
+    return JSON.parse(result.stdout);
+  };
+
+  it("writes the header: format, package version, the file's SHA-256 and the kit's name (spec 17.11 example 23)", () => {
+    const written = document();
+    expect(Object.keys(written)).toEqual(["format", "plate_pool", "inventory_sha256", "name", "tables"]);
+    expect(written.format).toBe(1);
+    expect(written.plate_pool).toBe(packageJson.version);
+    expect(written.inventory_sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(written.inventory_sha256).toBe(createHash("sha256").update(readFileSync(inventoryPath)).digest("hex"));
+    expect(written.name).toBe("Home gym");
+  });
+
+  it("hashes the bytes as read, not the parsed inventory", () => {
+    const spaced = writeInventory(`${inventoryText}\n\n`);
+    const result = JSON.parse(runWith(["achievable", "--inventory", spaced], {}).stdout);
+    expect(result.inventory_sha256).toBe(createHash("sha256").update(`${inventoryText}\n\n`).digest("hex"));
+    expect(result.inventory_sha256).not.toBe(document().inventory_sha256);
+  });
+
+  it("writes 14 tables in file order, then options order, pair before single (spec 17.11 example 23)", () => {
+    const { tables } = document();
+    expect(tables.map(({ implement, hardware, pair }: AchievableTable) => [implement, hardware, pair])).toEqual([
+      ["barbell", "collar-clamp", undefined],
+      ["barbell", "collar-spinlock", undefined],
+      ["barbell", "none", undefined],
+      ["dumbbell", "screw-standard", true],
+      ["dumbbell", "screw-standard", false],
+      ["dumbbell", "screw-long", true],
+      ["dumbbell", "screw-long", false],
+      ["dumbbell", "none", true],
+      ["dumbbell", "none", false],
+      ["kettlebell", "screw-standard", undefined],
+      ["kettlebell", "screw-long", undefined],
+      ["kettlebell", "none", undefined],
+      ["leg", undefined, undefined],
+      ["vest", undefined, undefined],
+    ]);
+    expect(Object.keys(tables[12])).toEqual(["implement", "rows"]);
+    expect(tables).toEqual(achievable(inventory));
+  });
+
+  it.each([
+    ["the owner's file", inventoryPath, inventory],
+    ["the Olympic kit", olympicPath, olympic],
+  ])("gives rows that load exactly with their hardware and pair setting, for %s", (_, path, kit: Inventory) => {
+    const { tables } = JSON.parse(runWith(["achievable", "--inventory", path], {}).stdout) as { tables: AchievableTable[] };
+    expect(tables.length).toBeGreaterThan(0);
+    for (const table of tables) {
+      const unit = kit.implements.find((implement) => implement.id === table.implement)!.unit;
+      const key = table.pair === undefined ? table.implement : `${table.implement}.${table.pair ? "pair" : "single"}`;
+      const hardware = table.hardware === undefined ? [] : [`${table.implement}.hardware=${table.hardware}`];
+      for (const row of table.rows) {
+        const response = jsonOf(["load", `${key}=${row.total[unit]}${unit}`, ...hardware, "--inventory", path], {});
+        expect(response.results[0].exact, `${key}=${row.total[unit]}${unit} ${hardware.join(" ")}`).toBe(true);
+      }
+    }
+  }, 120_000);
+
+  it.each([[["achievable", "barbell"]], [["achievable", "--from", "10"]]])("exits 1 for %j", (args) => {
+    const result = runWith(args);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
   });
 });

@@ -23,8 +23,8 @@ import { display, thousandths, used, type Display } from "./weight.js";
 export interface ReverseRequest {
   implement: string;
   pair?: boolean;
-  /** Plates per position, innermost first, by weight; `ids` names the plates where two accepted plates share a weight. */
-  positions: { name: string; plates: number[]; ids?: string[] }[];
+  /** Plates per position, innermost first, by weight; `ids` names the plates where two accepted plates share a weight, and a missing id means the plate is found by weight. */
+  positions: { name: string; plates: number[]; ids?: (string | undefined)[] }[];
   /** A hardware id from the implement's options, or "none". Without it the library picks by the hardware rule. */
   hardware?: string;
   /** A handle with hardware on one end only: the end that carries it. */

@@ -26,7 +26,7 @@ function runCli(args: string[]) {
   const code = run(args, {
     stdout: (text) => (stdout += text),
     stderr: (text) => (stderr += text),
-    defaultInventoryPath: inventoryPath,
+    variables: { PLATE_POOL_INVENTORY: inventoryPath },
   });
   return { code, stdout, stderr };
 }
