@@ -6,6 +6,7 @@ import { linkQuery, readLink, type View } from "./links";
 import { ListScreen } from "./ListScreen";
 import { LoadScreen, type LoadChoice } from "./LoadScreen";
 import { newCard, type Card } from "./plan";
+import { moveItem } from "./reorder";
 import { ReverseScreen } from "./ReverseScreen";
 import { useSettings, type SettingsChange } from "./settings";
 
@@ -58,7 +59,10 @@ function Screens({ inventory, kit }: CalculatorProps) {
     if (first.implement !== settings.implement) updateSettings({ implement: first.implement });
   };
   const selectImplement = (implement: string) => {
-    if (implement !== selected) changeCards([newCard(inventory, implement), ...cards.slice(1)]);
+    if (implement === selected) return;
+    const held = cards.findIndex((card) => card.implement === implement);
+    if (held > 0) changeCards(moveItem(cards, held, 0));
+    else changeCards([newCard(inventory, implement), ...cards.slice(1)]);
   };
   const changePair = (pair: boolean) => changeCards([{ ...cards[0]!, pair }, ...cards.slice(1)]);
   const openInLoad = (choice: LoadChoice) => {

@@ -211,6 +211,88 @@ describe("several implements: priority order (spec 8.3)", () => {
   });
 });
 
+describe("several implements: the tab of an implement a lower card holds (spec 8.3)", () => {
+  const names = () => cards().map((item) => item.getAttribute("aria-label"));
+  const target = (priority: number) => within(card(priority)).getByLabelText("Target");
+
+  function planBarbellThenDumbbells() {
+    render(<Calculator inventory={owner} />);
+    typeTarget(1, "173");
+    addImplement("Dumbbell pair");
+    typeTarget(2, "40");
+  }
+
+  it("moves that card to the top with its target, and both keep their results", () => {
+    planBarbellThenDumbbells();
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
+
+    expect(names()).toEqual(["1. Dumbbell pair", "2. Straight bar"]);
+    expect(target(1)).toHaveProperty("value", "40");
+    expect(target(2)).toHaveProperty("value", "173");
+    expect(text(result(1))).toContain("Exact");
+    expect(text(result(1))).toContain("Each end 3 × 5");
+    expect(text(result(2))).toContain("Exact");
+    expect(text(result(2))).toContain("Each side 2 × 22.5, 6 × 5, 1 × 2.5");
+    expect(screen.getByRole("tab", { name: "Dumbbell" }).getAttribute("aria-selected")).toBe("true");
+    expectSameAsLibrary(library({ implement: "dumbbell", target: "40lb" }, { implement: "barbell", target: "173lb" }));
+  });
+
+  it("keeps the other cards in their order below it", () => {
+    planBarbellThenDumbbells();
+    addImplement("Kettlebell");
+    typeTarget(3, "30");
+    fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
+    expect(names()).toEqual(["1. Kettlebell", "2. Straight bar", "3. Dumbbell pair"]);
+    expect(target(1)).toHaveProperty("value", "30");
+  });
+
+  it("moves a lower card that holds one dumbbell, and adds no second card for it", () => {
+    render(<Calculator inventory={owner} />);
+    typeTarget(1, "173");
+    addImplement("Dumbbell pair");
+    fireEvent.click(within(within(card(2)).getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
+    typeTarget(2, "12.5");
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
+
+    expect(names()).toEqual(["1. Dumbbell single", "2. Straight bar"]);
+    expect(target(1)).toHaveProperty("value", "12.5");
+    expect(text(result(1))).toContain("Exact");
+    expect(text(result(2))).toContain("Exact");
+  });
+
+  it("moves the higher of two lower cards that hold one dumbbell each", () => {
+    render(<Calculator inventory={owner} />);
+    addImplement("Dumbbell pair");
+    fireEvent.click(within(within(card(2)).getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
+    typeTarget(2, "12.5");
+    addImplement("Dumbbell single");
+    typeTarget(3, "15");
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
+
+    expect(names()).toEqual(["1. Dumbbell single", "2. Straight bar", "3. Dumbbell single"]);
+    expect(target(1)).toHaveProperty("value", "12.5");
+    expect(target(3)).toHaveProperty("value", "15");
+  });
+
+  it("moves the link and the last implement used with the new first card", () => {
+    planBarbellThenDumbbells();
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
+    const query = new URLSearchParams(window.location.search);
+    expect([...query.keys()].filter((key) => key === "dumbbell" || key === "barbell")).toEqual(["dumbbell", "barbell"]);
+    expect(query.get("dumbbell")).toBe("40lb");
+    expect(query.get("barbell")).toBe("173lb");
+    expect(JSON.parse(localStorage.getItem("plate-pool:settings")!).implement).toBe("dumbbell");
+  });
+
+  it("still changes the first card for the tab of an implement no card holds", () => {
+    planBarbellThenDumbbells();
+    fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
+    expect(names()).toEqual(["1. Kettlebell", "2. Dumbbell pair"]);
+    expect(target(1)).toHaveProperty("value", "");
+    expect(target(2)).toHaveProperty("value", "40");
+  });
+});
+
 describe("several implements: the plate pool", () => {
   const choices = () => within(screen.getByRole("group", { name: "Implement to add" })).getAllByRole("button").map((button) => button.textContent);
 
@@ -230,13 +312,10 @@ describe("several implements: the plate pool", () => {
   });
 
   it("explains a card that asks for more of an implement than the inventory holds, and serves the cards above it", () => {
+    window.history.replaceState(null, "", "/plate-pool/?dumbbell.single=30lb&dumbbell=40lb");
     render(<Calculator inventory={owner} />);
-    addImplement("Dumbbell pair");
-    typeTarget(2, "40");
-    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
-    typeTarget(1, "30");
     expect(text(result(1))).toContain("Exact");
-    expect(text(result(2))).toBe("The request needs 4 × dumbbell. The inventory holds 2.");
+    expect(text(result(2))).toBe("The request needs 3 × dumbbell. The inventory holds 2.");
   });
 
   it("explains a target it cannot read on its own card only", () => {
