@@ -20,7 +20,7 @@ function errorsOf(error: unknown): string[] {
 }
 
 export function inventoryOf(text: string): Inventory {
-  return readInventory(text.replace(/^﻿/, ""));
+  return readInventory(text.replace(/^\uFEFF/, ""));
 }
 
 export async function kitFromBytes(bytes: Uint8Array<ArrayBuffer>): Promise<KitRead> {

@@ -16,10 +16,9 @@ function dropFragment(): void {
   replaceUrl(url);
 }
 
-/** A replaced kit's hash no longer describes the targets, so the new kit must not see it as a mismatch. */
-function dropKitParameter(): void {
+function dropParameter(name: string): void {
   const url = new URL(window.location.href);
-  url.searchParams.delete("kit");
+  url.searchParams.delete(name);
   replaceUrl(url);
 }
 
@@ -52,7 +51,8 @@ export function App() {
     const replacing = kit !== undefined;
     storeKit(next, { replacing });
     dropFragment();
-    if (replacing) dropKitParameter();
+    // A replaced kit's hash no longer describes the targets, so the new kit must not see them as a mismatch.
+    if (replacing) dropParameter("kit");
     setKit(next);
     setArrival(undefined);
     setKitPage(false);
@@ -65,7 +65,10 @@ export function App() {
       <ConfirmCard
         arriving={arrival.kit}
         {...(kit ? { stored: kit } : {})}
-        onUse={() => install(arrival.kit)}
+        onUse={() => {
+          dropParameter("view");
+          install(arrival.kit);
+        }}
         onKeep={() => {
           dropFragment();
           setArrival(undefined);

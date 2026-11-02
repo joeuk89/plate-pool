@@ -147,6 +147,15 @@ describe("arrival by set-up link (spec 17.5.2)", () => {
     expect(screen.getByRole("button", { name: /^Home gym/ })).toBeTruthy();
   });
 
+  it("the tap lands on Load even when the link names another view", async () => {
+    window.history.replaceState(null, "", `/?barbell=173lb&view=list${await setupFragment(ownerText)}`);
+    render(<App />);
+    fireEvent.click(within(await confirmCard()).getByRole("button", { name: "Use Home gym on this phone" }));
+    await exampleTwoShows();
+    expect(screen.getByRole("button", { name: "Load" }).getAttribute("aria-current")).toBe("page");
+    expect(new URLSearchParams(window.location.search).get("view")).toBeNull();
+  });
+
   it("installs with the network off: the device decodes and hashes the link itself", async () => {
     const fragment = await setupFragment(ownerText);
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("Failed to fetch")));
