@@ -39,3 +39,19 @@ describe("library boundary (spec 12.1)", () => {
     }
   });
 });
+
+describe("rules as data (spec 17.4)", () => {
+  const kindWords = new Set(["bar", "handle", "stack", "vest", "left", "right", "a", "b", "front", "back", "screw", "collar", "pin", "none"]);
+  const sources = readdirSync(join(packageRoot, "src"), { encoding: "utf8" })
+    .filter((file) => file.endsWith(".ts"))
+    .map((file) => [file, readFileSync(join(packageRoot, "src", file), "utf8")] as const);
+
+  it.each(["../../inventory/inventory.json", "test/fixtures/olympic-kit.json"])("names no plate, hardware or implement id from %s", (path) => {
+    const file = JSON.parse(readFileSync(join(packageRoot, path), "utf8"));
+    const ids: string[] = [...file.plates, ...file.hardware, ...file.implements].map((entry: { id: string }) => entry.id);
+    expect(ids.length).toBeGreaterThan(5);
+    for (const id of ids.filter((each) => !kindWords.has(each))) {
+      for (const [name, source] of sources) expect(source.includes(`"${id}"`), `${name} names "${id}"`).toBe(false);
+    }
+  });
+});

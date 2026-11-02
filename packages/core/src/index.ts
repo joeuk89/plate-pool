@@ -1,6 +1,6 @@
 export type * from "./inventory.js";
-export { list, step } from "./list.js";
-export type { ListOptions, ListRequest, ListResponse, ListRow, StepRequest } from "./list.js";
+export { achievable, list, step } from "./list.js";
+export type { AchievableTable, ListOptions, ListRequest, ListResponse, ListRow, StepRequest } from "./list.js";
 export { load } from "./request.js";
 export type { Changes, HardwareChanges, PositionChanges } from "./changes.js";
 export type { CurrentLoading, Leftover, LoadedPosition, Loading, LoadRequest, LoadResponse, LoadResult, TargetRequest } from "./load.js";

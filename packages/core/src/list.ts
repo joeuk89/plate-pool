@@ -69,6 +69,33 @@ export function list(inventory: Inventory, request: ListRequest): ListResponse {
   };
 }
 
+export interface AchievableTable {
+  implement: string;
+  hardware?: string;
+  pair?: boolean;
+  rows: ListRow[];
+}
+
+/** One table per implement, per hardware option and per pair or single on a handle the gym has two of: file order, then options order, pair first (spec 17.8). */
+export function achievable(inventory: Inventory): AchievableTable[] {
+  return inventory.implements.flatMap((implement) => {
+    const options: (string | undefined)[] = implement.hardware && implement.kind !== "vest" ? implement.hardware.options : [undefined];
+    const pairs: (boolean | undefined)[] = implement.kind === "handle" && implement.count >= 2 ? [true, false] : [undefined];
+    return options.flatMap((hardware) =>
+      pairs.map((pair) => ({
+        implement: implement.id,
+        ...(hardware !== undefined ? { hardware } : {}),
+        ...(pair !== undefined ? { pair } : {}),
+        rows: list(inventory, {
+          implement: implement.id,
+          ...(hardware !== undefined ? { hardware } : {}),
+          ...(pair !== undefined ? { pair } : {}),
+        }).rows,
+      })),
+    );
+  });
+}
+
 export function step(inventory: Inventory, request: StepRequest, direction: "up" | "down"): Display | undefined {
   const { unit, loadAt, nextAbove } = walker(inventory, request);
   const current = request.target === undefined || request.target.trim() === "" ? 0 : milliOf(request.target, unit);
