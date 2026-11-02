@@ -12,24 +12,16 @@ interface Props extends DrawOptions {
 
 export function StackPicture({ implement, loading, inventory, editing, ...options }: Props) {
   const drawing = drawStack(implement, loading, inventory, options);
-  const { base, loop, lever, holder, screw } = drawing;
+  const { mount, stop, post, hardware } = drawing;
+  const position = loading.positions[0]?.name;
 
   return (
     <svg {...pictureRole(drawing.description, editing)} className="picture" viewBox={`0 ${drawing.top} ${drawing.width} ${drawing.height}`}>
-      {loop && (
-        <path
-          className="handle"
-          strokeWidth={loop.thickness}
-          d={`M ${base.x + 0.1} ${-loop.radius} H ${loop.left + loop.thickness / 2 + loop.radius} A ${loop.radius} ${loop.radius} 0 0 0 ${loop.left + loop.thickness / 2 + loop.radius} ${loop.radius} H ${base.x + 0.1}`}
-        />
-      )}
-      {lever && <rect className="bar" x={lever.x} y={-lever.height / 2} width={lever.width} height={lever.height} rx={0.3} />}
-      {holder.length > 0 && (
-        <rect className="bar" x={holder.x} y={-holder.diameter / 2} width={holder.length} height={holder.diameter} rx={0.08} />
-      )}
-      <rect className="bar" x={base.x} y={-base.height / 2} width={base.width} height={base.height} rx={0.12} />
-      <Plates plates={drawing.plates} position={loading.positions[0]?.name} editing={editing} added={addedFrom(loading, loading.positions[0]?.name)} />
-      {screw && <HardwarePart hardware={screw} className="screw" radius={0.15} />}
+      <rect className="bar" x={mount.x} y={-mount.height / 2} width={mount.width} height={mount.height} rx={0.15} />
+      <rect className="bar" x={post.x} y={-post.diameter / 2} width={post.length} height={post.diameter} rx={0.08} />
+      <rect className="bar" x={stop.x} y={-stop.height / 2} width={stop.width} height={stop.height} rx={0.08} />
+      <Plates plates={drawing.plates} position={position} editing={editing} added={addedFrom(loading, position)} />
+      {hardware && <HardwarePart hardware={hardware} />}
     </svg>
   );
 }

@@ -62,14 +62,14 @@ describe("barbell Load screen: worked examples (spec section 7)", () => {
 describe("Load screen: implement tabs", () => {
   const tabs = () => within(screen.getByRole("tablist", { name: "Implements" })).getAllByRole("tab");
 
-  it("opens on the barbell, with the dumbbells, kettlebell, leg attachment and vest tabs beside it", () => {
+  it("opens on the first implement, with every implement's tab in file order, labelled by its name", () => {
     render(<App />);
     expect(tabs().map((tab) => [tab.textContent, tab.getAttribute("aria-selected")])).toEqual([
-      ["Barbell", "true"],
-      ["Dumbbells", "false"],
+      ["Straight bar", "true"],
+      ["Dumbbell", "false"],
       ["Kettlebell", "false"],
       ["Leg attachment", "false"],
-      ["Vest", "false"],
+      ["Weighted vest", "false"],
     ]);
   });
 
@@ -82,12 +82,12 @@ describe("Load screen: implement tabs", () => {
 
   it("switches to the vest and back", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("tab", { name: "Vest" }));
-    expect(screen.getByRole("tab", { name: "Vest" }).getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("tab", { name: "Barbell" }).getAttribute("aria-selected")).toBe("false");
+    fireEvent.click(screen.getByRole("tab", { name: "Weighted vest" }));
+    expect(screen.getByRole("tab", { name: "Weighted vest" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "Straight bar" }).getAttribute("aria-selected")).toBe("false");
     expect(screen.queryByRole("radiogroup", { name: "Collars" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Barbell" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Straight bar" }));
     expect(screen.getByRole("radiogroup", { name: "Collars" })).not.toBeNull();
   });
 });
@@ -95,7 +95,7 @@ describe("Load screen: implement tabs", () => {
 describe("vest Load screen", () => {
   function openVest() {
     render(<App />);
-    fireEvent.click(screen.getByRole("tab", { name: "Vest" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Weighted vest" }));
   }
 
   it("starts its unit switch on kilograms", () => {
@@ -145,7 +145,7 @@ describe("vest Load screen", () => {
     openVest();
     typeTarget("12");
     const notes = within(screen.getByRole("region", { name: "Result" })).getByRole("list", { name: "Notes" });
-    expect(text(notes)).toBe("Unverified: empty vest weight, block count");
+    expect(text(notes)).toBe("Unverified: empty weighted vest weight, block count");
   });
 
   it("names one block in the singular and an empty position as no blocks", () => {
@@ -168,7 +168,7 @@ describe("kettlebell Load screen", () => {
     expect(result).toContain("Exact");
     expect(result).toContain("80 lb 36.3 kg");
     expect(result).toContain("Stack 1 × 22.5, 6 × 5, 1 × 2.5");
-    expect(result).toContain("Locking screw 1 × Long locking screw");
+    expect(result).toContain("Screw 1 × Long locking screw");
   });
 
   it("shows the bare handle with no locking screw", () => {
@@ -176,7 +176,7 @@ describe("kettlebell Load screen", () => {
     typeTarget("22.5");
     const result = text(screen.getByRole("region", { name: "Result" }));
     expect(result).toContain("Stack No plates");
-    expect(result).toContain("Locking screw None");
+    expect(result).toContain("Screw None");
   });
 
   it("has no collar choice", () => {
@@ -269,14 +269,14 @@ describe("barbell Load screen: collars", () => {
   it("uses the clamp collar unless another is picked", () => {
     render(<App />);
     typeTarget("173");
-    expect(within(collars()).getByRole("radio", { name: "Clamp" })).toHaveProperty("checked", true);
+    expect(within(collars()).getByRole("radio", { name: 'Mirafit 1" clamp collar' })).toHaveProperty("checked", true);
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain('Collars 2 × Mirafit 1" clamp collar');
   });
 
   it("switches to spin-lock collars", () => {
     render(<App />);
     typeTarget("173");
-    fireEvent.click(within(collars()).getByRole("radio", { name: "Spin-lock" }));
+    fireEvent.click(within(collars()).getByRole("radio", { name: "Ironmaster spin-lock collar" }));
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Collars 2 × Ironmaster spin-lock collar");
   });
 
@@ -301,14 +301,14 @@ describe("barbell Load screen: notes", () => {
 describe("dumbbells Load screen", () => {
   function openDumbbells() {
     render(<App />);
-    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
   }
-  const dumbbells = () => screen.getByRole("radiogroup", { name: "Dumbbells" });
+  const dumbbells = () => screen.getByRole("radiogroup", { name: "Pair or single" });
   const result = () => screen.getByRole("region", { name: "Result" });
 
   it("selects the dumbbells tab, asks for a pair unless one is picked, and has no collar choice", () => {
     openDumbbells();
-    expect(screen.getByRole("tab", { name: "Dumbbells" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "Dumbbell" }).getAttribute("aria-selected")).toBe("true");
     expect(within(dumbbells()).getByRole("radio", { name: "Pair" })).toHaveProperty("checked", true);
     expect(screen.queryByRole("radiogroup", { name: "Collars" })).toBeNull();
   });
@@ -326,7 +326,7 @@ describe("dumbbells Load screen", () => {
 
   it("example 5: one dumbbell of 12.5 lb shows each end and the uneven note naming the heavier end", () => {
     openDumbbells();
-    fireEvent.click(within(dumbbells()).getByRole("radio", { name: "One" }));
+    fireEvent.click(within(dumbbells()).getByRole("radio", { name: "Single" }));
     typeTarget("12.5");
     const shown = text(result());
     expect(shown).toContain("End A heavier 1 × 2.5");
@@ -337,7 +337,7 @@ describe("dumbbells Load screen", () => {
 
   it("marks the uneven loadings when no loading is exact", () => {
     openDumbbells();
-    fireEvent.click(within(dumbbells()).getByRole("radio", { name: "One" }));
+    fireEvent.click(within(dumbbells()).getByRole("radio", { name: "Single" }));
     typeTarget("48");
     const notes = text(within(result()).getByRole("list", { name: "Notes" }));
     expect(notes).toContain("Below is uneven: end A is 2.5 lb heavier than end B.");

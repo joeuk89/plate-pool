@@ -1,32 +1,29 @@
-import { list, RequestError, type ListRequest, type ListResponse, type ListRow, type Unit } from "@plate-pool/core";
+import { list, RequestError, type Inventory, type ListRequest, type ListResponse, type ListRow, type Unit } from "@plate-pool/core";
 import { useId, useMemo, useState } from "react";
-import { collarOptions, dumbbellOptions, unitOf, type DumbbellChoice, type LoadChoice } from "./LoadScreen";
-import { Segmented } from "./Segmented";
-import { Switch } from "./Switch";
-import { blockList, endLabel, plateList, unverifiedList } from "./describe";
-import { inventory } from "./inventory";
-import { collarId, type CollarChoice } from "./settings";
-
-const screwLabels: Record<string, string> = {
-  "screw-standard": "Standard screw",
-  "screw-long": "Long screw",
-};
+import { hardwareList, positionRows, unverifiedList } from "./describe";
+import { HardwareChoice, PairChoice, UnevenSwitch, type HardwareProps } from "./ImplementOptions";
+import { hardwareOptions, hardwareTerm, kindOf, unitOf, useKit } from "./kit";
+import { hardwareChoice } from "./settings";
+import type { LoadChoice } from "./LoadScreen";
+import { pairOf } from "./plan";
 
 type Outcome = { response: ListResponse } | { error: string };
 
 interface Options {
-  collars: CollarChoice;
+  hardware: Record<string, string>;
   uneven: boolean;
-  dumbbells: DumbbellChoice;
+  pair: boolean;
 }
 
-function calculate(implement: string, from: string, to: string, { collars, uneven, dumbbells }: Options): Outcome {
+function calculate(inventory: Inventory, implement: string, from: string, to: string, { hardware, uneven, pair }: Options): Outcome {
+  const choice = hardware[implement];
   const request: ListRequest = {
     implement,
     ...(from.trim() === "" ? {} : { from }),
     ...(to.trim() === "" ? {} : { to }),
-    ...(implement === "dumbbell" ? { pair: dumbbells === "pair", uneven } : {}),
-    ...(implement === "barbell" ? { hardware: collarId(collars) } : {}),
+    ...pairOf(inventory, { implement, pair }),
+    ...(kindOf(inventory, implement) === "handle" ? { uneven } : {}),
+    ...(choice !== undefined ? { hardware: choice } : {}),
   };
   try {
     return { response: list(inventory, request) };
@@ -36,25 +33,24 @@ function calculate(implement: string, from: string, to: string, { collars, uneve
   }
 }
 
-interface Props {
+interface Props extends HardwareProps {
   implement: string;
-  collars: CollarChoice;
-  onCollarsChange: (collars: CollarChoice) => void;
   uneven: boolean;
   onUnevenChange: (uneven: boolean) => void;
-  dumbbells: DumbbellChoice;
-  onDumbbellsChange: (dumbbells: DumbbellChoice) => void;
+  pair: boolean;
+  onPairChange: (pair: boolean) => void;
   onOpen: (choice: LoadChoice) => void;
 }
 
 export function ListScreen(props: Props) {
-  const { implement, collars, onCollarsChange, uneven, onUnevenChange, dumbbells, onDumbbellsChange, onOpen } = props;
+  const { implement, hardware, onHardwareChange, uneven, onUnevenChange, pair, onPairChange, onOpen } = props;
+  const inventory = useKit();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const unit = unitOf(implement);
+  const unit = unitOf(inventory, implement);
   const outcome = useMemo(
-    () => calculate(implement, from, to, { collars, uneven, dumbbells }),
-    [implement, from, to, collars, uneven, dumbbells],
+    () => calculate(inventory, implement, from, to, { hardware, uneven, pair }),
+    [inventory, implement, from, to, hardware, uneven, pair],
   );
 
   return (
@@ -64,13 +60,9 @@ export function ListScreen(props: Props) {
           <RangeField label="From" unit={unit} value={from} onChange={setFrom} />
           <RangeField label="To" unit={unit} value={to} onChange={setTo} />
         </div>
-        {implement === "barbell" && <Segmented label="Collars" options={collarOptions} value={collars} onChange={onCollarsChange} />}
-        {implement === "dumbbell" && (
-          <>
-            <Segmented label="Dumbbells" options={dumbbellOptions} value={dumbbells} onChange={onDumbbellsChange} />
-            <Switch label="Uneven loading" checked={uneven} onChange={onUnevenChange} />
-          </>
-        )}
+        <HardwareChoice implement={implement} hardware={hardware} onHardwareChange={onHardwareChange} />
+        <PairChoice implement={implement} pair={pair} onChange={onPairChange} />
+        <UnevenSwitch implement={implement} uneven={uneven} onChange={onUnevenChange} />
       </div>
       {"error" in outcome ? (
         <p className="error">{outcome.error}</p>
@@ -78,8 +70,8 @@ export function ListScreen(props: Props) {
         <WeightTable
           response={outcome.response}
           unit={unit}
-          onOpen={(row) => onOpen({ target: String(row.total[unit]), dumbbells })}
-        />
+          showHardware={hardwareChoice(inventory, { hardware }, implement) === undefined && hardwareOptions(inventory, implement).length > 0}
+          onOpen={(row) => onOpen({ target: String(row.total[unit]), pair })} />
       )}
     </div>
   );
@@ -109,7 +101,16 @@ function RangeField({ label, unit, value, onChange }: { label: string; unit: Uni
   );
 }
 
-function WeightTable({ response, unit, onOpen }: { response: ListResponse; unit: Unit; onOpen: (row: ListRow) => void }) {
+interface TableProps {
+  response: ListResponse;
+  unit: Unit;
+  /** Rows name their hardware when the library chooses it row by row. */
+  showHardware: boolean;
+  onOpen: (row: ListRow) => void;
+}
+
+function WeightTable({ response, unit, showHardware, onOpen }: TableProps) {
+  const inventory = useKit();
   const other: Unit = unit === "lb" ? "kg" : "lb";
   const notes = [...response.warnings];
   if (response.unverified.length > 0) notes.push(`Unverified: ${unverifiedList(response.unverified, inventory)}`);
@@ -138,11 +139,24 @@ function WeightTable({ response, unit, onOpen }: { response: ListResponse; unit:
                 </td>
                 <td className="weight other">{row.total[other]}</td>
                 <td>
-                  <Positions implement={response.implement} row={row} />
+                  <dl className="positions">
+                    {positionRows(inventory, response.implement, row.loading).map(({ label, text, heavier }) => (
+                      <div key={label}>
+                        <dt>{`${label}${heavier ? " (heavier)" : ""}`}</dt>
+                        <dd>{text}</dd>
+                      </div>
+                    ))}
+                    {showHardware && (
+                      <div>
+                        <dt>{hardwareTerm(inventory, response.implement, response.pair === true)}</dt>
+                        <dd>{hardwareList(row.loading, inventory)}</dd>
+                      </div>
+                    )}
+                  </dl>
                 </td>
                 <td>
                   <div className="flags">
-                    {flags(response.implement, row).map((flag) => (
+                    {flags(inventory, response.implement, row).map((flag) => (
                       <span key={flag}>{flag}</span>
                     ))}
                   </div>
@@ -163,45 +177,6 @@ function WeightTable({ response, unit, onOpen }: { response: ListResponse; unit:
   );
 }
 
-function Positions({ implement, row }: { implement: string; row: ListRow }) {
-  const { loading } = row;
-  const [first, second] = loading.positions;
-  const entries: [term: string, description: string][] =
-    implement === "vest"
-      ? [
-          ["Front", blockList(first?.plates ?? [])],
-          ["Back", blockList(second?.plates ?? [])],
-        ]
-      : implement === "dumbbell" && loading.uneven
-        ? loading.positions.map((position) => [
-            `${endLabel(position.name)}${position.name === loading.heavier ? " (heavier)" : ""}`,
-            plateList(position.plates),
-          ])
-        : [[positionLabel(implement), plateList(first?.plates ?? [])]];
-
-  return (
-    <dl className="positions">
-      {entries.map(([term, description]) => (
-        <div key={term}>
-          <dt>{term}</dt>
-          <dd>{description}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function positionLabel(implement: string): string {
-  if (implement === "barbell") return "Each side";
-  if (implement === "dumbbell") return "Each end";
-  return "Stack";
-}
-
-function flags(implement: string, row: ListRow): string[] {
-  const screw = row.loading.hardware.map(({ id }) => screwLabels[id]).find((label) => label !== undefined);
-  return [
-    ...(row.uneven ? ["Uneven"] : []),
-    ...(row.smallest && implement !== "vest" ? ["Micro"] : []),
-    ...(screw ? [implement === "dumbbell" ? `${screw}s` : screw] : []),
-  ];
+function flags(inventory: Inventory, implement: string, row: ListRow): string[] {
+  return [...(row.uneven ? ["Uneven"] : []), ...(row.smallest && kindOf(inventory, implement) !== "vest" ? ["Smallest"] : [])];
 }

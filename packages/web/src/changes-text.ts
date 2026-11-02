@@ -1,79 +1,68 @@
 import type { Inventory, Loading } from "@plate-pool/core";
 import type { PinnedLoading } from "./current";
-import { endLabel } from "./describe";
+import { mirroredLabel, positionLabel } from "./describe";
+import { canPair, hardwareOf, isCounted, kindOf, lower } from "./kit";
 
 export interface ChangesText {
   count: string;
   lines: { label: string; text: string }[];
 }
 
-const mirroredLabels: Record<string, string> = { barbell: "Each side", dumbbell: "Each end" };
-const positionLabels: Record<string, string> = { stack: "Stack", front: "Front", back: "Back" };
-
 export function changesText(implement: string, loading: Loading, current: PinnedLoading, inventory: Inventory): ChangesText | undefined {
   const { changes } = loading;
   if (!changes) return undefined;
-  const pair = implement === "dumbbell" && current.pair !== false;
-  const nowScrews = screwsOf(
-    current.hardware?.replace(/^screw-/, ""),
+  const pair = canPair(inventory, implement) && current.pair !== false;
+  const counted = (id: string | undefined) => (isCounted(hardwareOf(inventory, id)) ? id : undefined);
+  const nowPieces = piecesOf(
+    counted(current.hardware),
     current.hardwareOn,
     current.positions.map(({ name }) => name),
   );
-  const nextScrews = screwsOf(
-    screwKindOf(loading, inventory),
-    oneScrewEnd(loading),
+  const nextPieces = piecesOf(
+    counted(loading.hardware.find(({ id }) => counted(id))?.id),
+    oneEnd(loading),
     loading.positions.map(({ name }) => name),
   );
-  const screwName = (kind: string) => `${kind} screw`;
+  const nameOf = (id: string) => lower(hardwareOf(inventory, id)?.name ?? id);
+  const vest = kindOf(inventory, implement) === "vest";
 
   const perPosition = changes.positions.map(({ name, remove, add }, index) => {
     const parts: string[] = [];
-    if (remove.length > 0) parts.push(`take off ${platesText(implement, remove)}`);
-    if (add.length > 0) parts.push(`put on ${platesText(implement, add)}`);
-    const from = nowScrews[index];
-    const to = nextScrews[index];
-    if (from && to && from !== to) parts.push(`swap ${screwName(from)} for ${screwName(to)}`);
-    else if (from && !to) parts.push(`take off ${screwName(from)}`);
-    else if (!from && to) parts.push(`put on ${screwName(to)}`);
+    if (remove.length > 0) parts.push(`take off ${platesText(vest, remove)}`);
+    if (add.length > 0) parts.push(`put on ${platesText(vest, add)}`);
+    const from = nowPieces[index];
+    const to = nextPieces[index];
+    if (from && to && from !== to) parts.push(`swap ${nameOf(from)} for ${nameOf(to)}`);
+    else if (from && !to) parts.push(`take off ${nameOf(from)}`);
+    else if (!from && to) parts.push(`put on ${nameOf(to)}`);
     return { label: positionLabel(name), text: parts.length > 0 ? parts.join(" · ") : "unchanged" };
   });
 
-  const mirrored = mirroredLabels[implement];
+  const mirrored = mirroredLabel(inventory, implement);
   const allSame = perPosition.every((line) => line.text === perPosition[0]?.text);
   const lines = mirrored && allSame && perPosition.length > 1 ? [{ label: mirrored, text: perPosition[0]!.text }] : perPosition;
-  return { count: countText(changes.count, pair), lines: changes.count === 0 ? [] : lines };
+  const name = pair ? lower(inventory.implements.find((item) => item.id === implement)?.name ?? implement) : undefined;
+  return { count: countText(changes.count, name), lines: changes.count === 0 ? [] : lines };
 }
 
-export function countText(count: number, pair = false): string {
+/** With `perPair` set to the implement's name, a pair's count also reads per handle: "8 changes, 4 per dumbbell". */
+export function countText(count: number, perPair?: string): string {
   if (count === 0) return "No changes";
   const total = `${count} ${count === 1 ? "change" : "changes"}`;
-  return pair ? `${total}, ${count / 2} per dumbbell` : total;
+  return perPair ? `${total}, ${count / 2} per ${perPair}` : total;
 }
 
-function platesText(implement: string, plates: number[]): string {
-  if (implement === "vest") return plates.length === 1 ? "1 block" : `${plates.length} blocks`;
+function platesText(vest: boolean, plates: number[]): string {
+  if (vest) return plates.length === 1 ? "1 block" : `${plates.length} blocks`;
   return plates.join(", ");
 }
 
-function positionLabel(name: string): string {
-  const end = endLabel(name);
-  return end !== name ? end : (positionLabels[name] ?? name);
+function oneEnd(loading: Loading): string | undefined {
+  const [pieces] = loading.hardware;
+  return pieces && pieces.count < loading.positions.length ? loading.heavier : undefined;
 }
 
-function screwKindOf(loading: Loading, inventory: Inventory): string | undefined {
-  for (const { id } of loading.hardware) {
-    const item = inventory.hardware.find((hardware) => hardware.id === id);
-    if (item?.kind === "screw") return id.replace(/^screw-/, "");
-  }
-  return undefined;
-}
-
-function oneScrewEnd(loading: Loading): string | undefined {
-  const [screws] = loading.hardware;
-  return screws && screws.count < loading.positions.length ? loading.heavier : undefined;
-}
-
-function screwsOf(kind: string | undefined, onlyOn: string | undefined, positions: string[]): (string | undefined)[] {
-  if (!kind || kind === "none") return positions.map(() => undefined);
-  return positions.map((name) => (onlyOn === undefined || onlyOn === name ? kind : undefined));
+function piecesOf(id: string | undefined, onlyOn: string | undefined, positions: string[]): (string | undefined)[] {
+  if (!id) return positions.map(() => undefined);
+  return positions.map((name) => (onlyOn === undefined || onlyOn === name ? id : undefined));
 }

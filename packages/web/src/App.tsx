@@ -1,16 +1,14 @@
+import type { Inventory } from "@plate-pool/core";
 import { useEffect, useId, useState } from "react";
 import { useCurrentLoadings, type PinnedLoading } from "./current";
+import { inventory as builtIn } from "./inventory";
+import { KitContext } from "./kit";
 import { linkQuery, readLink, type View } from "./links";
 import { ListScreen } from "./ListScreen";
 import { LoadScreen, type LoadChoice } from "./LoadScreen";
-import { cardLabel, newCard, type Card, type DumbbellChoice } from "./plan";
+import { newCard, type Card } from "./plan";
 import { ReverseScreen } from "./ReverseScreen";
-import { useSettings } from "./settings";
-
-const implementTabs = ["barbell", "dumbbell", "kettlebell", "leg", "vest"].map((id) => ({
-  id,
-  label: cardLabel({ implement: id, dumbbells: "pair" }),
-}));
+import { useSettings, type SettingsChange } from "./settings";
 
 const views: { id: View; label: string }[] = [
   { id: "load", label: "Load" },
@@ -18,17 +16,25 @@ const views: { id: View; label: string }[] = [
   { id: "reverse", label: "Reverse" },
 ];
 
-export function App() {
-  const [link] = useState(() => readLink(window.location.search));
-  const [settings, updateSettings] = useSettings(link.settings);
-  const [cards, setCards] = useState<Card[]>(() => (link.cards.length > 0 ? link.cards : [newCard(settings.implement)]));
+export function App({ inventory = builtIn }: { inventory?: Inventory }) {
+  return (
+    <KitContext.Provider value={inventory}>
+      <Screens inventory={inventory} />
+    </KitContext.Provider>
+  );
+}
+
+function Screens({ inventory }: { inventory: Inventory }) {
+  const [link] = useState(() => readLink(inventory, window.location.search));
+  const [settings, updateSettings] = useSettings(inventory, link.settings);
+  const [cards, setCards] = useState<Card[]>(() => (link.cards.length > 0 ? link.cards : [newCard(inventory, settings.implement)]));
   const selected = cards[0]?.implement ?? settings.implement;
   const [view, setView] = useState<View>(link.view);
-  const [current, pin] = useCurrentLoadings();
+  const [current, pin] = useCurrentLoadings(inventory);
   useEffect(() => {
-    const query = linkQuery({ cards, settings, view });
+    const query = linkQuery(inventory, { cards, settings, view });
     window.history.replaceState(window.history.state, "", `${window.location.pathname}?${query}${window.location.hash}`);
-  }, [cards, settings, view]);
+  }, [inventory, cards, settings, view]);
   const tabIds = useId();
   const tabId = (implement: string) => `${tabIds}-${implement}`;
 
@@ -39,11 +45,11 @@ export function App() {
     if (first.implement !== settings.implement) updateSettings({ implement: first.implement });
   };
   const selectImplement = (implement: string) => {
-    if (implement !== selected) changeCards([newCard(implement), ...cards.slice(1)]);
+    if (implement !== selected) changeCards([newCard(inventory, implement), ...cards.slice(1)]);
   };
-  const changeDumbbells = (dumbbells: DumbbellChoice) => changeCards([{ ...cards[0]!, dumbbells }, ...cards.slice(1)]);
+  const changePair = (pair: boolean) => changeCards([{ ...cards[0]!, pair }, ...cards.slice(1)]);
   const openInLoad = (choice: LoadChoice) => {
-    changeCards([{ ...newCard(selected, choice.dumbbells), target: choice.target }, ...cards.slice(1)]);
+    changeCards([{ ...newCard(inventory, selected, choice.pair), target: choice.target }, ...cards.slice(1)]);
     setView("load");
   };
   const pinFromReverse = (pinned: PinnedLoading, choice: LoadChoice) => {
@@ -51,8 +57,8 @@ export function App() {
     openInLoad(choice);
   };
   const sharedOptions = {
-    collars: settings.collars,
-    onCollarsChange: (collars: typeof settings.collars) => updateSettings({ collars }),
+    hardware: settings.hardware,
+    onHardwareChange: (implement: string, choice: string | undefined) => updateSettings({ hardware: { implement, choice } } satisfies SettingsChange),
     uneven: settings.uneven,
     onUnevenChange: (uneven: boolean) => updateSettings({ uneven }),
   };
@@ -76,7 +82,7 @@ export function App() {
         </nav>
       </header>
       <nav className="tabs" role="tablist" aria-label="Implements">
-        {implementTabs.map(({ id, label }) => (
+        {inventory.implements.map(({ id, name }) => (
           <button
             key={id}
             id={tabId(id)}
@@ -86,7 +92,7 @@ export function App() {
             className="tab"
             onClick={() => selectImplement(id)}
           >
-            {label}
+            {name}
           </button>
         ))}
       </nav>
@@ -98,8 +104,8 @@ export function App() {
             key={selected}
             implement={selected}
             {...sharedOptions}
-            dumbbells={cards[0]?.dumbbells ?? "pair"}
-            onDumbbellsChange={changeDumbbells}
+            pair={cards[0]?.pair ?? true}
+            onPairChange={changePair}
             onOpen={openInLoad}
           />
         ) : (

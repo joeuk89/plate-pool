@@ -1,11 +1,9 @@
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import type { Loading, LoadResponse } from "@plate-pool/core";
+import { load, type Loading, type LoadRequest } from "@plate-pool/core";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { run } from "../../cli/src/main.ts";
 import { App } from "../src/App";
 import { plateList } from "../src/describe";
+import { olympic, owner } from "./kits";
 
 afterEach(cleanup);
 
@@ -16,24 +14,17 @@ function text(element: HTMLElement): string {
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
-function open(link: string) {
+function open(link: string, inventory = owner) {
   window.history.replaceState(null, "", link);
-  render(<App />);
+  render(<App inventory={inventory} />);
 }
 
 const card = (priority: number) => screen.getByRole("region", { name: new RegExp(`^${priority}\\. `) });
 const cardNames = () => screen.getAllByRole("region", { name: /^\d\. / }).map((item) => item.getAttribute("aria-label"));
 const result = (priority: number) => within(card(priority)).getByRole("region", { name: "Result" });
 
-function expectSameAsCommandLine(targets: string[], options: string[] = []) {
-  let stdout = "";
-  const code = run(["load", ...targets, ...options, "--json"], {
-    stdout: (output) => (stdout += output),
-    stderr: () => {},
-    variables: { PLATE_POOL_INVENTORY: join(dirname(fileURLToPath(import.meta.url)), "../../../inventory/inventory.json") },
-  });
-  expect(code).toBe(0);
-  const response = JSON.parse(stdout) as LoadResponse;
+function expectSameAsLibrary(request: LoadRequest) {
+  const response = load(owner, request);
   response.results.forEach((item, index) => {
     const loading = (item.loading ?? (item.recommended && item[item.recommended])) as Loading;
     const shown = text(result(index + 1));
@@ -43,57 +34,76 @@ function expectSameAsCommandLine(targets: string[], options: string[] = []) {
   });
 }
 
-const settings = () => JSON.parse(localStorage.getItem("plate-pool:settings") ?? "{}") as Record<string, unknown>;
+const settings = () => JSON.parse(localStorage.getItem("plate-pool:settings") ?? "{}") as { hardware?: Record<string, string> };
 const collar = (name: string) => within(screen.getByRole("radiogroup", { name: "Collars" })).getByRole("radio", { name });
 const unevenSwitch = () => screen.getByRole("switch", { name: "Uneven loading" });
+const pairOrSingle = (name: string) => within(screen.getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name });
 
-describe("links: the example in spec 8.7", () => {
-  it("opens example 10's result: barbell 173 lb then dumbbells 40 lb, both exact, with the plates left over", () => {
-    open("/plate-pool/?barbell=173&dumbbells=40");
-    expect(cardNames()).toEqual(["1. Barbell", "2. Dumbbells"]);
-    expect(text(result(1))).toContain("Exact");
+describe("links: per-line links (spec 17.6)", () => {
+  it("opens the issue's link: example 2 and example 5 with the spin-lock collar", () => {
+    open("/plate-pool/?barbell=173lb&dumbbell.single=12.5lb&barbell.hardware=collar-spinlock");
+    expect(cardNames()).toEqual(["1. Straight bar", "2. Dumbbell single"]);
+    expect(collar("Ironmaster spin-lock collar")).toHaveProperty("checked", true);
     expect(text(result(1))).toContain("Each side 2 × 22.5, 6 × 5, 1 × 2.5");
+    expect(text(result(1))).toContain("Collars 2 × Ironmaster spin-lock collar");
     expect(text(result(2))).toContain("Exact");
+    expect(text(result(2))).toContain("End A heavier 1 × 2.5");
+  });
+
+  it("opens example 10's result: barbell 173 lb then a pair of dumbbells 40 lb, with the plates left over", () => {
+    open("/plate-pool/?barbell=173lb&dumbbell=40lb");
+    expect(cardNames()).toEqual(["1. Straight bar", "2. Dumbbell pair"]);
+    expect(text(result(1))).toContain("Each side 2 × 22.5, 6 × 5, 1 × 2.5");
     expect(text(result(2))).toContain("Each end 3 × 5");
     const leftover = text(screen.getByRole("region", { name: "Left over" }));
     expect(leftover).toContain("Plates 1 × 22.5, 2 × 2.5, 4 × 1.25");
     expect(leftover).toContain("Locking hardware 5 × Long locking screw");
   });
-});
 
-describe("links: targets (spec 8.7)", () => {
-  const unit = (priority: number) => within(card(priority)).getByRole("radiogroup", { name: "Unit" });
+  it("reads <id>.pair as the explicit pair form", () => {
+    open("/plate-pool/?dumbbell.pair=40lb");
+    expect(pairOrSingle("Pair")).toHaveProperty("checked", true);
+    expect(text(result(1))).toContain("Each end 3 × 5");
+  });
 
-  it("reads a unit on the value: barbell=80kg is 80 kg on the barbell", () => {
-    open("/plate-pool/?barbell=80kg&kettlebell=40");
+  it("refuses <id>.pair on a handle the kit holds one of", () => {
+    const one = structuredClone(olympic);
+    one.implements[1]!.count = 1;
+    open("/plate-pool/?dumbbell.pair=7.5kg", one);
+    expect(text(screen.getByRole("region", { name: "Result" }))).toContain("cannot be loaded as a pair");
+  });
+
+  it("reads a unit on the value, and a bare value in the implement's unit", () => {
+    open("/plate-pool/?barbell=80kg&vest=12");
+    const unit = (priority: number) => within(card(priority)).getByRole("radiogroup", { name: "Unit" });
     expect(within(unit(1)).getByRole("radio", { name: "kg" })).toHaveProperty("checked", true);
-    expect(within(card(1)).getByLabelText("Target")).toHaveProperty("value", "80");
     expect(text(result(1))).toContain("No exact loading for 176.37 lb (80 kg)");
+    expect(text(result(2))).toContain("Front 6 blocks");
   });
 
-  it("reads a bare number in the implement's own unit: vest=12 is example 13, and vest=12kg is the same", () => {
-    open("/plate-pool/?vest=12");
-    expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Front 6 blocks");
-    cleanup();
-    open("/plate-pool/?vest=12kg");
-    expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Front 6 blocks");
+  it("reads a bare value in a kilogram kit's unit", () => {
+    open("/plate-pool/?bar=95.5", olympic);
+    expect(text(screen.getByRole("region", { name: "Result" }))).toContain("95.5 kg");
+    expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Exact");
   });
 
-  it("reads vest=30lb as example 14: 13 kg below and 14 kg above", () => {
-    open("/plate-pool/?vest=30lb");
-    expect(text(screen.getByRole("region", { name: "Result" }))).toContain("No exact loading for 13.6 kg (30 lb)");
-  });
-
-  it("reads dumbbell as one dumbbell: dumbbell=12.5 is example 5", () => {
-    open("/plate-pool/?dumbbell=12.5");
-    expect(within(screen.getByRole("radiogroup", { name: "Dumbbells" })).getByRole("radio", { name: "One" })).toHaveProperty("checked", true);
-    expect(text(screen.getByRole("region", { name: "Result" }))).toContain("End A heavier 1 × 2.5");
-  });
-
-  it("puts the implements in the link's order, which is priority order: dumbbells 120 lb then kettlebell 40 lb is example 9", () => {
-    open("/plate-pool/?dumbbells=120&kettlebell=40");
-    expect(cardNames()).toEqual(["1. Dumbbells", "2. Kettlebell"]);
+  it("puts targets in the link's order, which is priority order (example 9)", () => {
+    open("/plate-pool/?dumbbell=120lb&kettlebell=40lb");
+    expect(cardNames()).toEqual(["1. Dumbbell pair", "2. Kettlebell"]);
     expect(text(result(2))).toContain("Not exact because the dumbbells use the 5 lb plates the kettlebell needs to reach 40 lb.");
+  });
+
+  it("shows the library's results for the same targets", () => {
+    open("/plate-pool/?barbell=173lb&dumbbell=40lb&leg=50lb&vest=12kg");
+    expect(cardNames()).toEqual(["1. Straight bar", "2. Dumbbell pair", "3. Leg attachment", "4. Weighted vest"]);
+    expectSameAsLibrary({
+      targets: [
+        { implement: "barbell", target: "173lb" },
+        { implement: "dumbbell", target: "40lb", pair: true },
+        { implement: "leg", target: "50lb" },
+        { implement: "vest", target: "12kg" },
+      ],
+    });
   });
 
   it("shows the reason on the card for a value that is not a weight", () => {
@@ -101,15 +111,16 @@ describe("links: targets (spec 8.7)", () => {
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain('"abc" is not a weight.');
   });
 
-  it("reads the implement names and target syntax the command-line tool takes", () => {
-    open("/plate-pool/?barbell=173lb&dumbbells=40&leg=50&vest=12kg");
-    expect(cardNames()).toEqual(["1. Barbell", "2. Dumbbells", "3. Leg attachment", "4. Vest"]);
-    expectSameAsCommandLine(["barbell=173lb", "dumbbell=40", "leg=50", "vest=12kg"]);
+  it("ignores the retired dumbbells and collars parameters and any it does not know", () => {
+    open("/plate-pool/?rack=100&dumbbells=40&collars=none&barbell.single=5&barbell=173lb&kit=00000000");
+    expect(cardNames()).toEqual(["1. Straight bar"]);
+    expect(collar('Mirafit 1" clamp collar')).toHaveProperty("checked", true);
+    expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Exact");
   });
 
-  it("ignores parameters it does not know", () => {
-    open("/plate-pool/?rack=100&barbell=173");
-    expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Exact");
+  it("ignores a hardware id the implement does not take", () => {
+    open("/plate-pool/?barbell=173lb&barbell.hardware=screw-long");
+    expect(collar('Mirafit 1" clamp collar')).toHaveProperty("checked", true);
   });
 });
 
@@ -125,52 +136,64 @@ describe("links: the URL follows the result", () => {
     fireEvent.click(within(screen.getByRole("group", { name: "Implement to add" })).getByRole("button", { name }));
   }
 
-  it("names the implement before a target is typed", () => {
+  it("names the implement and its hardware before a target is typed", () => {
     open("/plate-pool/");
     expect(window.location.pathname).toBe("/plate-pool/");
-    expect(search()).toBe("?barbell&collars=clamp");
+    expect(search()).toBe("?barbell&barbell.hardware=collar-clamp");
   });
 
-  it("writes each target as it is typed, in priority order, with the collar choice and the uneven switch", () => {
+  it("writes each target with its unit suffix, in priority order, with the hardware choice and the uneven switch", () => {
     open("/plate-pool/");
     typeTarget(1, "173");
-    expect(search()).toBe("?barbell=173&collars=clamp");
-    addImplement("Dumbbells");
+    expect(search()).toBe("?barbell=173lb&barbell.hardware=collar-clamp");
+    addImplement("Dumbbell pair");
     typeTarget(2, "40");
-    expect(search()).toBe("?barbell=173&dumbbells=40&collars=clamp&uneven=1");
+    expect(search()).toBe("?barbell=173lb&dumbbell=40lb&barbell.hardware=collar-clamp&uneven=1");
   });
 
-  it("writes the unit when it is not the implement's own", () => {
-    open("/plate-pool/?barbell=80");
+  it("writes the unit the target is typed in", () => {
+    open("/plate-pool/?barbell=80lb");
     fireEvent.click(within(within(card(1)).getByRole("radiogroup", { name: "Unit" })).getByRole("radio", { name: "kg" }));
-    expect(search()).toBe("?barbell=80kg&collars=clamp");
+    expect(search()).toBe("?barbell=80kg&barbell.hardware=collar-clamp");
   });
 
-  it("writes one dumbbell as dumbbell and the uneven switch off as uneven=0", () => {
-    open("/plate-pool/?dumbbells=12.5");
-    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Dumbbells" })).getByRole("radio", { name: "One" }));
+  it("writes a single as <id>.single and the uneven switch off as uneven=0", () => {
+    open("/plate-pool/?dumbbell=12.5lb");
+    fireEvent.click(pairOrSingle("Single"));
     fireEvent.click(unevenSwitch());
-    expect(search()).toBe("?dumbbell=12.5&uneven=0");
+    expect(search()).toBe("?dumbbell.single=12.5lb&uneven=0");
+  });
+
+  it("writes a hardware choice made on a handle", () => {
+    open("/plate-pool/?dumbbell=40lb");
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Screws" })).getByRole("radio", { name: "Long locking screw" }));
+    expect(search()).toBe("?dumbbell=40lb&dumbbell.hardware=screw-long&uneven=1");
+  });
+
+  it("writes no uneven switch for a handle that may not be uneven", () => {
+    open("/plate-pool/?dumbbell=7.5kg", olympic);
+    expect(search()).toBe("?dumbbell=7.5kg");
   });
 
   it("writes the collar choice when it changes", () => {
-    open("/plate-pool/?barbell=173");
-    fireEvent.click(collar("Spin-lock"));
-    expect(search()).toBe("?barbell=173&collars=spinlock");
+    open("/plate-pool/?barbell=173lb");
+    fireEvent.click(collar("Ironmaster spin-lock collar"));
+    expect(search()).toBe("?barbell=173lb&barbell.hardware=collar-spinlock");
   });
 
   it("writes the view when it is not Load", () => {
-    open("/plate-pool/?kettlebell=40");
-    fireEvent.click(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "List" }));
-    expect(search()).toBe("?kettlebell=40&view=list");
-    fireEvent.click(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "Reverse" }));
-    expect(search()).toBe("?kettlebell=40&view=reverse");
-    fireEvent.click(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "Load" }));
-    expect(search()).toBe("?kettlebell=40");
+    open("/plate-pool/?kettlebell=40lb");
+    const go = (name: string) => fireEvent.click(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name }));
+    go("List");
+    expect(search()).toBe("?kettlebell=40lb&view=list");
+    go("Reverse");
+    expect(search()).toBe("?kettlebell=40lb&view=reverse");
+    go("Load");
+    expect(search()).toBe("?kettlebell=40lb");
   });
 
   it("writes the implement picked from the tabs", () => {
-    open("/plate-pool/?barbell=173");
+    open("/plate-pool/?barbell=173lb");
     fireEvent.click(screen.getByRole("tab", { name: "Leg attachment" }));
     expect(search()).toBe("?leg");
   });
@@ -188,7 +211,7 @@ describe("links: the URL follows the result", () => {
     open("/plate-pool/");
     typeTarget(1, "88");
     fireEvent.click(collar("None"));
-    addImplement("Dumbbells");
+    addImplement("Dumbbell pair");
     typeTarget(2, "75");
     const shown = [text(result(1)), text(result(2))];
     const link = `${window.location.pathname}${window.location.search}`;
@@ -205,7 +228,7 @@ describe("links: view", () => {
   const selectedTab = () => within(screen.getByRole("tablist", { name: "Implements" })).getByRole("tab", { selected: true });
 
   it("opens the Load screen when the link names no view", () => {
-    open("/plate-pool/?barbell=173");
+    open("/plate-pool/?barbell=173lb");
     expect(currentView().textContent).toBe("Load");
   });
 
@@ -216,16 +239,16 @@ describe("links: view", () => {
     expect(screen.getByRole("region", { name: "Achievable weights" })).toBeTruthy();
   });
 
-  it("opens the List screen for one dumbbell with dumbbell and view=list", () => {
-    open("/plate-pool/?dumbbell&view=list");
+  it("opens the List screen for a single with <id>.single and view=list", () => {
+    open("/plate-pool/?dumbbell.single&view=list");
     expect(currentView().textContent).toBe("List");
-    expect(within(screen.getByRole("radiogroup", { name: "Dumbbells" })).getByRole("radio", { name: "One" })).toHaveProperty("checked", true);
+    expect(pairOrSingle("Single")).toHaveProperty("checked", true);
   });
 
   it("opens the Reverse screen with view=reverse", () => {
     open("/plate-pool/?view=reverse&vest");
     expect(currentView().textContent).toBe("Reverse");
-    expect(selectedTab().textContent).toBe("Vest");
+    expect(selectedTab().textContent).toBe("Weighted vest");
     expect(screen.getByRole("region", { name: "Total" })).toBeTruthy();
   });
 
@@ -236,45 +259,45 @@ describe("links: view", () => {
 });
 
 describe("links: a parameter wins over a remembered setting", () => {
-  it("uses collars from the link over the remembered collar choice, and leaves the remembered choice alone", () => {
-    localStorage.setItem("plate-pool:settings", JSON.stringify({ collars: "spinlock" }));
-    open("/plate-pool/?barbell=173&collars=none");
+  it("uses the link's hardware over the remembered choice, and leaves the remembered choice alone", () => {
+    localStorage.setItem("plate-pool:settings", JSON.stringify({ hardware: { barbell: "collar-spinlock" } }));
+    open("/plate-pool/?barbell=173lb&barbell.hardware=none");
     expect(collar("None")).toHaveProperty("checked", true);
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Collars None");
-    expect(settings().collars ?? "spinlock").toBe("spinlock");
+    expect(settings().hardware).toEqual({ barbell: "collar-spinlock" });
   });
 
-  it("uses the remembered collar choice when the link names none", () => {
-    localStorage.setItem("plate-pool:settings", JSON.stringify({ collars: "spinlock" }));
-    open("/plate-pool/?barbell=173");
-    expect(collar("Spin-lock")).toHaveProperty("checked", true);
+  it("uses the remembered hardware choice when the link names none", () => {
+    localStorage.setItem("plate-pool:settings", JSON.stringify({ hardware: { barbell: "collar-spinlock" } }));
+    open("/plate-pool/?barbell=173lb");
+    expect(collar("Ironmaster spin-lock collar")).toHaveProperty("checked", true);
   });
 
   it("turns uneven loading off with uneven=0, over the remembered switch", () => {
     localStorage.setItem("plate-pool:settings", JSON.stringify({ uneven: true }));
-    open("/plate-pool/?dumbbell=11.25&uneven=0");
+    open("/plate-pool/?dumbbell.single=11.25lb&uneven=0");
     expect(unevenSwitch().getAttribute("aria-checked")).toBe("false");
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain("No exact loading for 11.25 lb");
-    expectSameAsCommandLine(["dumbbell.single=11.25"], ["--no-uneven"]);
+    expectSameAsLibrary({ targets: [{ implement: "dumbbell", target: "11.25lb", pair: false }], uneven: false });
   });
 
   it("turns uneven loading on with uneven=1, over the remembered switch", () => {
     localStorage.setItem("plate-pool:settings", JSON.stringify({ uneven: false }));
-    open("/plate-pool/?dumbbell=11.25&uneven=1");
+    open("/plate-pool/?dumbbell.single=11.25lb&uneven=1");
     expect(unevenSwitch().getAttribute("aria-checked")).toBe("true");
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Exact");
   });
 
   it("remembers a choice the owner makes after opening a link", () => {
-    open("/plate-pool/?barbell=173&collars=none");
-    fireEvent.click(collar("Spin-lock"));
-    expect(settings().collars).toBe("spinlock");
+    open("/plate-pool/?barbell=173lb&barbell.hardware=none");
+    fireEvent.click(collar("Ironmaster spin-lock collar"));
+    expect(settings().hardware).toEqual({ barbell: "collar-spinlock" });
   });
 
-  it("ignores a collars or uneven value it does not know", () => {
-    localStorage.setItem("plate-pool:settings", JSON.stringify({ collars: "spinlock", uneven: false }));
-    open("/plate-pool/?barbell=173&collars=rope&dumbbell=11.25&uneven=maybe");
-    expect(collar("Spin-lock")).toHaveProperty("checked", true);
+  it("ignores a hardware or uneven value it does not know", () => {
+    localStorage.setItem("plate-pool:settings", JSON.stringify({ hardware: { barbell: "collar-spinlock" }, uneven: false }));
+    open("/plate-pool/?barbell=173lb&barbell.hardware=rope&dumbbell.single=11.25lb&uneven=maybe");
+    expect(collar("Ironmaster spin-lock collar")).toHaveProperty("checked", true);
     expect(unevenSwitch().getAttribute("aria-checked")).toBe("false");
   });
 });

@@ -14,17 +14,19 @@ Status values: **verified** (manufacturer or distributor states it), **owner** (
 
 ### Plates
 
-| Plate | Type | Count | Weight | Stack length per plate | Shape | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| 22.5 lb | Quick-Lock | 5 | 22.5 lb | 1.875 in | Square | Weight verified; length unverified |
-| 5 lb | Quick-Lock | 24 | 5 lb | 0.5 in | Square | Weight verified; length unverified |
-| 2.5 lb | Quick-Lock | 4 | 2.5 lb | 0.25 in | Square | Weight verified; length unverified |
-| Micro | Quick-Lock | 4 | 1.25 lb | 0.25 in | Round | Weight verified; length unverified |
-| Vest block | Vest block | 30 | 1 kg | n/a | Block | Weight verified; count unverified |
+| Plate | Type | Count | Weight | Stack length per plate | Diameter | Shape | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 22.5 lb | Quick-Lock | 5 | 22.5 lb | 1.875 in | 6.7 in | Square | Weight verified; length unverified |
+| 5 lb | Quick-Lock | 24 | 5 lb | 0.5 in | 6.7 in | Square | Weight verified; length unverified |
+| 2.5 lb | Quick-Lock | 4 | 2.5 lb | 0.25 in | 6.7 in | Square | Weight verified; length unverified |
+| Micro | Quick-Lock | 4 | 1.25 lb | 0.25 in | 5 in | Round | Weight verified; length and diameter unverified |
+| Vest block | Vest block | 30 | 1 kg | n/a | n/a | Block | Weight verified; count unverified |
 
 Quick-Lock plates total 247.5 lb.
 
 Stack length is how much a plate adds to a stack. Ironmaster publishes no thickness, so these values are calculated from published dumbbell lengths. They set how many plates a locking screw holds and how the picture is drawn.
+
+Diameter only sets the picture's plate heights. Ironmaster states the square plates are 6.7 in across. The micro plate's diameter is unpublished: 5 in is an estimate that fits inside a 2.5 lb plate's border, as Ironmaster describes it.
 
 ### Locking hardware
 
@@ -68,5 +70,6 @@ None of these block a build. Each is one value in the inventory file.
 | Do two 22.5 lb plates fit on the kettlebell | Not allowed: at most one | Trying it once |
 | Shortest stack a long screw locks on a dumbbell | 3.0 in | Trying it once |
 | Plate stack lengths | Calculated values in the plates table above | Measuring a stack of five 5 lb plates |
+| Micro plate diameter | 5 in, an estimate for the picture | Measuring one |
 
 The research file lists further checks. They affect drawing scale only.

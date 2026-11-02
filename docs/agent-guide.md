@@ -326,6 +326,7 @@ The output has four lists. This shows the first entry of each:
       "count": 5,
       "weight": { "listed": 22.5, "status": "verified" },
       "stackLength": { "listed": 1.875, "status": "unverified" },
+      "diameter": 6.7,
       "colour": "#c9353f",
       "shape": "square"
     }

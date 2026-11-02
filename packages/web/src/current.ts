@@ -1,11 +1,10 @@
-import { reverse, type CurrentLoading, type Loading, type ReverseResult } from "@plate-pool/core";
+import { reverse, type CurrentLoading, type Inventory, type Loading, type ReverseResult } from "@plate-pool/core";
 import { useState } from "react";
-import { blockList, plateList } from "./describe";
-import { inventory } from "./inventory";
-import { collarId, type CollarChoice } from "./settings";
+import { plateList, vestList } from "./describe";
+import { canPair, hardwareOf, implementOf, isCounted, kindOf, positionNames } from "./kit";
 
 export interface PinnedLoading extends CurrentLoading {
-  /** Dumbbells only: whether the loading is on a pair or on one dumbbell. */
+  /** Handles the gym has two or more of: whether the loading is on a pair or on a single. */
   pair?: boolean;
 }
 
@@ -13,16 +12,26 @@ export type CurrentLoadings = Partial<Record<string, PinnedLoading>>;
 
 const storageKey = "plate-pool:current";
 
-export function pinnedFrom(implement: string, loading: Pick<Loading, "positions" | "hardware" | "heavier">, pair: boolean): PinnedLoading {
+/** A current loading keeps the screws and pins it was pinned with, since swapping them counts as changes; collars follow the hardware choice. */
+export function pinnedFrom(
+  inventory: Inventory,
+  implement: string,
+  loading: Pick<Loading, "positions" | "hardware" | "heavier">,
+  pair: boolean,
+): PinnedLoading {
   const positions = loading.positions.map(({ name, plates }) => ({ name, plates: [...plates] }));
-  if (implement !== "dumbbell" && implement !== "kettlebell") return { positions };
-  const screw = loading.hardware.find(({ id }) => inventory.hardware.find((item) => item.id === id)?.kind === "screw");
-  const oneScrew = implement === "dumbbell" && screw?.count === 1 && loading.heavier !== undefined;
+  const pairing = canPair(inventory, implement) ? { pair } : {};
+  const options = implementOf(inventory, implement)?.hardware?.options ?? [];
+  if (kindOf(inventory, implement) === "vest" || !options.some((id) => isCounted(hardwareOf(inventory, id)))) {
+    return { positions, ...pairing };
+  }
+  const counted = loading.hardware.find(({ id }) => isCounted(hardwareOf(inventory, id)));
+  const oneEnd = kindOf(inventory, implement) === "handle" && counted !== undefined && counted.count === 1 && loading.heavier !== undefined;
   return {
     positions,
-    hardware: screw?.id ?? "none",
-    ...(oneScrew ? { hardwareOn: loading.heavier! } : {}),
-    ...(implement === "dumbbell" ? { pair } : {}),
+    hardware: counted?.id ?? "none",
+    ...(oneEnd ? { hardwareOn: loading.heavier! } : {}),
+    ...pairing,
   };
 }
 
@@ -30,37 +39,27 @@ export function currentLoading({ pair: _, ...current }: PinnedLoading): CurrentL
   return current;
 }
 
-export function reverseOf(implement: string, pinned: PinnedLoading, collars: CollarChoice): ReverseResult {
+export function reverseOf(inventory: Inventory, implement: string, pinned: PinnedLoading, hardware: Record<string, string>): ReverseResult {
+  const choice = hardware[implement];
   return reverse(inventory, {
     implement,
+    ...(choice !== undefined ? { hardware: choice } : {}),
     ...currentLoading(pinned),
-    ...(implement === "barbell" ? { hardware: collarId(collars) } : {}),
-    ...(implement === "dumbbell" ? { pair: pinned.pair !== false } : {}),
+    ...(canPair(inventory, implement) ? { pair: pinned.pair !== false } : {}),
   });
 }
 
-const stripPlaces: Record<string, string> = {
-  barbell: "On the bar",
-  kettlebell: "On the kettlebell",
-  leg: "On the attachment",
-  vest: "In the vest",
-};
-
-export function stripPlace(implement: string, pinned: PinnedLoading): string {
-  if (implement === "dumbbell") return pinned.pair === false ? "On the dumbbell" : "On the dumbbells";
-  return stripPlaces[implement] ?? `On the ${implement}`;
-}
-
-export function stripPlates(implement: string, positions: PinnedLoading["positions"]): string {
+export function stripPlates(inventory: Inventory, implement: string, positions: PinnedLoading["positions"]): string {
   const [first, second] = positions;
   const plates = (position = first) => plateList(position?.plates ?? []);
-  switch (implement) {
-    case "vest":
-      return `front ${blockList(first?.plates ?? [])}, back ${blockList(second?.plates ?? [])}`.toLowerCase();
-    case "kettlebell":
-    case "leg":
+  switch (kindOf(inventory, implement)) {
+    case "vest": {
+      const list = (position = first) => vestList(inventory, implement, position?.plates ?? []);
+      return `front ${list(first)}, back ${list(second)}`.replace(/No (blocks|plates)/g, "no $1");
+    }
+    case "stack":
       return `stack ${plates()}`;
-    case "barbell":
+    case "bar":
       return `each side ${plates()}`;
     default:
       return first && second && first.plates.join() === second.plates.join()
@@ -69,18 +68,11 @@ export function stripPlates(implement: string, positions: PinnedLoading["positio
   }
 }
 
-const positionsByKind: Record<string, string[]> = { bar: ["left", "right"], handle: ["a", "b"], stack: ["stack"], vest: ["front", "back"] };
-
-export function positionNames(implement: string): string[] | undefined {
-  const kind = inventory.implements.find((item) => item.id === implement)?.kind;
-  return kind ? positionsByKind[kind] : undefined;
-}
-
-function isPinned(implement: string, value: unknown): value is PinnedLoading {
+function isPinned(inventory: Inventory, implement: string, value: unknown): value is PinnedLoading {
   if (typeof value !== "object" || value === null) return false;
   const { positions } = value as { positions?: unknown };
-  const names = positionNames(implement);
-  if (!names || !Array.isArray(positions) || positions.length !== names.length) return false;
+  const names = positionNames(inventory, implement);
+  if (names.length === 0 || !Array.isArray(positions) || positions.length !== names.length) return false;
   const valid = positions.every(
     (position: unknown, index) =>
       typeof position === "object" &&
@@ -91,14 +83,14 @@ function isPinned(implement: string, value: unknown): value is PinnedLoading {
   );
   if (!valid) return false;
   try {
-    reverseOf(implement, value as PinnedLoading, "clamp");
+    reverseOf(inventory, implement, value as PinnedLoading, {});
     return true;
   } catch {
     return false;
   }
 }
 
-function readCurrent(): CurrentLoadings {
+function readCurrent(inventory: Inventory): CurrentLoadings {
   let stored: unknown;
   try {
     stored = JSON.parse(localStorage.getItem(storageKey) ?? "{}");
@@ -106,7 +98,7 @@ function readCurrent(): CurrentLoadings {
     return {};
   }
   if (typeof stored !== "object" || stored === null) return {};
-  return Object.fromEntries(Object.entries(stored).filter(([implement, value]) => isPinned(implement, value)));
+  return Object.fromEntries(Object.entries(stored).filter(([implement, value]) => isPinned(inventory, implement, value)));
 }
 
 function writeCurrent(current: CurrentLoadings): void {
@@ -117,8 +109,8 @@ function writeCurrent(current: CurrentLoadings): void {
   }
 }
 
-export function useCurrentLoadings(): [CurrentLoadings, (implement: string, pinned: PinnedLoading | undefined) => void] {
-  const [current, setCurrent] = useState(readCurrent);
+export function useCurrentLoadings(inventory: Inventory): [CurrentLoadings, (implement: string, pinned: PinnedLoading | undefined) => void] {
+  const [current, setCurrent] = useState(() => readCurrent(inventory));
   const update = (implement: string, pinned: PinnedLoading | undefined) => {
     const { [implement]: _, ...rest } = current;
     const next = pinned ? { ...rest, [implement]: pinned } : rest;
@@ -127,3 +119,4 @@ export function useCurrentLoadings(): [CurrentLoadings, (implement: string, pinn
   };
   return [current, update];
 }
+

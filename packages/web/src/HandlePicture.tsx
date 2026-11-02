@@ -1,17 +1,18 @@
 import type { Inventory, Loading } from "@plate-pool/core";
-import { drawDumbbell, heavierTicks } from "./dumbbell-drawing";
-import { addedFrom, CalloutLabel, pictureRole, Plates, type Editing } from "./picture-parts";
+import { drawHandle, heavierTicks } from "./handle-drawing";
+import { addedFrom, CalloutLabel, HardwareGlyph, pictureRole, Plates, type Editing } from "./picture-parts";
 import { HARDWARE_FONT_SIZE, type DrawOptions } from "./plate-stack";
 
 interface Props extends DrawOptions {
+  implement: string;
   loading: Loading;
   inventory: Inventory;
   editing?: Editing | undefined;
 }
 
-export function DumbbellPicture({ loading, inventory, editing, ...options }: Props) {
-  const drawing = drawDumbbell(loading, inventory, options);
-  const { handle, heavier, screwLabel } = drawing;
+export function HandlePicture({ implement, loading, inventory, editing, ...options }: Props) {
+  const drawing = drawHandle(implement, loading, inventory, options);
+  const { handle, heavier, hardwareKind, hardwareLabel } = drawing;
 
   return (
     <svg {...pictureRole(drawing.description, editing)} className="picture" viewBox={`0 ${drawing.top} ${drawing.width} ${drawing.height}`}>
@@ -26,6 +27,9 @@ export function DumbbellPicture({ loading, inventory, editing, ...options }: Pro
           ))}
         </g>
       )}
+      {drawing.sleeves.map((sleeve, index) => (
+        <rect key={index} className="bar" x={sleeve.x} y={-sleeve.height / 2} width={sleeve.width} height={sleeve.height} rx={0.08} />
+      ))}
       <rect className="bar" x={handle.grip.x} y={-handle.grip.height / 2} width={handle.grip.width} height={handle.grip.height} rx={0.3} />
       {handle.stops.map((stop, index) => (
         <rect key={index} className="bar" x={stop.x} y={-stop.height / 2} width={stop.width} height={stop.height} rx={0.08} />
@@ -33,12 +37,10 @@ export function DumbbellPicture({ loading, inventory, editing, ...options }: Pro
       {drawing.ends.map((end) => (
         <g key={end.name}>
           <Plates plates={end.plates} position={end.name} editing={editing} added={addedFrom(loading, end.name)} />
-          {end.screw && (
-            <rect className="screw" x={end.screw.x + 0.025} y={-end.screw.height / 2} width={end.screw.width - 0.05} height={end.screw.height} rx={0.15} />
-          )}
+          {end.hardware && hardwareKind && <HardwareGlyph kind={hardwareKind} part={end.hardware} />}
         </g>
       ))}
-      {screwLabel && <CalloutLabel callout={screwLabel} />}
+      {hardwareLabel && <CalloutLabel callout={hardwareLabel} />}
     </svg>
   );
 }

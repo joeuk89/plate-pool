@@ -1,18 +1,16 @@
-import { reverse, type Loading, type ReverseRequest, type ReverseResult, type Unit } from "@plate-pool/core";
+import { reverse, type Inventory, type Loading, type Plate, type ReverseRequest, type ReverseResult } from "@plate-pool/core";
 import { useState, type CSSProperties } from "react";
-import { pinnedFrom, positionNames as positionsOf, type PinnedLoading } from "./current";
+import { pinnedFrom, type PinnedLoading } from "./current";
 import { unevenNote, unverifiedList } from "./describe";
-import { inventory } from "./inventory";
-import { collarOptions, dumbbellOptions, Total, unitOf, type DumbbellChoice, type LoadChoice } from "./LoadScreen";
+import { HardwareChoice, PairChoice, type HardwareProps } from "./ImplementOptions";
+import { acceptedPlates, canPair, implementOf, kindOf, lower, NONE, plateUnit, positionNames, unitOf, used, useKit } from "./kit";
+import { Total, type LoadChoice } from "./LoadScreen";
 import { Picture } from "./Picture";
 import type { Editing } from "./picture-parts";
 import { plateColour } from "./plate-colours";
-import { used } from "./plate-stack";
-import { Segmented } from "./Segmented";
 import { Switch } from "./Switch";
-import { collarId, type CollarChoice } from "./settings";
 
-type Positions = { name: string; plates: number[] }[];
+type Positions = { name: string; plates: number[]; ids: string[] }[];
 
 interface Row {
   label: string;
@@ -20,10 +18,8 @@ interface Row {
   positions: string[];
 }
 
-interface ReverseScreenProps {
+interface ReverseScreenProps extends HardwareProps {
   implement: string;
-  collars: CollarChoice;
-  onCollarsChange: (collars: CollarChoice) => void;
   uneven: boolean;
   onPin: (pinned: PinnedLoading, choice: LoadChoice) => void;
 }
@@ -37,50 +33,42 @@ const positionWords: Record<string, { label: string; phrase: string }> = {
 };
 
 const mirroredWords: Record<string, { label: string; phrase: string }> = {
-  barbell: { label: "Each side", phrase: "each side" },
-  dumbbell: { label: "Each end", phrase: "each end" },
+  bar: { label: "Each side", phrase: "each side" },
+  handle: { label: "Each end", phrase: "each end" },
 };
 
-function positionNames(implement: string): string[] {
-  return positionsOf(implement) ?? [];
-}
-
-function plateWeights(implement: string): { weight: number; shape: string }[] {
-  const accepts = inventory.implements.find((item) => item.id === implement)?.accepts ?? [];
-  return inventory.plates
-    .filter((plate) => accepts.includes(plate.type))
-    .map((plate) => ({ weight: used(plate.weight), shape: plate.shape }))
-    .sort((a, b) => b.weight - a.weight);
-}
-
-function rowsFor(implement: string, mirrored: boolean): Row[] {
-  const names = positionNames(implement);
-  const mirroredRow = mirroredWords[implement];
+function rowsFor(inventory: Inventory, implement: string, mirrored: boolean): Row[] {
+  const names = positionNames(inventory, implement);
+  const mirroredRow = mirroredWords[kindOf(inventory, implement) ?? ""];
   if (mirrored && mirroredRow) return [{ ...mirroredRow, positions: names }];
   return names.map((name) => ({ ...(positionWords[name] ?? { label: name, phrase: name }), positions: [name] }));
 }
 
-function addPlate(positions: Positions, weight: number, to: string[]): Positions {
-  return positions.map((position) => (to.includes(position.name) ? { ...position, plates: [...position.plates, weight] } : position));
+function addPlate(positions: Positions, plate: Plate, to: string[]): Positions {
+  return positions.map((position) =>
+    to.includes(position.name)
+      ? { ...position, plates: [...position.plates, used(plate.weight)], ids: [...position.ids, plate.id] }
+      : position,
+  );
 }
 
 function removePlate(positions: Positions, position: string, index: number, mirrored: boolean): Positions {
-  const weight = positions.find(({ name }) => name === position)?.plates[index];
+  const id = positions.find(({ name }) => name === position)?.ids[index];
+  const without = <T,>(items: T[]) => items.filter((_, i) => i !== index);
   return positions.map((each) =>
-    each.name === position || (mirrored && each.plates[index] === weight)
-      ? { ...each, plates: each.plates.filter((_, i) => i !== index) }
-      : each,
+    each.name === position || (mirrored && each.ids[index] === id) ? { ...each, plates: without(each.plates), ids: without(each.ids) } : each,
   );
 }
 
 function clearPlates(positions: Positions): Positions {
-  return positions.map((position) => ({ ...position, plates: [] }));
+  return positions.map((position) => ({ ...position, plates: [], ids: [] }));
 }
 
-function Notes({ result }: { result: ReverseResult }) {
+function Notes({ implement, result }: { implement: string; result: ReverseResult }) {
+  const inventory = useKit();
   const loading = loadingOf(result);
   const notes = [
-    ...(loading.uneven ? [unevenNote("Uneven", loading, inventory)] : []),
+    ...(loading.uneven ? [unevenNote("Uneven", implement, loading, inventory)] : []),
     ...result.notes,
     ...(result.unverified.length > 0 ? [`Unverified: ${unverifiedList(result.unverified, inventory)}`] : []),
   ];
@@ -99,37 +87,48 @@ function loadingOf(result: ReverseResult): Loading {
   return { total, hardware, positions, uneven, ...(heavier ? { heavier } : {}) };
 }
 
-export function ReverseScreen({ implement, collars, onCollarsChange, uneven, onPin }: ReverseScreenProps) {
-  const [positions, setPositions] = useState<Positions>(() => positionNames(implement).map((name) => ({ name, plates: [] })));
-  const [mirrorEnds, setMirrorEnds] = useState(true);
-  const [dumbbells, setDumbbells] = useState<DumbbellChoice>("pair");
-  const unit = unitOf(implement);
-  const mirrored = implement === "barbell" || (implement === "dumbbell" && mirrorEnds);
-  const rows = rowsFor(implement, mirrored);
+function plateText(plate: Plate, plates: Plate[]): string {
+  const shared = plates.filter((each) => used(each.weight) === used(plate.weight)).length > 1;
+  return shared && plate.name ? `${used(plate.weight)} ${plate.name}` : String(used(plate.weight));
+}
 
-  const empty = positions.every(({ plates }) => plates.length === 0);
+export function ReverseScreen({ implement, hardware, onHardwareChange, uneven, onPin }: ReverseScreenProps) {
+  const inventory = useKit();
+  const [positions, setPositions] = useState<Positions>(() => positionNames(inventory, implement).map((name) => ({ name, plates: [], ids: [] })));
+  const [mirrorEnds, setMirrorEnds] = useState(true);
+  const [pair, setPair] = useState(() => canPair(inventory, implement));
+  const unit = unitOf(inventory, implement);
+  const kind = kindOf(inventory, implement);
+  const mirrored = kind === "bar" || (kind === "handle" && mirrorEnds);
+  const rows = rowsFor(inventory, implement, mirrored);
+  const plates = acceptedPlates(inventory, implement);
+  const choice = hardware[implement];
+  const implementName = lower(implementOf(inventory, implement)?.name ?? implement);
+
+  const empty = positions.every(({ plates: placed }) => placed.length === 0);
+  const options = implementOf(inventory, implement)?.hardware;
+  const bare = empty && choice === undefined && options !== undefined && options.default === undefined && options.options.includes(NONE);
   const request: ReverseRequest = {
     implement,
     positions,
-    ...(implement === "barbell" ? { hardware: collarId(collars) } : {}),
     uneven,
-    ...(implement === "dumbbell" ? { pair: dumbbells === "pair" } : {}),
-    ...(empty && implement !== "barbell" && implement !== "vest" ? { hardware: "none" } : {}),
+    ...(canPair(inventory, implement) ? { pair } : {}),
+    ...(choice !== undefined ? { hardware: choice } : bare && kind !== "vest" ? { hardware: NONE } : {}),
   };
   const result = reverse(inventory, request);
 
-  const pin = () =>
-    onPin(pinnedFrom(implement, loadingOf(result), dumbbells === "pair"), { target: String(result.total[unit]), dumbbells });
+  const pin = () => onPin(pinnedFrom(inventory, implement, loadingOf(result), pair), { target: String(result.total[unit]), pair });
   const phraseFor = (position: string) => (mirrored ? rows[0]!.phrase : (positionWords[position]?.phrase ?? position));
   const editing: Editing = {
     remove: (position, index) => setPositions(removePlate(positions, position, index, mirrored)),
     removeLabel: (position, weight) => `Remove ${weight} ${unit} from ${phraseFor(position)}`,
   };
+  const noun = kind === "vest" ? "block" : "plate";
 
   return (
     <div className="reverse">
       <section aria-label="Total" aria-live="polite" className="reverse-total">
-        <p className="total-label">{implement === "dumbbell" && dumbbells === "pair" ? "Total per dumbbell" : "Total"}</p>
+        <p className="total-label">{canPair(inventory, implement) && pair ? `Total per ${implementName}` : "Total"}</p>
         <Total weight={result.total} unit={unit} />
         {result.warnings.length > 0 && (
           <ul aria-label="Warnings" className="warnings">
@@ -138,47 +137,46 @@ export function ReverseScreen({ implement, collars, onCollarsChange, uneven, onP
             ))}
           </ul>
         )}
-        <Notes result={result} />
+        <Notes implement={implement} result={result} />
       </section>
       <figure className="editable-picture">
         <Picture implement={implement} loading={loadingOf(result)} inventory={inventory} editing={editing} />
-        <figcaption>{empty ? `Add ${plateNoun(implement)}s with the buttons below.` : `Tap a ${plateNoun(implement)} to remove it.`}</figcaption>
+        <figcaption>{empty ? `Add ${noun}s with the buttons below.` : `Tap a ${noun} to remove it.`}</figcaption>
       </figure>
-      <div className={`adders ${implement}`}>
+      <div className={`adders ${kind ?? ""}`}>
         {rows.map((row) => (
           <div key={row.label} role="group" aria-label={row.label} className="adder-row">
             <span className="adder-label" aria-hidden="true">
               {row.label}
             </span>
             <div className="plate-buttons">
-              {plateWeights(implement).map(({ weight, shape }) => (
-                <button
-                  key={weight}
-                  type="button"
-                  aria-label={`Add ${weight} ${unit} to ${row.phrase}`}
-                  className={`plate-button ${shape}`}
-                  style={plateStyle(weight, unit)}
-                  onClick={() => setPositions(addPlate(positions, weight, row.positions))}
-                >
-                  <span className="plus" aria-hidden="true">
-                    +
-                  </span>
-                  {weight}
-                  {shape === "block" && <span className="unit-suffix">{unit}</span>}
-                </button>
-              ))}
+              {plates.map((plate) => {
+                const text = plateText(plate, plates);
+                return (
+                  <button
+                    key={plate.id}
+                    type="button"
+                    aria-label={`Add ${text} ${plateUnit(inventory, plate)} to ${row.phrase}`}
+                    className={`plate-button ${plate.shape}${plateColour(inventory, plate).outline ? " light" : ""}`}
+                    style={plateStyle(inventory, plate)}
+                    onClick={() => setPositions(addPlate(positions, plate, row.positions))}
+                  >
+                    <span className="plus" aria-hidden="true">
+                      +
+                    </span>
+                    {text}
+                    {plate.shape === "block" && <span className="unit-suffix">{plateUnit(inventory, plate)}</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
       </div>
       <div className="reverse-options">
-        {implement === "barbell" && <Segmented label="Collars" options={collarOptions} value={collars} onChange={onCollarsChange} />}
-        {implement === "dumbbell" && (
-          <>
-            <Segmented label="Dumbbells" options={dumbbellOptions} value={dumbbells} onChange={setDumbbells} />
-            <Switch label="Mirror ends" checked={mirrorEnds} onChange={setMirrorEnds} />
-          </>
-        )}
+        <HardwareChoice implement={implement} hardware={hardware} onHardwareChange={onHardwareChange} />
+        <PairChoice implement={implement} pair={pair} onChange={setPair} />
+        {kind === "handle" && <Switch label="Mirror ends" checked={mirrorEnds} onChange={setMirrorEnds} />}
         <div className="reverse-actions">
           <button type="button" className="clear" disabled={empty} onClick={() => setPositions(clearPlates(positions))}>
             Clear
@@ -192,11 +190,8 @@ export function ReverseScreen({ implement, collars, onCollarsChange, uneven, onP
   );
 }
 
-function plateNoun(implement: string): string {
-  return implement === "vest" ? "block" : "plate";
-}
-
-function plateStyle(weight: number, unit: Unit): CSSProperties {
-  const { fill, ink } = plateColour(weight, unit);
+function plateStyle(inventory: Inventory, plate: Plate): CSSProperties {
+  const { fill, ink } = plateColour(inventory, plate);
   return { "--plate": fill, "--plate-ink": ink } as CSSProperties;
 }
+

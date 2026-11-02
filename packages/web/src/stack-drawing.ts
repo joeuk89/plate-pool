@@ -1,16 +1,19 @@
 import type { Inventory, Loading } from "@plate-pool/core";
+import { lower } from "./kit";
 import {
   drawHardware,
+  drawnLength,
+  fullReach,
   HARDWARE_LABEL_BOTTOM,
+  hardwareIn,
+  hardwareWidth,
   LABELS_TOP,
   MARGIN,
+  MIN_PICTURE_WIDTH,
+  PLATE_HEIGHT,
   placeOutsideLabels,
   plateSequence,
-  QUICK_LOCK_PLATE,
-  SCREW,
-  screwCapacity,
-  screwFor,
-  stackLength,
+  scaleFor,
   stackPlates,
   type DrawOptions,
   type HardwareDrawing,
@@ -22,63 +25,54 @@ export interface StackDrawing {
   width: number;
   top: number;
   height: number;
-  /** What the plates sit against: the kettlebell handle's base, or the leg attachment's stop. */
-  base: { x: number; width: number; height: number };
-  /** The kettlebell handle's loop, lying on its side to the left of the base. */
-  loop?: { left: number; right: number; radius: number; thickness: number };
-  /** The leg attachment's lever and the plate holder that carries the stack. */
-  lever?: { x: number; width: number; height: number };
-  holder: { x: number; length: number; diameter: number };
+  mount: { x: number; width: number; height: number };
+  stop: { x: number; width: number; height: number };
+  post: { x: number; length: number; diameter: number };
   plates: PlateDrawing[];
-  screw?: HardwareDrawing;
+  hardware?: HardwareDrawing;
 }
 
-// Sizes in inches, for drawing only.
-const LOOP = { radius: 2.2, thickness: 0.8, straight: 1.1 };
-const KETTLEBELL_BASE = { width: 0.75, height: QUICK_LOCK_PLATE };
-const LEVER = { width: 0.9, height: QUICK_LOCK_PLATE + 0.6 };
-const LEG_STOP = { width: 0.375, height: 2.5 };
-const HOLDER = { diameter: 1, beyond: 0.5, shortest: 10.5 };
+// Drawing units, for drawing only.
+const MOUNT = { width: 0.9, height: PLATE_HEIGHT * 0.6 };
+const STOP = { width: 0.375, height: 2.5 };
+const POST = { diameter: 1, beyond: 0.5 };
+/** A stack with no `positionLength` and no hardware capacity draws a post this long, or as long as its loading. */
+const POST_WITHOUT_LENGTH = 1.5 * PLATE_HEIGHT;
 
 export function drawStack(implement: string, loading: Loading, inventory: Inventory, options: DrawOptions = {}): StackDrawing {
-  const kettlebell = implement === "kettlebell";
-  const screwHardware = screwFor(loading, inventory);
+  const scale = scaleFor(inventory, implement);
+  const item = hardwareIn(loading, inventory);
   const top = LABELS_TOP;
   const shown = options.sideBySide ?? [loading];
-  const bottom = shown.some((each) => screwFor(each, inventory)) ? HARDWARE_LABEL_BOTTOM : QUICK_LOCK_PLATE / 2 + MARGIN;
+  const bottom = shown.some((each) => hardwareIn(each, inventory)) ? HARDWARE_LABEL_BOTTOM : PLATE_HEIGHT / 2 + MARGIN;
   const height = bottom - top;
 
-  const loop = kettlebell
-    ? { left: MARGIN, right: MARGIN + LOOP.thickness / 2 + LOOP.radius + LOOP.straight, radius: LOOP.radius, thickness: LOOP.thickness }
-    : undefined;
-  const lever = kettlebell ? undefined : { x: MARGIN, ...LEVER };
-  const base = loop ? { x: loop.right, ...KETTLEBELL_BASE } : { x: MARGIN + LEVER.width, ...LEG_STOP };
-  const start = base.x + base.width;
+  const mount = { x: MARGIN, ...MOUNT };
+  const stop = { x: mount.x + mount.width, ...STOP };
+  const start = stop.x + stop.width;
 
-  const extent = (each: Loading) => stackLength(each.positions[0]?.plates ?? [], inventory) + (screwFor(each, inventory) ? SCREW.width : 0);
-  const fullReach = kettlebell ? screwCapacity(implement, inventory) + SCREW.width : HOLDER.shortest;
-  const reach = Math.max(...shown.map(extent), options.sideBySide ? 0 : fullReach);
-  const holderLength = kettlebell ? 0 : Math.max(reach + HOLDER.beyond, options.sideBySide ? 0 : HOLDER.shortest);
-  const drawn = start + (kettlebell ? reach : holderLength) + MARGIN;
-  const width = options.sideBySide ? Math.max(drawn, height) : drawn;
+  const extent = (each: Loading) => drawnLength(scale, each.positions[0]) + hardwareWidth(scale, each);
+  const longest = Math.max(...shown.map(extent));
+  const reach = options.sideBySide ? longest : Math.max(longest, fullReach(scale) ?? POST_WITHOUT_LENGTH);
+  const postLength = reach + POST.beyond;
+  const drawn = start + postLength + MARGIN;
+  const width = options.sideBySide ? Math.max(drawn, height) : Math.max(drawn, MIN_PICTURE_WIDTH);
 
-  const weights = loading.positions[0]?.plates ?? [];
-  const plates = stackPlates(weights, inventory, start);
+  const position = loading.positions[0];
+  const plates = stackPlates(scale, position, start);
   placeOutsideLabels(plates, 0, width);
-  const screw = screwHardware && drawHardware(screwHardware.name, start + stackLength(weights, inventory), SCREW, width);
+  const hardware = item && drawHardware(scale, item, start + drawnLength(scale, position), width);
 
-  const then = screwHardware ? `, then the ${screwHardware.name.toLowerCase()}` : "";
+  const then = item ? `, then the ${lower(item.name)}` : "";
   return {
-    description: `Stack, inside to outside: ${plateSequence(weights)}${then}`,
+    description: `Stack, inside to outside: ${plateSequence(position?.plates ?? [])}${then}`,
     width,
     top,
     height,
-    base,
-    ...(loop ? { loop } : {}),
-    ...(lever ? { lever } : {}),
-    holder: { x: start, length: holderLength, diameter: HOLDER.diameter },
+    mount,
+    stop,
+    post: { x: start, length: postLength, diameter: POST.diameter },
     plates,
-    ...(screw ? { screw } : {}),
+    ...(hardware ? { hardware } : {}),
   };
 }
-

@@ -2,7 +2,9 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it } from "vitest";
 import type { Loading, LoadResult } from "@plate-pool/core";
 import { App } from "../src/App";
+import { KitContext } from "../src/kit";
 import { OtherWays } from "../src/OtherWays";
+import { owner } from "./kits";
 
 afterEach(cleanup);
 
@@ -60,7 +62,11 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
       warnings: [],
       unverified: [],
     };
-    render(<OtherWays result={result} />);
+    render(
+      <KitContext.Provider value={owner}>
+        <OtherWays result={result} />
+      </KitContext.Provider>,
+    );
     expect(screen.getAllByRole("listitem").map(text)).toEqual([
       "Each end 3 × 5, 1 × 2.5, 1 × 1.25",
       "End A heavier 1 × 22.5 End B 2 × 5, 1 × 2.5 Uneven",
@@ -69,7 +75,7 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
 
   it("lists the other loadings of a pair of dumbbells", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     typeTarget("40");
     expect(within(otherWays()!).getAllByRole("listitem").map(text)).toEqual([
       "End A 3 × 5 End B 2 × 5, 2 × 2.5 Loaded",
