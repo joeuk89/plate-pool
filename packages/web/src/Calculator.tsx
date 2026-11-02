@@ -8,6 +8,7 @@ import { LoadScreen, type LoadChoice } from "./LoadScreen";
 import { newCard, type Card } from "./plan";
 import { moveItem } from "./reorder";
 import { ReverseScreen } from "./ReverseScreen";
+import { ShareButton } from "./ShareButton";
 import { useSettings, type SettingsChange } from "./settings";
 
 const views: { id: View; label: string }[] = [
@@ -105,6 +106,7 @@ function Screens({ inventory, kit }: CalculatorProps) {
             </button>
           ))}
         </nav>
+        <ShareButton />
       </header>
       {mismatch && (
         <p role="status" className="mismatch">
