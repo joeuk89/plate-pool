@@ -712,6 +712,11 @@ describe("plate-pool inventory", () => {
     expect(result.stdout).toBe(inventoryText);
   });
 
+  it("adds nothing to the file with --json, not even a final newline", () => {
+    const unterminated = inventoryText.trimEnd();
+    expect(runWith(["inventory", "--json", "--inventory", writeInventory(unterminated)], {}).stdout).toBe(unterminated);
+  });
+
   it("prints the kit's name and length unit, then its plates, hardware and implements", () => {
     const result = runWith(["inventory"]);
     expect(result.code).toBe(0);

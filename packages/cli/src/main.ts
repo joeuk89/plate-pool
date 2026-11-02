@@ -154,7 +154,7 @@ export function run(args: string[], environment: Environment): number {
           }),
         );
       } else {
-        environment.stdout(options.json ? (text.endsWith("\n") ? text : `${text}\n`) : inventoryText(inventory));
+        environment.stdout(options.json ? text : inventoryText(inventory));
       }
       return 0;
     }
