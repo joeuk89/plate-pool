@@ -320,6 +320,8 @@ This is the main screen.
 
 Every result has its own URL. Opening the URL shows the same result.
 
+A Share button shares the current URL. Without a share sheet, it copies the link.
+
 | Parameter | Meaning | Example |
 | --- | --- | --- |
 | `barbell`, `kettlebell`, `leg`, `vest` | Target for that implement | `barbell=175` |
