@@ -2,11 +2,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { list, readInventory, type ListResponse } from "@plate-pool/core";
-import type { CollarChoice } from "../src/settings";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp, type Deployment } from "./build-app";
 
 const inventoryFile = new URL("../../../inventory/inventory.json", import.meta.url);
+
+type CollarChoice = "clamp" | "spinlock" | "none";
 
 let deployment: Deployment;
 

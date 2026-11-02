@@ -28,7 +28,7 @@ describe("barbell picture on the Load screen: worked examples (spec section 7)",
     render(<App />);
     typeTarget("173");
     const labels = [...pictureIn(/Exact/).querySelectorAll("text")].map((text) => text.textContent);
-    expect(labels).toEqual(["22.5", "22.5", "5", "5", "5", "5", "5", "5", "2.5", "Clamp collar"]);
+    expect(labels).toEqual(["22.5", "22.5", "5", "5", "5", "5", "5", "5", "2.5", 'Mirafit 1" clamp collar']);
   });
 
   it("example 1: 175 lb draws a picture for the loading below and for the loading above", () => {
@@ -64,9 +64,9 @@ describe("barbell picture on the Load screen: collars", () => {
 
 describe("barbell picture on the Load screen: other implements", () => {
   it.each([
-    ["Vest", "12"],
+    ["Weighted vest", "12"],
     ["Kettlebell", "80"],
-    ["Dumbbells", "40"],
+    ["Dumbbell", "40"],
   ])("draws its own picture, not the barbell picture, for the %s", (tab, target) => {
     render(<App />);
     fireEvent.click(screen.getByRole("tab", { name: tab }));

@@ -3,13 +3,14 @@ import { addedFrom, pictureRole, removable, type Editing } from "./picture-parts
 import { drawVest } from "./vest-drawing";
 
 interface Props {
+  implement: string;
   loading: Loading;
   inventory: Inventory;
   editing?: Editing | undefined;
 }
 
-export function VestPicture({ loading, inventory, editing }: Props) {
-  const drawing = drawVest(loading, inventory);
+export function VestPicture({ implement, loading, inventory, editing }: Props) {
+  const drawing = drawVest(implement, loading, inventory);
   const { fontSize } = drawing;
 
   return (
@@ -36,7 +37,15 @@ export function VestPicture({ loading, inventory, editing }: Props) {
                       rx={0.13}
                     />
                   )}
-                  <rect x={slot.x} y={slot.y} width={slot.width} height={slot.height} rx={0.1} fill={slot.block.fill} />
+                  <rect
+                    x={slot.x}
+                    y={slot.y}
+                    width={slot.width}
+                    height={slot.height}
+                    rx={0.1}
+                    fill={slot.block.fill}
+                    {...(slot.block.outline ? { className: "light-plate" } : {})}
+                  />
                   <text
                     x={slot.x + slot.width / 2}
                     y={slot.y + slot.height / 2 + fontSize * 0.35}

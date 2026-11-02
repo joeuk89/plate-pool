@@ -1,10 +1,11 @@
-import type { Loading } from "@plate-pool/core";
+import type { HardwareKind, Loading } from "@plate-pool/core";
 import type { KeyboardEvent } from "react";
 import type { Callout, HardwareDrawing, Line, PlateDrawing } from "./plate-stack";
 import { FONT_SIZE, HARDWARE_FONT_SIZE } from "./plate-stack";
 
 const PLATE_GAP = 0.05;
 const ADDED_RING = 0.12;
+const PIN_ROD = 0.24;
 
 export interface Editing {
   remove: (position: string, index: number) => void;
@@ -63,7 +64,7 @@ export function Plates({ plates, position, editing, added }: PlatesProps) {
                 y={-plate.height / 2 - ADDED_RING}
                 width={width + 2 * ADDED_RING}
                 height={plate.height + 2 * ADDED_RING}
-                rx={plate.round ? width / 2 + ADDED_RING : 0.1 + ADDED_RING}
+                rx={0.1 + ADDED_RING}
               />
             )}
             <rect
@@ -71,8 +72,9 @@ export function Plates({ plates, position, editing, added }: PlatesProps) {
               y={-plate.height / 2}
               width={width}
               height={plate.height}
-              rx={plate.round ? width / 2 : 0.1}
+              rx={0.1}
               fill={plate.fill}
+              {...(plate.outline ? { className: "light-plate" } : {})}
             />
             {plate.leader && <Leader line={plate.leader} />}
             <text
@@ -91,17 +93,27 @@ export function Plates({ plates, position, editing, added }: PlatesProps) {
   );
 }
 
-export function HardwarePart({ hardware, className, radius }: { hardware: HardwareDrawing; className: string; radius: number }) {
+export function HardwareGlyph({ kind, part }: { kind: HardwareKind; part: { x: number; width: number; height: number } }) {
+  if (kind === "pin") {
+    const rod = Math.min(part.width, PIN_ROD);
+    return <rect className="pin" x={part.x + (part.width - rod) / 2} y={-part.height / 2} width={rod} height={part.height} rx={rod / 2} />;
+  }
+  return (
+    <rect
+      className={kind}
+      x={part.x + PLATE_GAP / 2}
+      y={-part.height / 2}
+      width={part.width - PLATE_GAP}
+      height={part.height}
+      rx={kind === "screw" ? 0.15 : 0.18}
+    />
+  );
+}
+
+export function HardwarePart({ hardware }: { hardware: HardwareDrawing }) {
   return (
     <g>
-      <rect
-        className={className}
-        x={hardware.x + PLATE_GAP / 2}
-        y={-hardware.height / 2}
-        width={hardware.width - PLATE_GAP}
-        height={hardware.height}
-        rx={radius}
-      />
+      <HardwareGlyph kind={hardware.kind} part={hardware} />
       <CalloutLabel callout={hardware} />
     </g>
   );

@@ -11,7 +11,7 @@ function open(tab: string, target: string) {
 }
 
 function chooseOne() {
-  fireEvent.click(within(screen.getByRole("radiogroup", { name: "Dumbbells" })).getByRole("radio", { name: "One" }));
+  fireEvent.click(within(screen.getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
 }
 
 function picture(heading: RegExp = /Exact/) {
@@ -25,7 +25,7 @@ function labels(svg: HTMLElement): string[] {
 
 describe("dumbbell picture: worked examples (spec section 7)", () => {
   it("example 4: 40 lb pair draws both ends with 3 × 5 each and names the standard locking screws", () => {
-    open("Dumbbells", "40");
+    open("Dumbbell", "40");
     const svg = picture();
     expect(svg.getAttribute("aria-label")).toBe(
       "Each end, inside to outside: 5, 5, 5, then a standard locking screw",
@@ -34,7 +34,7 @@ describe("dumbbell picture: worked examples (spec section 7)", () => {
   });
 
   it("example 5: one 12.5 lb dumbbell marks end A, with its one 2.5 lb plate, as the heavier end", () => {
-    open("Dumbbells", "12.5");
+    open("Dumbbell", "12.5");
     chooseOne();
     const svg = picture();
     expect(svg.getAttribute("aria-label")).toBe(
@@ -45,7 +45,7 @@ describe("dumbbell picture: worked examples (spec section 7)", () => {
   });
 
   it("example 6: one 47.5 lb dumbbell draws 4 × 5 on end A and 3 × 5 + 1 × 2.5 on end B, end A heavier", () => {
-    open("Dumbbells", "47.5");
+    open("Dumbbell", "47.5");
     chooseOne();
     const svg = picture();
     expect(svg.getAttribute("aria-label")).toBe(
@@ -56,7 +56,7 @@ describe("dumbbell picture: worked examples (spec section 7)", () => {
   });
 
   it("example 7: 120 lb pair draws 1 × 22.5, 6 × 5, 1 × 2.5 on each end with long locking screws", () => {
-    open("Dumbbells", "120");
+    open("Dumbbell", "120");
     const svg = picture();
     expect(svg.getAttribute("aria-label")).toBe(
       "Each end, inside to outside: 22.5, 5, 5, 5, 5, 5, 5, 2.5, then a long locking screw",
@@ -93,7 +93,7 @@ describe("kettlebell and leg attachment pictures: worked examples (spec section 
 
 describe("vest picture: worked examples (spec section 7)", () => {
   it("example 13: 12 kg draws front and back grids with 6 blocks each, each labelled with its weight", () => {
-    open("Vest", "12");
+    open("Weighted vest", "12");
     const svg = picture();
     expect(svg.getAttribute("aria-label")).toBe("Front: 6 blocks. Back: 6 blocks");
     const six = Array.from({ length: 6 }, () => "1");

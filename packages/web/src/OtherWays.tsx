@@ -1,9 +1,8 @@
 import type { Loading, LoadResult } from "@plate-pool/core";
 import { countText } from "./changes-text";
-import { endLabel, plateList } from "./describe";
+import { positionRows } from "./describe";
+import { canPair, implementOf, lower, useKit } from "./kit";
 import { LoadedButton } from "./LoadedButton";
-
-const positionNouns: Record<string, string> = { barbell: "side", dumbbell: "end" };
 
 interface Props {
   result: LoadResult;
@@ -11,24 +10,25 @@ interface Props {
 }
 
 export function OtherWays({ result, onPin }: Props) {
+  const inventory = useKit();
   if (result.alternatives.length === 0) return null;
+  const pair = canPair(inventory, result.implement) && result.pair !== false;
+  const perPair = pair ? lower(implementOf(inventory, result.implement)?.name ?? result.implement) : undefined;
   return (
     <details className="other-ways" aria-label="Other ways to make this">
       <summary>{`Other ways to make this (${result.alternatives.length})`}</summary>
       <ul>
         {result.alternatives.map((loading) => (
           <li key={JSON.stringify(loading.positions)}>
-            {loading.changes && (
-              <p className="changes-count">{countText(loading.changes.count, result.implement === "dumbbell" && result.pair !== false)}</p>
-            )}
+            {loading.changes && <p className="changes-count">{countText(loading.changes.count, perPair)}</p>}
             <dl className="details">
-              {positionRows(result.implement, loading).map(({ label, plates, heavier }) => (
+              {positionRows(inventory, result.implement, loading).map(({ label, text, heavier }) => (
                 <div key={label}>
                   <dt>
                     {label}
                     {heavier && <span className="heavier"> heavier</span>}
                   </dt>
-                  <dd>{plateList(plates)}</dd>
+                  <dd>{text}</dd>
                 </div>
               ))}
             </dl>
@@ -39,19 +39,4 @@ export function OtherWays({ result, onPin }: Props) {
       </ul>
     </details>
   );
-}
-
-function positionRows(implement: string, loading: Loading): { label: string; plates: number[]; heavier?: boolean }[] {
-  const [first, ...rest] = loading.positions;
-  const noun = positionNouns[implement];
-  const mirrored = first && rest.length > 0 && rest.every((position) => position.plates.join() === first.plates.join());
-  if (noun && first && mirrored) return [{ label: `Each ${noun}`, plates: first.plates }];
-  return loading.positions.map(({ name, plates }) => ({ label: positionLabel(name), plates, heavier: name === loading.heavier }));
-}
-
-function positionLabel(name: string): string {
-  const end = endLabel(name);
-  if (end !== name) return end;
-  const words = name.replaceAll("-", " ");
-  return words.charAt(0).toUpperCase() + words.slice(1);
 }

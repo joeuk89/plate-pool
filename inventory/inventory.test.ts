@@ -63,19 +63,20 @@ describe("plates (inventory/README.md)", () => {
     ["ql-22.5", 5, 22.5, 1.875, "#c9353f", "square"],
     ["ql-5", 24, 5, 0.5, "#2f67cc", "square"],
     ["ql-2.5", 4, 2.5, 0.25, "#1c8a55", "square"],
-  ])("%s is a Quick-Lock plate named by weight, with a verified weight and an unverified stack length", (id, count, weight, stackLength, colour, shape) => {
+  ])("%s is a 6.7 in Quick-Lock plate named by weight, with a verified weight and an unverified stack length", (id, count, weight, stackLength, colour, shape) => {
     expect(byId(inventory.plates, id)).toEqual({
       id,
       type: "quick-lock",
       count,
       weight: { listed: weight, status: "verified" },
       stackLength: { listed: stackLength, status: "unverified" },
+      diameter: 6.7,
       colour,
       shape,
     });
   });
 
-  it("names the micro plate Micro", () => {
+  it("names the micro plate Micro and draws it 5 in across", () => {
     expect(byId(inventory.plates, "ql-micro")).toEqual({
       id: "ql-micro",
       name: "Micro",
@@ -83,6 +84,7 @@ describe("plates (inventory/README.md)", () => {
       count: 4,
       weight: { listed: 1.25, status: "verified" },
       stackLength: { listed: 0.25, status: "unverified" },
+      diameter: 5,
       colour: "#7a4fc4",
       shape: "round",
     });

@@ -1,11 +1,9 @@
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import type { Loading, LoadResponse } from "@plate-pool/core";
+import { load, type Loading, type LoadResponse, type TargetRequest } from "@plate-pool/core";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { run } from "../../cli/src/main.ts";
 import { App } from "../src/App";
 import { plateList } from "../src/describe";
+import { owner } from "./kits";
 
 afterEach(() => {
   cleanup();
@@ -34,18 +32,11 @@ function addImplement(name: string) {
   fireEvent.click(within(screen.getByRole("group", { name: "Implement to add" })).getByRole("button", { name }));
 }
 
-function commandLine(...targets: string[]): LoadResponse {
-  let stdout = "";
-  const code = run(["load", ...targets, "--json"], {
-    stdout: (output) => (stdout += output),
-    stderr: () => {},
-    variables: { PLATE_POOL_INVENTORY: join(dirname(fileURLToPath(import.meta.url)), "../../../inventory/inventory.json") },
-  });
-  expect(code).toBe(0);
-  return JSON.parse(stdout) as LoadResponse;
+function library(...targets: TargetRequest[]): LoadResponse {
+  return load(owner, { targets });
 }
 
-function expectSameAsCommandLine(response: LoadResponse) {
+function expectSameAsLibrary(response: LoadResponse) {
   response.results.forEach((item, index) => {
     const recommended = item.loading ?? (item.recommended && item[item.recommended]);
     const shown = text(result(index + 1));
@@ -59,7 +50,7 @@ function expectSameAsCommandLine(response: LoadResponse) {
 describe("several implements: worked examples (spec section 7)", () => {
   it("example 9: dumbbells 120 lb then kettlebell 40 lb recommends 47.5 lb, with a warning that names the dumbbells", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     typeTarget(1, "120");
     addImplement("Kettlebell");
     typeTarget(2, "40");
@@ -74,13 +65,13 @@ describe("several implements: worked examples (spec section 7)", () => {
     expect(text(within(result(2)).getByRole("list", { name: "Notes" }))).toContain(
       "Not exact because the dumbbells use the 5 lb plates the kettlebell needs to reach 40 lb.",
     );
-    expectSameAsCommandLine(commandLine("dumbbell=120", "kettlebell=40"));
+    expectSameAsLibrary(library({ implement: "dumbbell", target: "120lb" }, { implement: "kettlebell", target: "40lb" }));
   });
 
   it("example 10: barbell 173 lb then dumbbells 40 lb are both exact, and the line at the bottom shows what is left over", () => {
     render(<App />);
     typeTarget(1, "173");
-    addImplement("Dumbbells");
+    addImplement("Dumbbell pair");
     typeTarget(2, "40");
 
     expect(text(result(1))).toContain("Exact");
@@ -91,19 +82,19 @@ describe("several implements: worked examples (spec section 7)", () => {
     expect(text(leftover())).toBe(
       'Left over Plates 1 × 22.5, 2 × 2.5, 4 × 1.25 Locking hardware 5 × Long locking screw, 2 × Ironmaster spin-lock collar, 2 × Mirafit 1" clamp collar',
     );
-    expectSameAsCommandLine(commandLine("barbell=173", "dumbbell=40"));
+    expectSameAsLibrary(library({ implement: "barbell", target: "173lb" }, { implement: "dumbbell", target: "40lb" }));
   });
 
   it("example 11: barbell 88 lb gives up its fewest-plate loading so dumbbells 75 lb are exact", () => {
     render(<App />);
     typeTarget(1, "88");
-    addImplement("Dumbbells");
+    addImplement("Dumbbell pair");
     typeTarget(2, "75");
 
     expect(text(result(1))).toContain("Each side 7 × 5");
     expect(text(result(2))).toContain("Each end 1 × 22.5, 2 × 5");
     expect(text(result(2))).toContain("Screws per dumbbell 2 × Standard locking screw");
-    expectSameAsCommandLine(commandLine("barbell=88", "dumbbell=75"));
+    expectSameAsLibrary(library({ implement: "barbell", target: "88lb" }, { implement: "dumbbell", target: "75lb" }));
   });
 });
 
@@ -112,12 +103,12 @@ describe("several implements: cards (spec 8.3)", () => {
     render(<App />);
     expect(cards()).toHaveLength(1);
     addImplement("Kettlebell");
-    expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Barbell", "2. Kettlebell"]);
+    expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Straight bar", "2. Kettlebell"]);
   });
 
   it("puts the cursor in the new card's target", () => {
     render(<App />);
-    addImplement("Vest");
+    addImplement("Weighted vest");
     expect(document.activeElement).toBe(within(card(2)).getByLabelText("Target"));
   });
 
@@ -142,7 +133,7 @@ describe("several implements: priority order (spec 8.3)", () => {
 
   function planDumbbellsThenKettlebell() {
     render(<App />);
-    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     typeTarget(1, "120");
     addImplement("Kettlebell");
     typeTarget(2, "40");
@@ -157,7 +148,7 @@ describe("several implements: priority order (spec 8.3)", () => {
   }
 
   function expectKettlebellServedFirst() {
-    expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Kettlebell", "2. Dumbbells"]);
+    expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Kettlebell", "2. Dumbbell pair"]);
     expect(text(result(1))).toContain("Exact");
     expect(text(result(1))).toContain("40 lb");
     expect(text(result(2))).toContain("No exact loading for 120 lb");
@@ -188,7 +179,7 @@ describe("several implements: priority order (spec 8.3)", () => {
     planDumbbellsThenKettlebell();
     stackCards();
     drag(within(card(2)).getByRole("button", { name: "Move Kettlebell" }), -30, "touch");
-    expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Dumbbells", "2. Kettlebell"]);
+    expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Dumbbell pair", "2. Kettlebell"]);
   });
 
   it("moves a card with the arrow keys on its handle, and keeps focus on the handle", () => {
@@ -206,14 +197,14 @@ describe("several implements: priority order (spec 8.3)", () => {
 
   it("changes the first card's implement from the implement tabs and keeps the cards under it", () => {
     planDumbbellsThenKettlebell();
-    fireEvent.click(screen.getByRole("tab", { name: "Barbell" }));
-    expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Barbell", "2. Kettlebell"]);
+    fireEvent.click(screen.getByRole("tab", { name: "Straight bar" }));
+    expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Straight bar", "2. Kettlebell"]);
     expect(within(card(2)).getByLabelText("Target")).toHaveProperty("value", "40");
   });
 
   it("removes a card, and the next one moves up", () => {
     planDumbbellsThenKettlebell();
-    fireEvent.click(within(card(1)).getByRole("button", { name: "Remove Dumbbells" }));
+    fireEvent.click(within(card(1)).getByRole("button", { name: "Remove Dumbbell pair" }));
     expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Kettlebell"]);
     expect(text(result(1))).toContain("Exact");
     expect(screen.queryByRole("region", { name: "Left over" })).toBeNull();
@@ -225,24 +216,24 @@ describe("several implements: the plate pool", () => {
 
   it("offers only the implements that are still free", () => {
     render(<App />);
-    addImplement("Dumbbells");
+    addImplement("Dumbbell pair");
     fireEvent.click(screen.getByRole("button", { name: "Add implement" }));
-    expect(choices()).toEqual(["Kettlebell", "Leg attachment", "Vest", "Cancel"]);
+    expect(choices()).toEqual(["Kettlebell", "Leg attachment", "Weighted vest", "Cancel"]);
   });
 
   it("offers one dumbbell when the other is in use", () => {
     render(<App />);
-    addImplement("Dumbbells");
-    fireEvent.click(within(within(card(2)).getByRole("radiogroup", { name: "Dumbbells" })).getByRole("radio", { name: "One" }));
-    addImplement("One dumbbell");
-    expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Barbell", "2. One dumbbell", "3. One dumbbell"]);
+    addImplement("Dumbbell pair");
+    fireEvent.click(within(within(card(2)).getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
+    addImplement("Dumbbell single");
+    expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Straight bar", "2. Dumbbell single", "3. Dumbbell single"]);
   });
 
   it("explains a card that asks for more of an implement than the inventory holds, and serves the cards above it", () => {
     render(<App />);
-    addImplement("Dumbbells");
+    addImplement("Dumbbell pair");
     typeTarget(2, "40");
-    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     typeTarget(1, "30");
     expect(text(result(1))).toContain("Exact");
     expect(text(result(2))).toBe("The request needs 4 × dumbbell. The inventory holds 2.");
@@ -260,7 +251,7 @@ describe("several implements: the plate pool", () => {
   it("shows vest blocks in the line at the bottom", () => {
     render(<App />);
     typeTarget(1, "173");
-    addImplement("Vest");
+    addImplement("Weighted vest");
     typeTarget(2, "12");
     expect(text(leftover())).toContain("Plates 1 × 22.5, 12 × 5, 2 × 2.5, 4 × 1.25, 18 blocks");
   });

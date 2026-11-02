@@ -14,6 +14,7 @@
       "count": 5,
       "weight": { "listed": 22.5, "status": "verified" },
       "stackLength": { "listed": 1.875, "status": "unverified" },
+      "diameter": 6.7,
       "colour": "#c9353f",
       "shape": "square"
     },
@@ -23,6 +24,7 @@
       "count": 24,
       "weight": { "listed": 5, "status": "verified" },
       "stackLength": { "listed": 0.5, "status": "unverified" },
+      "diameter": 6.7,
       "colour": "#2f67cc",
       "shape": "square"
     },
@@ -32,6 +34,7 @@
       "count": 4,
       "weight": { "listed": 2.5, "status": "verified" },
       "stackLength": { "listed": 0.25, "status": "unverified" },
+      "diameter": 6.7,
       "colour": "#1c8a55",
       "shape": "square"
     },
@@ -42,6 +45,7 @@
       "count": 4,
       "weight": { "listed": 1.25, "status": "verified" },
       "stackLength": { "listed": 0.25, "status": "unverified" },
+      "diameter": 5,
       "colour": "#7a4fc4",
       "shape": "round"
     },

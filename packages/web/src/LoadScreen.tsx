@@ -3,40 +3,27 @@ import {
   RequestError,
   step,
   type Display,
+  type Inventory,
   type Loading,
   type LoadResult,
   type StepRequest,
   type Unit,
 } from "@plate-pool/core";
 import { useId, useMemo, useRef } from "react";
+import { AddImplement } from "./AddImplement";
 import { changesText, type ChangesText } from "./changes-text";
 import { CurrentStrip } from "./CurrentStrip";
-import { LoadedButton } from "./LoadedButton";
 import { pinnedFrom, type CurrentLoadings, type PinnedLoading } from "./current";
+import { hardwareList, positionRows, unevenNote, unverifiedList } from "./describe";
+import { HardwareChoice, PairChoice, UnevenSwitch, type HardwareProps } from "./ImplementOptions";
+import { canPair, hardwareOptions, hardwareTerm, kindOf, unitOf, useKit } from "./kit";
+import { LeftoverLine } from "./LeftoverLine";
+import { LoadedButton } from "./LoadedButton";
 import { OtherWays } from "./OtherWays";
 import { Picture } from "./Picture";
-import { Segmented } from "./Segmented";
-import { Switch } from "./Switch";
-import { blockList, endLabel, hardwareList, plateList, unevenNote, unverifiedList } from "./describe";
-import { inventory } from "./inventory";
-import { AddImplement } from "./AddImplement";
-import { LeftoverLine } from "./LeftoverLine";
-import { cardLabel, newCard, pinnedFor, plan, targetWithUnit, unitOf, type Card, type DumbbellChoice, type Outcome } from "./plan";
+import { cardLabel, newCard, pairOf, pinnedFor, plan, targetWithUnit, type Card, type Outcome } from "./plan";
 import { useReorder } from "./reorder";
-import { collarId, type CollarChoice } from "./settings";
-
-export { unitOf, type DumbbellChoice } from "./plan";
-
-export const collarOptions: { value: CollarChoice; label: string }[] = [
-  { value: "clamp", label: "Clamp" },
-  { value: "spinlock", label: "Spin-lock" },
-  { value: "none", label: "None" },
-];
-
-export const dumbbellOptions: { value: DumbbellChoice; label: string }[] = [
-  { value: "pair", label: "Pair" },
-  { value: "one", label: "One" },
-];
+import { Segmented } from "./Segmented";
 
 const unitOptions: { value: Unit; label: string }[] = [
   { value: "lb", label: "lb" },
@@ -45,27 +32,30 @@ const unitOptions: { value: Unit; label: string }[] = [
 
 export interface LoadChoice {
   target: string;
-  dumbbells: DumbbellChoice;
+  pair: boolean;
 }
 
 interface Options {
-  collars: CollarChoice;
+  hardware: Record<string, string>;
   uneven: boolean;
-  dumbbells: DumbbellChoice;
+  pair: boolean;
 }
 
 function nextWeight(
+  inventory: Inventory,
   implement: string,
   target: string,
   unit: Unit,
-  { collars, uneven, dumbbells }: Options,
+  { hardware, uneven, pair }: Options,
   direction: "up" | "down",
 ): Display | undefined {
+  const choice = hardware[implement];
   const request: StepRequest = {
     implement,
     ...(target.trim() === "" ? {} : { target: targetWithUnit(target, unit) }),
-    ...(implement === "dumbbell" ? { pair: dumbbells === "pair", uneven } : {}),
-    ...(implement === "barbell" ? { hardware: collarId(collars) } : {}),
+    ...pairOf(inventory, { implement, pair }),
+    ...(kindOf(inventory, implement) === "handle" ? { uneven } : {}),
+    ...(choice !== undefined ? { hardware: choice } : {}),
   };
   try {
     return step(inventory, request, direction);
@@ -75,11 +65,9 @@ function nextWeight(
   }
 }
 
-interface LoadScreenProps {
+interface LoadScreenProps extends HardwareProps {
   cards: Card[];
   onCardsChange: (cards: Card[]) => void;
-  collars: CollarChoice;
-  onCollarsChange: (collars: CollarChoice) => void;
   uneven: boolean;
   onUnevenChange: (uneven: boolean) => void;
   current: CurrentLoadings;
@@ -87,16 +75,20 @@ interface LoadScreenProps {
 }
 
 export function LoadScreen(props: LoadScreenProps) {
-  const { cards, onCardsChange, collars, onCollarsChange, uneven, onUnevenChange, current, onPin } = props;
-  const { outcomes, leftover } = useMemo(() => plan(cards, { collars, uneven, current }), [cards, collars, uneven, current]);
-  const pinned = pinnedFor(cards, current);
+  const { cards, onCardsChange, hardware, onHardwareChange, uneven, onUnevenChange, current, onPin } = props;
+  const inventory = useKit();
+  const { outcomes, leftover } = useMemo(
+    () => plan(inventory, cards, { hardware, uneven, current }),
+    [inventory, cards, hardware, uneven, current],
+  );
+  const pinned = pinnedFor(inventory, cards, current);
   const { reordering, listProps, itemProps, gripProps } = useReorder(cards, onCardsChange);
   const several = cards.length > 1;
   const update = (id: number, change: Partial<Card>) => onCardsChange(cards.map((card) => (card.id === id ? { ...card, ...change } : card)));
   const remove = (id: number) => onCardsChange(cards.filter((card) => card.id !== id));
   const added = useRef<number>(undefined);
-  const add = (implement: string, dumbbells: DumbbellChoice) => {
-    const card = newCard(implement, dumbbells);
+  const add = (implement: string, pair: boolean) => {
+    const card = newCard(inventory, implement, pair);
     added.current = card.id;
     onCardsChange([...cards, card]);
   };
@@ -115,8 +107,8 @@ export function LoadScreen(props: LoadScreenProps) {
               priority={index + 1}
               several={several}
               outcome={outcomes[index]}
-              collars={collars}
-              onCollarsChange={onCollarsChange}
+              hardware={hardware}
+              onHardwareChange={onHardwareChange}
               uneven={uneven}
               onUnevenChange={onUnevenChange}
               pinned={pinned[index]}
@@ -135,13 +127,11 @@ export function LoadScreen(props: LoadScreenProps) {
   );
 }
 
-interface LoadCardProps {
+interface LoadCardProps extends HardwareProps {
   card: Card;
   priority: number;
   several: boolean;
   outcome: Outcome;
-  collars: CollarChoice;
-  onCollarsChange: (collars: CollarChoice) => void;
   uneven: boolean;
   onUnevenChange: (uneven: boolean) => void;
   pinned: PinnedLoading | undefined;
@@ -158,8 +148,8 @@ function LoadCard(props: LoadCardProps) {
     priority,
     several,
     outcome,
-    collars,
-    onCollarsChange,
+    hardware,
+    onHardwareChange,
     uneven,
     onUnevenChange,
     pinned,
@@ -169,19 +159,20 @@ function LoadCard(props: LoadCardProps) {
     grip,
     autoFocus,
   } = props;
-  const { implement, target, unit, dumbbells } = card;
+  const inventory = useKit();
+  const { implement, target, unit, pair } = card;
   const targetId = useId();
-  const label = cardLabel(card);
+  const label = cardLabel(inventory, card);
 
-  const options = { collars, uneven, dumbbells };
-  const lighter = nextWeight(implement, target, unit, options, "down");
-  const heavier = nextWeight(implement, target, unit, options, "up");
+  const options = { hardware, uneven, pair };
+  const lighter = nextWeight(inventory, implement, target, unit, options, "down");
+  const heavier = nextWeight(inventory, implement, target, unit, options, "up");
   const moveTo = (weight: Display) => {
-    const own = unitOf(implement);
+    const own = unitOf(inventory, implement);
     onChange({ unit: own, target: String(weight[own]) });
   };
   const pin = (loading: Loading) => {
-    onPin(pinnedFrom(implement, loading, dumbbells === "pair"));
+    onPin(pinnedFrom(inventory, implement, loading, pair));
     moveTo(loading.total);
   };
 
@@ -194,7 +185,7 @@ function LoadCard(props: LoadCardProps) {
           </span>
           <h2 className="card-name">{label}</h2>
           <span className="card-summary" aria-hidden="true">
-            {summary(card, outcome)}
+            {summary(inventory, card, outcome)}
           </span>
           <button type="button" className="grip" aria-label={`Move ${label}`} aria-keyshortcuts="ArrowUp ArrowDown" {...grip}>
             <svg viewBox="0 0 12 20" aria-hidden="true">
@@ -255,20 +246,11 @@ function LoadCard(props: LoadCardProps) {
               +
             </button>
           </div>
-          {implement === "barbell" && <Segmented label="Collars" options={collarOptions} value={collars} onChange={onCollarsChange} />}
-          {implement === "dumbbell" && (
-            <>
-              <Segmented
-                label="Dumbbells"
-                options={dumbbellOptions}
-                value={dumbbells}
-                onChange={(value) => onChange({ dumbbells: value })}
-              />
-              <Switch label="Uneven loading" checked={uneven} onChange={onUnevenChange} />
-            </>
-          )}
+          <HardwareChoice implement={implement} hardware={hardware} onHardwareChange={onHardwareChange} />
+          <PairChoice implement={implement} pair={pair} onChange={(value) => onChange({ pair: value })} />
+          <UnevenSwitch implement={implement} uneven={uneven} onChange={onUnevenChange} />
         </div>
-        {pinned && <CurrentStrip implement={implement} pinned={pinned} collars={collars} onUnload={() => onPin(undefined)} />}
+        {pinned && <CurrentStrip implement={implement} pinned={pinned} hardware={hardware} onUnload={() => onPin(undefined)} />}
         <section aria-label="Result" aria-live="polite" className="result">
           {outcome && "result" in outcome && <ResultView result={outcome.result} pinned={pinned} onPin={pin} />}
           {outcome && "error" in outcome && <p className="error">{outcome.error}</p>}
@@ -278,8 +260,8 @@ function LoadCard(props: LoadCardProps) {
   );
 }
 
-function summary(card: Card, outcome: Outcome): string {
-  const unit = unitOf(card.implement);
+function summary(inventory: Inventory, card: Card, outcome: Outcome): string {
+  const unit = unitOf(inventory, card.implement);
   if (!outcome) return "";
   if ("error" in outcome) return card.target.trim();
   const { result } = outcome;
@@ -303,7 +285,8 @@ function ResultView({ result, ...pinning }: { result: LoadResult } & Pinning) {
 }
 
 function Loadings({ result, ...pinning }: { result: LoadResult } & Pinning) {
-  const unit = unitOf(result.implement);
+  const inventory = useKit();
+  const unit = unitOf(inventory, result.implement);
   if (result.loading) {
     return (
       <div className="choices single">
@@ -326,6 +309,9 @@ function Loadings({ result, ...pinning }: { result: LoadResult } & Pinning) {
   return (
     <>
       <p className="status">{`No exact loading for ${describeWeight(result.target, unit)}`}</p>
+      {!result.below && !result.above && (
+        <p className="unloadable">{`This kit's plates and hardware cannot load the ${cardLabel(inventory, { implement: result.implement, pair: result.pair !== false }).toLowerCase()}.`}</p>
+      )}
       <div className={sideBySide ? "choices" : "choices single"}>
         {result.below && (
           <LoadingView
@@ -369,6 +355,7 @@ interface LoadingViewProps extends Pinning {
 }
 
 function LoadingView({ heading, result, loading, unit, recommended = false, sideBySide, pinned, onPin }: LoadingViewProps) {
+  const inventory = useKit();
   const headingId = useId();
   const changes = pinned && changesText(result.implement, loading, pinned, inventory);
   return (
@@ -404,72 +391,28 @@ function ChangesBlock({ changes }: { changes: ChangesText }) {
 }
 
 function PlateDetails({ result, loading }: { result: LoadResult; loading: Loading }) {
+  const inventory = useKit();
+  const implement = result.implement;
+  const rows = positionRows(inventory, implement, loading);
+  const pair = canPair(inventory, implement) && result.pair !== false;
   return (
     <dl className="details">
-      {result.implement === "dumbbell" ? (
-        <DumbbellDetails pair={result.pair !== false} loading={loading} />
-      ) : (
-        details(result.implement, loading).map(([term, description]) => (
-          <div key={term}>
-            <dt>{term}</dt>
-            <dd>{description}</dd>
-          </div>
-        ))
-      )}
-    </dl>
-  );
-}
-
-function details(implement: string, loading: Loading): [term: string, description: string][] {
-  const [first, second] = loading.positions;
-  const plates = plateList(first?.plates ?? []);
-  const hardware = hardwareList(loading, inventory);
-  switch (implement) {
-    case "vest":
-      return [
-        ["Front", blockList(first?.plates ?? [])],
-        ["Back", blockList(second?.plates ?? [])],
-      ];
-    case "kettlebell":
-      return [
-        ["Stack", plates],
-        ["Locking screw", hardware],
-      ];
-    case "leg":
-      return [["Stack", plates]];
-    default:
-      return [
-        ["Each side", plates],
-        ["Collars", hardware],
-      ];
-  }
-}
-
-function DumbbellDetails({ pair, loading }: { pair: boolean; loading: Loading }) {
-  const [first] = loading.positions;
-  return (
-    <>
-      {loading.uneven ? (
-        loading.positions.map((position) => (
-          <div key={position.name}>
-            <dt>
-              {endLabel(position.name)}
-              {position.name === loading.heavier && <span className="heavier"> heavier</span>}
-            </dt>
-            <dd>{plateList(position.plates)}</dd>
-          </div>
-        ))
-      ) : (
+      {rows.map(({ label, text, heavier }) => (
+        <div key={label}>
+          <dt>
+            {label}
+            {heavier && <span className="heavier"> heavier</span>}
+          </dt>
+          <dd>{text}</dd>
+        </div>
+      ))}
+      {hardwareOptions(inventory, implement).length > 0 && (
         <div>
-          <dt>Each end</dt>
-          <dd>{plateList(first?.plates ?? [])}</dd>
+          <dt>{hardwareTerm(inventory, implement, pair)}</dt>
+          <dd>{hardwareList(loading, inventory)}</dd>
         </div>
       )}
-      <div>
-        <dt>{pair ? "Screws per dumbbell" : "Screws"}</dt>
-        <dd>{hardwareList(loading, inventory)}</dd>
-      </div>
-    </>
+    </dl>
   );
 }
 
@@ -488,12 +431,13 @@ export function Total({ weight, unit }: { weight: Display; unit: Unit }) {
 }
 
 function Notes({ result }: { result: LoadResult }) {
+  const inventory = useKit();
   const warnings = result.refused ? result.warnings.filter((warning) => !warning.startsWith("Refused:")) : result.warnings;
   const uneven = [
     { label: "Uneven", loading: result.loading },
     { label: "Below is uneven", loading: result.below },
     { label: "Above is uneven", loading: result.above },
-  ].flatMap(({ label, loading }) => (loading?.uneven ? [unevenNote(label, loading, inventory)] : []));
+  ].flatMap(({ label, loading }) => (loading?.uneven ? [unevenNote(label, result.implement, loading, inventory)] : []));
   const notes = [...uneven, ...warnings];
   if (result.unverified.length > 0) notes.push(`Unverified: ${unverifiedList(result.unverified, inventory)}`);
   if (notes.length === 0) return null;

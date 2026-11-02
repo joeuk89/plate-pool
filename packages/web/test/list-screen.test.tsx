@@ -34,9 +34,9 @@ describe("List screen (spec 8.5)", () => {
     setRange("170", "176");
     expect(rows()).toEqual([
       ["lb", "kg", "Plates", "Flags"],
-      ["170.5", "77.3", "Each side 2 × 22.5, 6 × 5, 1 × 1.25", "Micro"],
+      ["170.5", "77.3", "Each side 2 × 22.5, 6 × 5, 1 × 1.25", "Smallest"],
       ["173", "78.5", "Each side 2 × 22.5, 6 × 5, 1 × 2.5", ""],
-      ["175.5", "79.6", "Each side 2 × 22.5, 6 × 5, 1 × 2.5, 1 × 1.25", "Micro"],
+      ["175.5", "79.6", "Each side 2 × 22.5, 6 × 5, 1 × 2.5, 1 × 1.25", "Smallest"],
     ]);
   });
 
@@ -46,22 +46,22 @@ describe("List screen (spec 8.5)", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
     const all = rows();
     expect(all[1]?.[0]).toBe("22.5");
-    expect(all.at(-1)).toEqual(["80", "36.3", "Stack 1 × 22.5, 6 × 5, 1 × 2.5", "Long screw"]);
+    expect(all.at(-1)).toEqual(["80", "36.3", "Stack 1 × 22.5, 6 × 5, 1 × 2.5 Screw 1 × Long locking screw", ""]);
   });
 
-  it("lists one dumbbell with its ends, the uneven flag and the screw kind", () => {
+  it("lists one dumbbell with its ends and the screws in the loading, and the uneven flag", () => {
     render(<App />);
     openList();
-    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
-    fireEvent.click(screen.getByRole("radio", { name: "One" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Single" }));
     setRange("12.5", "12.5");
-    expect(rows()[1]).toEqual(["12.5", "5.7", "End A (heavier) 1 × 2.5 End B No plates", "Uneven Standard screws"]);
+    expect(rows()[1]).toEqual(["12.5", "5.7", "End A (heavier) 1 × 2.5 End B No plates Screws 2 × Standard locking screw", "Uneven"]);
   });
 
   it("shows the vest in kilograms first", () => {
     render(<App />);
     openList();
-    fireEvent.click(screen.getByRole("tab", { name: "Vest" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Weighted vest" }));
     setRange("12", "12");
     expect(rows()).toEqual([
       ["kg", "lb", "Plates", "Flags"],
@@ -79,9 +79,9 @@ describe("List screen (spec 8.5)", () => {
 
   it("shares the collar choice with the Load screen", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("radio", { name: "Spin-lock" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Ironmaster spin-lock collar" }));
     openList();
-    expect((screen.getByRole("radio", { name: "Spin-lock" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: "Ironmaster spin-lock collar" }) as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole("radio", { name: "None" }));
     fireEvent.click(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "Load" }));
     expect((screen.getByRole("radio", { name: "None" }) as HTMLInputElement).checked).toBe(true);
@@ -90,8 +90,8 @@ describe("List screen (spec 8.5)", () => {
   it("leaves out the weights that need uneven dumbbells when uneven loading is off", () => {
     render(<App />);
     openList();
-    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
-    fireEvent.click(screen.getByRole("radio", { name: "One" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Single" }));
     setRange("10", "12.5");
     expect(rows().slice(1).map(([lb]) => lb)).toEqual(["10", "11.25", "12.5"]);
     fireEvent.click(screen.getByRole("switch", { name: "Uneven loading" }));
@@ -120,12 +120,12 @@ describe("List screen (spec 8.5)", () => {
   it("opens a row with the same implement and options it was listed with", () => {
     render(<App />);
     openList();
-    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
-    fireEvent.click(screen.getByRole("radio", { name: "One" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Single" }));
     setRange("12.5", "12.5");
     fireEvent.click(screen.getByRole("button", { name: "Open 12.5 lb in Load" }));
-    expect(screen.getByRole("tab", { name: "Dumbbells" }).getAttribute("aria-selected")).toBe("true");
-    expect((screen.getByRole("radio", { name: "One" }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole("tab", { name: "Dumbbell" }).getAttribute("aria-selected")).toBe("true");
+    expect((screen.getByRole("radio", { name: "Single" }) as HTMLInputElement).checked).toBe(true);
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Exact");
   });
 });
@@ -171,8 +171,8 @@ describe("Load screen: step buttons (spec 8.2)", () => {
 
   it("follows the dumbbell choice", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("tab", { name: "Dumbbells" }));
-    fireEvent.click(screen.getByRole("radio", { name: "One" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Single" }));
     fireEvent.change(screen.getByLabelText("Target"), { target: { value: "10" } });
     up();
     expect(target()).toBe("11.25");

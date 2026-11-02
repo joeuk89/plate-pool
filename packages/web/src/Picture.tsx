@@ -1,10 +1,11 @@
 import type { Inventory, Loading } from "@plate-pool/core";
-import { BarbellPicture } from "./BarbellPicture";
-import { DumbbellPicture } from "./DumbbellPicture";
-import { StackPicture } from "./StackPicture";
-import { VestPicture } from "./VestPicture";
+import { BarPicture } from "./BarPicture";
+import { HandlePicture } from "./HandlePicture";
+import { kindOf } from "./kit";
 import type { Editing } from "./picture-parts";
 import type { DrawOptions } from "./plate-stack";
+import { StackPicture } from "./StackPicture";
+import { VestPicture } from "./VestPicture";
 
 interface Props extends DrawOptions {
   implement: string;
@@ -13,17 +14,16 @@ interface Props extends DrawOptions {
   editing?: Editing | undefined;
 }
 
-export function Picture({ implement, ...props }: Props) {
-  switch (implement) {
-    case "barbell":
-      return <BarbellPicture {...props} />;
-    case "dumbbell":
-      return <DumbbellPicture {...props} />;
-    case "kettlebell":
-    case "leg":
-      return <StackPicture implement={implement} {...props} />;
+export function Picture(props: Props) {
+  switch (kindOf(props.inventory, props.implement)) {
+    case "bar":
+      return <BarPicture {...props} />;
+    case "handle":
+      return <HandlePicture {...props} />;
+    case "stack":
+      return <StackPicture {...props} />;
     case "vest":
-      return <VestPicture loading={props.loading} inventory={props.inventory} editing={props.editing} />;
+      return <VestPicture implement={props.implement} loading={props.loading} inventory={props.inventory} editing={props.editing} />;
     default:
       return null;
   }

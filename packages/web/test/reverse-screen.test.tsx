@@ -11,7 +11,7 @@ function text(element: HTMLElement): string {
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
-function openReverse(tab = "Barbell") {
+function openReverse(tab = "Straight bar") {
   render(<App />);
   fireEvent.click(screen.getByRole("tab", { name: tab }));
   fireEvent.click(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "Reverse" }));
@@ -45,7 +45,7 @@ describe("barbell Reverse screen: worked examples (spec section 7)", () => {
     expect(picture().getAttribute("aria-label")).toBe(
       'Each side, inside to outside: 22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, then the Mirafit 1" clamp collar',
     );
-    expect(labels(picture())).toEqual(["22.5", "22.5", "5", "5", "5", "5", "5", "5", "2.5", "Clamp collar"]);
+    expect(labels(picture())).toEqual(["22.5", "22.5", "5", "5", "5", "5", "5", "5", "2.5", 'Mirafit 1" clamp collar']);
   });
 
   it("example 1: example 2 plus 1 micro plate on each side totals 175.5 lb (79.6 kg)", () => {
@@ -106,29 +106,29 @@ describe("Reverse screen: options", () => {
     openReverse();
     buildExample2();
     fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Barbell" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Straight bar" }));
     expect(total()).toContain("18 lb");
   });
 });
 
 describe("dumbbell Reverse screen: worked examples (spec section 7)", () => {
   const mirrorSwitch = () => screen.getByRole("switch", { name: "Mirror ends" });
-  const chooseOne = () => fireEvent.click(within(screen.getByRole("radiogroup", { name: "Dumbbells" })).getByRole("radio", { name: "One" }));
+  const chooseOne = () => fireEvent.click(within(screen.getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
 
   it("mirrors the ends by default", () => {
-    openReverse("Dumbbells");
+    openReverse("Dumbbell");
     expect(mirrorSwitch().getAttribute("aria-checked")).toBe("true");
   });
 
   it("example 4: each end 3 × 5 totals 40 lb with standard screws", () => {
-    openReverse("Dumbbells");
+    openReverse("Dumbbell");
     add("Add 5 lb to each end", 3);
     expect(total()).toContain("40 lb 18.1 kg");
     expect(picture().getAttribute("aria-label")).toBe("Each end, inside to outside: 5, 5, 5, then a standard locking screw");
   });
 
   it("example 5: with mirroring off, one 2.5 lb plate on end A totals 12.5 lb and marks end A heavier", () => {
-    openReverse("Dumbbells");
+    openReverse("Dumbbell");
     chooseOne();
     fireEvent.click(mirrorSwitch());
     add("Add 2.5 lb to end A");
@@ -137,7 +137,7 @@ describe("dumbbell Reverse screen: worked examples (spec section 7)", () => {
   });
 
   it("example 6: with mirroring off, builds 4 × 5 on end A and 3 × 5 + 1 × 2.5 on end B for 47.5 lb", () => {
-    openReverse("Dumbbells");
+    openReverse("Dumbbell");
     chooseOne();
     fireEvent.click(mirrorSwitch());
     add("Add 5 lb to end A", 4);
@@ -147,7 +147,7 @@ describe("dumbbell Reverse screen: worked examples (spec section 7)", () => {
   });
 
   it("example 7: each end 1 × 22.5, 6 × 5, 1 × 2.5 totals 120 lb per dumbbell with long screws, and the pair fits the plate pool", () => {
-    openReverse("Dumbbells");
+    openReverse("Dumbbell");
     add("Add 22.5 lb to each end");
     add("Add 5 lb to each end", 6);
     add("Add 2.5 lb to each end");
@@ -157,7 +157,7 @@ describe("dumbbell Reverse screen: worked examples (spec section 7)", () => {
   });
 
   it("with mirroring off, tapping a plate removes it from its own end only", () => {
-    openReverse("Dumbbells");
+    openReverse("Dumbbell");
     add("Add 5 lb to each end", 3);
     fireEvent.click(mirrorSwitch());
     fireEvent.click(within(picture()).getAllByRole("button", { name: "Remove 5 lb from end B" })[0]!);
@@ -165,7 +165,7 @@ describe("dumbbell Reverse screen: worked examples (spec section 7)", () => {
   });
 
   it("with mirroring on, tapping a plate removes it from both ends", () => {
-    openReverse("Dumbbells");
+    openReverse("Dumbbell");
     add("Add 5 lb to each end", 3);
     fireEvent.click(within(picture()).getAllByRole("button", { name: "Remove 5 lb from each end" })[0]!);
     expect(total()).toContain("30 lb");
@@ -177,12 +177,12 @@ describe("dumbbell Reverse screen: worked examples (spec section 7)", () => {
   });
 
   it("starts on the bare handle, 5 lb with no locking screws", () => {
-    openReverse("Dumbbells");
+    openReverse("Dumbbell");
     expect(total()).toContain("5 lb 2.3 kg");
   });
 
   it("notes the heavier end of an uneven dumbbell", () => {
-    openReverse("Dumbbells");
+    openReverse("Dumbbell");
     chooseOne();
     fireEvent.click(mirrorSwitch());
     add("Add 2.5 lb to end A");
@@ -217,7 +217,7 @@ describe("kettlebell, leg attachment and vest Reverse screens: worked examples (
   });
 
   it("example 13: 6 blocks on the front and 6 on the back total 12 kg, kilograms first", () => {
-    openReverse("Vest");
+    openReverse("Weighted vest");
     add("Add 1 kg to the front", 6);
     add("Add 1 kg to the back", 6);
     expect(total()).toContain("12 kg 26.46 lb");
@@ -225,7 +225,7 @@ describe("kettlebell, leg attachment and vest Reverse screens: worked examples (
   });
 
   it("removes a vest block when it is tapped in the picture", () => {
-    openReverse("Vest");
+    openReverse("Weighted vest");
     add("Add 1 kg to the front", 2);
     fireEvent.click(within(picture()).getAllByRole("button", { name: "Remove 1 kg from the front" })[0]!);
     expect(total()).toContain("1 kg");
@@ -247,20 +247,20 @@ describe("Reverse screen: rule warnings under the total (spec 6.6)", () => {
   });
 
   it("warns when a pair of dumbbells needs more plates than the plate pool holds", () => {
-    openReverse("Dumbbells");
+    openReverse("Dumbbell");
     add("Add 22.5 lb to each end", 2);
     expect(text(warnings())).toContain("The pair uses 8 × 22.5 lb plates. The plate pool holds 5.");
   });
 
   it("warns when the vest's blocks are not split evenly", () => {
-    openReverse("Vest");
+    openReverse("Weighted vest");
     add("Add 1 kg to the front");
     expect(text(warnings())).toContain("The plates split 1 kg front and 0 kg back.");
   });
 
   it("names the unverified values the total uses", () => {
-    openReverse("Vest");
+    openReverse("Weighted vest");
     add("Add 1 kg to the front");
-    expect(text(notes())).toBe("Unverified: empty vest weight, block count");
+    expect(text(notes())).toBe("Unverified: empty weighted vest weight, block count");
   });
 });

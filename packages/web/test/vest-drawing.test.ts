@@ -1,11 +1,13 @@
 import { load, type Loading } from "@plate-pool/core";
 import { describe, expect, it } from "vitest";
-import { inventory } from "../src/inventory";
 import { plateColour } from "../src/plate-colours";
-import { drawVest } from "../src/vest-drawing";
+import { drawVest as draw } from "../src/vest-drawing";
+import { olympic, owner as inventory } from "./kits";
 
-function loadingFor(target: string): Loading {
-  const [result] = load(inventory, { targets: [{ implement: "vest", target }] }).results;
+const drawVest = (loading: Loading, kit = inventory) => draw("vest", loading, kit);
+
+function loadingFor(target: string, kit = inventory): Loading {
+  const [result] = load(kit, { targets: [{ implement: "vest", target }] }).results;
   if (!result?.loading) throw new Error(`No loading for vest ${target}`);
   return result.loading;
 }
@@ -26,9 +28,10 @@ describe("vest drawing", () => {
     const { panels } = drawVest(loadingFor("2kg"), inventory);
     const blocks = panels.flatMap((panel) => panel.slots.flatMap((slot) => (slot.block ? [slot.block] : [])));
     expect(blocks.map((block) => block.label)).toEqual(["1", "1"]);
-    const fill = plateColour(1, "kg").fill;
+    const fill = plateColour(inventory, inventory.plates.find((plate) => plate.id === "vest-block")!).fill;
     for (const block of blocks) expect(block.fill).toBe(fill);
-    expect([22.5, 5, 2.5, 1.25].map((weight) => plateColour(weight, "lb").fill)).not.toContain(fill);
+    const quickLock = inventory.plates.filter((plate) => plate.type === "quick-lock");
+    expect(quickLock.map((plate) => plateColour(inventory, plate).fill)).not.toContain(fill);
   });
 
   it("draws both grids empty for an empty vest", () => {
@@ -44,5 +47,13 @@ describe("vest drawing", () => {
     const { panels, description } = drawVest(empty, inventory);
     expect(panels.every((panel) => panel.slots.every((slot) => !slot.block))).toBe(true);
     expect(description).toBe("Front: no blocks. Back: no blocks");
+  });
+});
+
+describe("vest drawing: a plate carrier (spec 17.7)", () => {
+  it("draws one cell per panel when every plate is capped at 1 per position", () => {
+    const { panels } = drawVest(loadingFor("17.5kg", olympic), olympic);
+    expect(panels.map((panel) => panel.slots.length)).toEqual([1, 1]);
+    expect(panels.map((panel) => panel.slots[0]!.block?.label)).toEqual(["8", "8"]);
   });
 });

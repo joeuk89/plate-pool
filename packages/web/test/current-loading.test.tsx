@@ -56,7 +56,7 @@ describe("current loading: Loaded and the strip (spec 16.4)", () => {
     render(<App />);
     typeTarget("173");
     pin(loadingCard("Exact"));
-    expect(text(strip()!)).toBe("On the bar · 173 lb · each side 2 × 22.5, 6 × 5, 1 × 2.5 Unload");
+    expect(text(strip()!)).toBe("Straight bar · 173 lb · each side 2 × 22.5, 6 × 5, 1 × 2.5 Unload");
     expect(text(changesOf(loadingCard("Exact"))!)).toBe("No changes");
   });
 
@@ -64,7 +64,7 @@ describe("current loading: Loaded and the strip (spec 16.4)", () => {
     render(<App />);
     typeTarget("88");
     pinOtherWay("7 × 5");
-    expect(text(strip()!)).toContain("On the bar · 88 lb · each side 7 × 5");
+    expect(text(strip()!)).toContain("Straight bar · 88 lb · each side 7 × 5");
     const exact = loadingCard("Exact");
     expect(text(exact)).toContain("No changes");
     expect(within(exact).getByRole("img").getAttribute("aria-label")).toContain("5, 5, 5, 5, 5, 5, 5");
@@ -76,39 +76,39 @@ describe("current loading: Loaded and the strip (spec 16.4)", () => {
     pin(loadingCard("Above"));
     expect(targetValue()).toBe("175.5");
     expect(text(loadingCard("Exact"))).toContain("175.5 lb");
-    expect(text(strip()!)).toContain("On the bar · 175.5 lb");
+    expect(text(strip()!)).toContain("Straight bar · 175.5 lb");
   });
 
-  it("names each implement in the strip", () => {
+  it("starts the strip with the implement's name (spec 17.5.4)", () => {
     render(<App />);
-    openTab("Dumbbells");
+    openTab("Dumbbell");
     typeTarget("40");
     pin(loadingCard("Exact"));
-    expect(text(strip()!)).toMatch(/^On the dumbbells · 40 lb · each end 3 × 5/);
+    expect(text(strip()!)).toMatch(/^Dumbbell · 40 lb · each end 3 × 5/);
 
     openTab("Kettlebell");
     typeTarget("80");
     pin(loadingCard("Exact"));
-    expect(text(strip()!)).toMatch(/^On the kettlebell · 80 lb · stack 1 × 22.5, 6 × 5, 1 × 2.5/);
+    expect(text(strip()!)).toMatch(/^Kettlebell · 80 lb · stack 1 × 22.5, 6 × 5, 1 × 2.5/);
 
     openTab("Leg attachment");
     typeTarget("50");
     pin(loadingCard("Exact"));
-    expect(text(strip()!)).toMatch(/^On the attachment · 50 lb · stack 2 × 22.5, 1 × 5/);
+    expect(text(strip()!)).toMatch(/^Leg attachment · 50 lb · stack 2 × 22.5, 1 × 5/);
 
-    openTab("Vest");
+    openTab("Weighted vest");
     typeTarget("12");
     pin(loadingCard("Exact"));
-    expect(text(strip()!)).toMatch(/^In the vest · 12 kg · front 6 blocks, back 6 blocks/);
+    expect(text(strip()!)).toMatch(/^Weighted vest · 12 kg · front 6 blocks, back 6 blocks/);
   });
 
-  it("says On the dumbbell for one dumbbell", () => {
+  it("starts the strip with the handle's name for a single too", () => {
     render(<App />);
-    openTab("Dumbbells");
-    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Dumbbells" })).getByRole("radio", { name: "One" }));
+    openTab("Dumbbell");
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
     typeTarget("12.5");
     pin(loadingCard("Exact"));
-    expect(text(strip()!)).toMatch(/^On the dumbbell · 12.5 lb/);
+    expect(text(strip()!)).toMatch(/^Dumbbell · 12.5 lb · end A 1 × 2.5, end B No plates/);
   });
 
   it("Unload clears the current loading and the changes block", () => {
@@ -158,7 +158,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
 
   it("example 19 (revised in 17.11): dumbbells 70 lb to 80 lb keep standard screws and put on 1 × 5 per end, 4 changes", () => {
     render(<App />);
-    openTab("Dumbbells");
+    openTab("Dumbbell");
     typeTarget("70");
     pin(loadingCard("Exact"));
     expect(text(strip()!)).toContain("each end 1 × 22.5, 1 × 5, 1 × 2.5");
@@ -166,6 +166,15 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
     expect(text(changesOf(loadingCard("Exact"))!)).toBe(
       "4 changes, 2 per dumbbell Each end put on 5",
     );
+  });
+
+  it("names a screw swap by the screws' names", () => {
+    render(<App />);
+    openTab("Kettlebell");
+    typeTarget("50");
+    pin(loadingCard("Exact"));
+    typeTarget("80");
+    expect(text(changesOf(loadingCard("Exact"))!)).toContain("swap standard locking screw for long locking screw");
   });
 
   it("names plates taken off before plates put on", () => {
@@ -178,7 +187,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
 
   it("counts vest blocks per panel", () => {
     render(<App />);
-    openTab("Vest");
+    openTab("Weighted vest");
     typeTarget("12");
     pin(loadingCard("Exact"));
     typeTarget("15");
@@ -187,8 +196,8 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
 
   it("reads unchanged for a position with nothing to do", () => {
     render(<App />);
-    openTab("Dumbbells");
-    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Dumbbells" })).getByRole("radio", { name: "One" }));
+    openTab("Dumbbell");
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
     typeTarget("40");
     pin(loadingCard("Exact"));
     typeTarget("42.5");
@@ -224,7 +233,7 @@ describe("current loading: Reverse (spec 16.4)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Loaded" }));
     expect(screen.getByRole("button", { name: "Load" }).getAttribute("aria-current")).toBe("page");
     expect(targetValue()).toBe("88");
-    expect(text(strip()!)).toContain("On the bar · 88 lb · each side 7 × 5");
+    expect(text(strip()!)).toContain("Straight bar · 88 lb · each side 7 × 5");
     expect(text(changesOf(loadingCard("Exact"))!)).toBe("No changes");
   });
 });
@@ -236,7 +245,7 @@ describe("current loading: storage, links and scope (spec 16.4)", () => {
     pin(loadingCard("Exact"));
     reopen();
     typeTarget("175");
-    expect(text(strip()!)).toContain("On the bar · 173 lb");
+    expect(text(strip()!)).toContain("Straight bar · 173 lb");
     expect(text(changesOf(loadingCard("Above"))!)).toBe("2 changes Each side put on 1.25");
   });
 
@@ -259,7 +268,7 @@ describe("current loading: storage, links and scope (spec 16.4)", () => {
     render(<App />);
     typeTarget("173");
     pin(loadingCard("Exact"));
-    expect(text(strip()!)).toContain("On the bar · 173 lb");
+    expect(text(strip()!)).toContain("Straight bar · 173 lb");
   });
 
   it("ignores a stored current loading it cannot read", () => {
@@ -273,7 +282,7 @@ describe("current loading: storage, links and scope (spec 16.4)", () => {
     render(<App />);
     typeTarget("173");
     pin(loadingCard("Exact"));
-    expect(window.location.search).toBe("?barbell=173&collars=clamp");
+    expect(window.location.search).toBe("?barbell=173lb&barbell.hardware=collar-clamp");
   });
 
   it("affects its own implement only", () => {

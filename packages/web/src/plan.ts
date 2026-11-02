@@ -1,16 +1,14 @@
-import { load, RequestError, type Leftover, type LoadResult, type TargetRequest, type Unit } from "@plate-pool/core";
+import { load, RequestError, type Inventory, type Leftover, type LoadResult, type TargetRequest, type Unit } from "@plate-pool/core";
 import { currentLoading, type CurrentLoadings, type PinnedLoading } from "./current";
-import { inventory } from "./inventory";
-import { collarHardware, type CollarChoice } from "./settings";
-
-export type DumbbellChoice = "pair" | "one";
+import { canPair, implementOf, kindOf, unitOf } from "./kit";
 
 export interface Card {
   id: number;
   implement: string;
   target: string;
   unit: Unit;
-  dumbbells: DumbbellChoice;
+  /** A handle the gym has two or more of loads as a pair, or as a single. */
+  pair: boolean;
 }
 
 export type Outcome = { result: LoadResult } | { error: string } | undefined;
@@ -21,13 +19,9 @@ export interface Plan {
 }
 
 interface Options {
-  collars: CollarChoice;
+  hardware: Record<string, string>;
   uneven: boolean;
   current?: CurrentLoadings;
-}
-
-export function unitOf(implement: string): Unit {
-  return inventory.implements.find((item) => item.id === implement)?.unit ?? "lb";
 }
 
 export function targetWithUnit(target: string, unit: Unit): string {
@@ -36,40 +30,46 @@ export function targetWithUnit(target: string, unit: Unit): string {
 
 let nextId = 0;
 
-export function newCard(implement: string, dumbbells: DumbbellChoice = "pair"): Card {
-  return { id: nextId++, implement, target: "", unit: unitOf(implement), dumbbells };
+export function newCard(inventory: Inventory, implement: string, pair: boolean = canPair(inventory, implement)): Card {
+  return { id: nextId++, implement, target: "", unit: unitOf(inventory, implement), pair };
 }
 
-export function cardLabel(card: Pick<Card, "implement" | "dumbbells">): string {
-  if (card.implement === "dumbbell") return card.dumbbells === "pair" ? "Dumbbells" : "One dumbbell";
-  if (card.implement === "leg") return "Leg attachment";
-  return card.implement.charAt(0).toUpperCase() + card.implement.slice(1);
+/** The implement's name, with "pair" or "single" after a handle the gym has two or more of. */
+export function cardLabel(inventory: Inventory, card: Pick<Card, "implement" | "pair">): string {
+  const name = implementOf(inventory, card.implement)?.name ?? card.implement;
+  if (!canPair(inventory, card.implement)) return name;
+  return `${name} ${card.pair ? "pair" : "single"}`;
 }
 
-function copiesOf(card: Pick<Card, "implement" | "dumbbells">): number {
-  return card.implement === "dumbbell" && card.dumbbells === "pair" ? 2 : 1;
+function copiesOf(inventory: Inventory, card: Pick<Card, "implement" | "pair">): number {
+  return kindOf(inventory, card.implement) === "handle" && card.pair ? 2 : 1;
 }
 
-export function freeCount(cards: Card[], implement: string): number {
-  const held = cards.filter((card) => card.implement === implement).reduce((sum, card) => sum + copiesOf(card), 0);
-  return (inventory.implements.find((item) => item.id === implement)?.count ?? 0) - held;
+export function freeCount(inventory: Inventory, cards: Card[], implement: string): number {
+  const held = cards.filter((card) => card.implement === implement).reduce((sum, card) => sum + copiesOf(inventory, card), 0);
+  return (implementOf(inventory, implement)?.count ?? 0) - held;
 }
 
-function targetFor(card: Card, pinned: PinnedLoading | undefined): TargetRequest {
+/** The pair setting a request carries: always on a handle the gym has two or more of, and on one it has one of only when a pair is asked for. */
+export function pairOf(inventory: Inventory, card: Pick<Card, "implement" | "pair">): { pair?: boolean } {
+  if (kindOf(inventory, card.implement) !== "handle") return {};
+  if (canPair(inventory, card.implement) || card.pair) return { pair: card.pair };
+  return {};
+}
+
+function targetFor(inventory: Inventory, card: Card, pinned: PinnedLoading | undefined): TargetRequest {
   const target = targetWithUnit(card.target, card.unit);
   const current = pinned ? { current: currentLoading(pinned) } : {};
-  return card.implement === "dumbbell"
-    ? { implement: card.implement, target, pair: card.dumbbells === "pair", ...current }
-    : { implement: card.implement, target, ...current };
+  return { implement: card.implement, target, ...pairOf(inventory, card), ...current };
 }
 
-/** The current loading each card starts from: an implement's current loading belongs to its first card, and a dumbbell's only to a card for the same pair or one. */
-export function pinnedFor(cards: Card[], current: CurrentLoadings = {}): (PinnedLoading | undefined)[] {
+/** The current loading each card starts from: an implement's current loading belongs to its first card, and a handle's only to a card for the same pair or single. */
+export function pinnedFor(inventory: Inventory, cards: Card[], current: CurrentLoadings = {}): (PinnedLoading | undefined)[] {
   const claimed = new Set<string>();
   return cards.map((card) => {
     const pinned = current[card.implement];
     if (!pinned || claimed.has(card.implement)) return undefined;
-    if (card.implement === "dumbbell" && (pinned.pair !== false) !== (card.dumbbells === "pair")) return undefined;
+    if (canPair(inventory, card.implement) && (pinned.pair !== false) !== card.pair) return undefined;
     claimed.add(card.implement);
     return pinned;
   });
@@ -80,15 +80,15 @@ function errorOf(error: unknown, card: Card): { error: string } {
   throw error;
 }
 
-export function plan(cards: Card[], { collars, uneven, current }: Options): Plan {
-  const pinned = pinnedFor(cards, current);
-  const targetOf = (card: Card) => targetFor(card, pinned[cards.indexOf(card)]);
+export function plan(inventory: Inventory, cards: Card[], { hardware, uneven, current }: Options): Plan {
+  const pinned = pinnedFor(inventory, cards, current);
+  const targetOf = (card: Card) => targetFor(inventory, card, pinned[cards.indexOf(card)]);
   const outcomes: Outcome[] = cards.map(() => undefined);
   const requested: number[] = [];
   cards.forEach((card, index) => {
     if (card.target.trim() === "") return;
     try {
-      load(inventory, { targets: [targetOf(card)], hardware: collarHardware(collars), uneven });
+      load(inventory, { targets: [targetOf(card)], hardware, uneven });
       requested.push(index);
     } catch (error) {
       outcomes[index] = errorOf(error, card);
@@ -96,8 +96,7 @@ export function plan(cards: Card[], { collars, uneven, current }: Options): Plan
   });
   if (requested.length === 0) return { outcomes };
 
-  const loadAll = (indexes: number[]) =>
-    load(inventory, { targets: indexes.map((index) => targetOf(cards[index]!)), hardware: collarHardware(collars), uneven });
+  const loadAll = (indexes: number[]) => load(inventory, { targets: indexes.map((index) => targetOf(cards[index]!)), hardware, uneven });
   let accepted = requested;
   let response;
   try {

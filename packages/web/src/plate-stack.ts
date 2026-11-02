@@ -1,4 +1,5 @@
-import type { Hardware, Inventory, Loading, Plate, Value } from "@plate-pool/core";
+import type { Hardware, HardwareKind, Implement, Inventory, Loading, Plate } from "@plate-pool/core";
+import { acceptedPlates, hardwareOf, hardwareOptions, implementOf, plateById, used } from "./kit";
 import { plateColour } from "./plate-colours";
 
 export interface Label {
@@ -20,9 +21,9 @@ export interface PlateDrawing {
   x: number;
   width: number;
   height: number;
-  round: boolean;
   fill: string;
   ink: string;
+  outline: boolean;
   label: Label;
   leader?: Line;
 }
@@ -33,6 +34,7 @@ export interface Callout {
 }
 
 export interface HardwareDrawing extends Callout {
+  kind: HardwareKind;
   name: string;
   x: number;
   width: number;
@@ -44,44 +46,112 @@ export interface DrawOptions {
   sideBySide?: Loading[];
 }
 
-// Sizes in inches. Only the Quick-Lock plate size comes from the spec; the rest are drawing-only values.
-export const QUICK_LOCK_PLATE = 6.7;
-export const PLATE_TOP = -QUICK_LOCK_PLATE / 2;
-const MICRO_PLATE = 5;
+/** Drawing units: the largest plate an implement takes is always PLATE_HEIGHT high, whatever the file's length unit. */
+export const PLATE_HEIGHT = 6.7;
+export const PLATE_TOP = -PLATE_HEIGHT / 2;
 export const FONT_SIZE = 0.72;
 export const HARDWARE_FONT_SIZE = 0.6;
 const LABEL_PADDING = 0.06;
 const LABEL_GAP = 0.2;
+/** Wide enough for a two-digit label inside the plate. */
+export const MIN_PLATE_WIDTH = 2 * 0.5 * FONT_SIZE + 2 * LABEL_PADDING;
 export const LEADER_LENGTH = 0.45;
+/** Keeps labels at one size from kit to kit: a short sleeve or post gets empty space after it instead of larger type. */
+export const MIN_PICTURE_WIDTH = 10;
 export const MARGIN = 0.2;
 export const OUTSIDE_LABEL_Y = PLATE_TOP - LEADER_LENGTH - 0.12;
-/** The top of the outside plate labels: the top of a Quick-Lock picture with nothing above them. */
+/** The top of the outside plate labels: the top of a picture with nothing above them. */
 export const LABELS_TOP = OUTSIDE_LABEL_Y - FONT_SIZE * 0.75 - MARGIN;
 /** The baseline of a hardware label under the plates, and the bottom of a picture that has one. */
-export const HARDWARE_LABEL_Y = QUICK_LOCK_PLATE / 2 + LEADER_LENGTH + HARDWARE_FONT_SIZE * 0.75;
+export const HARDWARE_LABEL_Y = PLATE_HEIGHT / 2 + LEADER_LENGTH + HARDWARE_FONT_SIZE * 0.75;
 export const HARDWARE_LABEL_BOTTOM = HARDWARE_LABEL_Y + MARGIN;
-export const HARDWARE_LEADER_END = QUICK_LOCK_PLATE / 2 + LEADER_LENGTH - 0.1;
+export const HARDWARE_LEADER_END = PLATE_HEIGHT / 2 + LEADER_LENGTH - 0.1;
+
+/** Used when no plate the implement takes states a diameter: a standard 450 mm plate. */
+const FALLBACK_REFERENCE = { mm: 450, in: 450 / 25.4 };
+
+const bands: [ratio: number, height: number][] = [
+  [0.85, 1],
+  [0.6, 0.78],
+  [0.4, 0.58],
+];
+const SMALLEST_BAND = 0.42;
+
+const glyphs: Record<HardwareKind, { width: number; height: number }> = {
+  collar: { width: 1, height: 2 },
+  screw: { width: 0.5, height: 4 },
+  pin: { width: 0.3, height: 5.2 },
+};
+
+/** How one implement's picture maps the file's lengths to drawing units. */
+export interface Scale {
+  inventory: Inventory;
+  implement: Implement | undefined;
+  /** The diameter, in the file's length unit, that draws at full height. */
+  reference: number;
+  /** Drawing units per unit of length in the file. */
+  factor: number;
+}
+
+export function scaleFor(inventory: Inventory, implementId: string): Scale {
+  const implement = implementOf(inventory, implementId);
+  const diameters = acceptedPlates(inventory, implementId).flatMap((plate) => plate.diameter ?? []);
+  const largest = diameters.length > 0 ? Math.max(...diameters) : FALLBACK_REFERENCE[inventory.lengthUnit];
+  const reference = Math.min(largest, implement?.maxPlateDiameter ?? Infinity);
+  return { inventory, implement, reference, factor: PLATE_HEIGHT / reference };
+}
+
+export function plateHeight(scale: Scale, plate: Plate | undefined): number {
+  if (plate?.diameter === undefined) return PLATE_HEIGHT;
+  const ratio = plate.diameter / scale.reference;
+  const band = bands.find(([least]) => ratio >= least)?.[1] ?? SMALLEST_BAND;
+  return PLATE_HEIGHT * band;
+}
+
+export function plateWidth(scale: Scale, plate: Plate | undefined): number {
+  const length = plate?.stackLength ? used(plate.stackLength) * scale.factor : 0;
+  return Math.max(length, MIN_PLATE_WIDTH);
+}
+
+/** The plates at a position, found by id, or by weight among the plates the implement takes. */
+export function platesAt(scale: Scale, position: { plates: number[]; ids?: string[] } | undefined): (Plate | undefined)[] {
+  if (!position) return [];
+  const accepted = scale.implement ? acceptedPlates(scale.inventory, scale.implement.id) : [];
+  return position.plates.map(
+    (weight, index) => plateById(scale.inventory, position.ids?.[index]) ?? accepted.find((plate) => used(plate.weight) === weight),
+  );
+}
 
 /** Lays plates out from `start`, innermost first, going right (1) or left (-1). */
-export function stackPlates(weights: number[], inventory: Inventory, start: number, direction: 1 | -1 = 1): PlateDrawing[] {
+export function stackPlates(
+  scale: Scale,
+  position: { plates: number[]; ids?: string[] } | undefined,
+  start: number,
+  direction: 1 | -1 = 1,
+): PlateDrawing[] {
+  const plates = platesAt(scale, position);
   let edge = start;
-  return weights.map((weight): PlateDrawing => {
-    const plate = plateFor(inventory, weight);
-    const width = plateLength(plate);
+  return (position?.plates ?? []).map((weight, index): PlateDrawing => {
+    const plate = plates[index];
+    const width = plateWidth(scale, plate);
     const x = direction === 1 ? edge : edge - width;
     edge += direction * width;
     const text = String(weight);
     const inside = textWidth(text, FONT_SIZE) + 2 * LABEL_PADDING <= width;
+    const colour = plate ? plateColour(scale.inventory, plate) : { fill: "#6f7780", ink: "#ffffff", outline: false };
     return {
       weight,
       x,
       width,
-      height: plate?.shape === "round" ? MICRO_PLATE : QUICK_LOCK_PLATE,
-      round: plate?.shape === "round",
-      ...plateColour(weight, "lb"),
+      height: plateHeight(scale, plate),
+      ...colour,
       label: { text, x: x + width / 2, y: inside ? FONT_SIZE * 0.35 : OUTSIDE_LABEL_Y, inside },
     };
   });
+}
+
+export function drawnLength(scale: Scale, position: { plates: number[]; ids?: string[] } | undefined): number {
+  return platesAt(scale, position).reduce((sum, plate) => sum + plateWidth(scale, plate), 0);
 }
 
 /** Spreads the labels that sit above the plates so none overlap, keeps them between `left` and `right`, and adds their leader lines. */
@@ -135,50 +205,52 @@ export function clampLabel(text: string, centre: number, fontSize: number, left:
   return Math.min(Math.max(centre, left + half), right - half);
 }
 
-export function drawHardware(name: string, x: number, shape: { width: number; height: number }, pictureWidth: number): HardwareDrawing {
+/** The glyph's size in drawing units: a collar block, a screw disc or a pin rod. `width` sets a collar's width when stated. */
+export function glyphOf(scale: Scale, hardware: Hardware): { width: number; height: number } {
+  const glyph = glyphs[hardware.kind];
+  if (hardware.kind !== "collar" || hardware.width === undefined) return glyph;
+  return { ...glyph, width: hardware.width * scale.factor };
+}
+
+export function drawHardware(
+  scale: Scale,
+  hardware: Hardware,
+  x: number,
+  pictureWidth: number,
+  text: string = hardware.name,
+): HardwareDrawing {
+  const shape = glyphOf(scale, hardware);
   const centre = x + shape.width / 2;
   return {
-    name,
+    kind: hardware.kind,
+    name: hardware.name,
     x,
     width: shape.width,
     height: shape.height,
-    label: { text: name, x: clampLabel(name, centre, HARDWARE_FONT_SIZE, 0, pictureWidth), y: HARDWARE_LABEL_Y },
+    label: { text, x: clampLabel(text, centre, HARDWARE_FONT_SIZE, 0, pictureWidth), y: HARDWARE_LABEL_Y },
     leaders: [{ x1: centre, y1: shape.height / 2, x2: centre, y2: HARDWARE_LEADER_END }],
   };
 }
 
-export function stackLength(weights: number[], inventory: Inventory): number {
-  return weights.reduce((sum, weight) => sum + plateLength(plateFor(inventory, weight)), 0);
+export function hardwareIn(loading: Loading, inventory: Inventory): Hardware | undefined {
+  return hardwareOf(inventory, loading.hardware[0]?.id);
 }
 
-function plateLength(plate: Plate | undefined): number {
-  return plate?.stackLength ? used(plate.stackLength) : 0.5;
+/** The drawn length the implement's position can hold: its `positionLength`, else the longest `capacity` among its hardware plus that hardware. */
+export function fullReach(scale: Scale): number | undefined {
+  const { implement, inventory, factor } = scale;
+  if (!implement) return undefined;
+  if (implement.positionLength) return used(implement.positionLength) * factor;
+  const reaches = hardwareOptions(inventory, implement.id).flatMap((id) => {
+    const item = hardwareOf(inventory, id);
+    return item?.capacity !== undefined ? [item.capacity * factor + glyphOf(scale, item).width] : [];
+  });
+  return reaches.length > 0 ? Math.max(...reaches) : undefined;
 }
 
-function plateFor(inventory: Inventory, weight: number): Plate | undefined {
-  return inventory.plates.find((plate) => plate.type === "quick-lock" && used(plate.weight) === weight);
-}
-
-export function hardwareFor(id: string | undefined, inventory: Inventory): Hardware | undefined {
-  return inventory.hardware.find((item) => item.id === id);
-}
-
-/** A locking screw's head, seen side on: the 4 in disc diameter comes from Ironmaster, the thickness is drawing-only. */
-export const SCREW = { width: 0.5, height: 4 };
-
-export function screwFor(loading: Loading, inventory: Inventory): Hardware | undefined {
-  const hardware = hardwareFor(loading.hardware[0]?.id, inventory);
-  return hardware?.kind === "screw" ? hardware : undefined;
-}
-
-/** The longest stack any locking screw the implement takes can hold. */
-export function screwCapacity(implement: string, inventory: Inventory): number {
-  const options = inventory.implements.find((item) => item.id === implement)?.hardware?.options ?? [];
-  return Math.max(0, ...options.map((id) => hardwareFor(id, inventory)?.capacity ?? 0));
-}
-
-export function used(value: Value): number {
-  return value.measured ?? value.listed;
+export function hardwareWidth(scale: Scale, loading: Loading): number {
+  const item = hardwareIn(loading, scale.inventory);
+  return item ? glyphOf(scale, item).width : 0;
 }
 
 export function plateSequence(weights: number[]): string {
