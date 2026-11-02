@@ -39,7 +39,7 @@ function commandLine(...targets: string[]): LoadResponse {
   const code = run(["load", ...targets, "--json"], {
     stdout: (output) => (stdout += output),
     stderr: () => {},
-    defaultInventoryPath: join(dirname(fileURLToPath(import.meta.url)), "../../../inventory/inventory.json"),
+    variables: { PLATE_POOL_INVENTORY: join(dirname(fileURLToPath(import.meta.url)), "../../../inventory/inventory.json") },
   });
   expect(code).toBe(0);
   return JSON.parse(stdout) as LoadResponse;
@@ -74,7 +74,7 @@ describe("several implements: worked examples (spec section 7)", () => {
     expect(text(within(result(2)).getByRole("list", { name: "Notes" }))).toContain(
       "Not exact because the dumbbells use the 5 lb plates the kettlebell needs to reach 40 lb.",
     );
-    expectSameAsCommandLine(commandLine("dumbbells=120", "kettlebell=40"));
+    expectSameAsCommandLine(commandLine("dumbbell=120", "kettlebell=40"));
   });
 
   it("example 10: barbell 173 lb then dumbbells 40 lb are both exact, and the line at the bottom shows what is left over", () => {
@@ -91,7 +91,7 @@ describe("several implements: worked examples (spec section 7)", () => {
     expect(text(leftover())).toBe(
       'Left over Plates 1 × 22.5, 2 × 2.5, 4 × 1.25 Locking hardware 5 × Long locking screw, 2 × Ironmaster spin-lock collar, 2 × Mirafit 1" clamp collar',
     );
-    expectSameAsCommandLine(commandLine("barbell=173", "dumbbells=40"));
+    expectSameAsCommandLine(commandLine("barbell=173", "dumbbell=40"));
   });
 
   it("example 11: barbell 88 lb gives up its fewest-plate loading so dumbbells 75 lb are exact", () => {
@@ -103,7 +103,7 @@ describe("several implements: worked examples (spec section 7)", () => {
     expect(text(result(1))).toContain("Each side 7 × 5");
     expect(text(result(2))).toContain("Each end 1 × 22.5, 2 × 5");
     expect(text(result(2))).toContain("Screws per dumbbell 2 × Standard locking screw");
-    expectSameAsCommandLine(commandLine("barbell=88", "dumbbells=75"));
+    expectSameAsCommandLine(commandLine("barbell=88", "dumbbell=75"));
   });
 });
 
