@@ -1,8 +1,8 @@
 # plate-pool: agent guide
 
-This guide is for software agents that plan training. It tells you how to ask plate-pool about weights and how to read its answers.
+This guide is for software agents that plan training. It tells you how to ask plate-pool about weights, how to read its answers, and how to send the athlete to the app.
 
-plate-pool knows every plate, piece of locking hardware and implement in one home gym. Its five implements share one plate pool: barbell, dumbbells, kettlebell, leg attachment and vest. Every answer comes from a fixed calculation over the owner's inventory file.
+plate-pool is a calculator for any plate-loaded gym. It knows nothing about a gym until you give it the gym's inventory file. Every answer comes from a fixed calculation over that file.
 
 ## What plate-pool answers
 
@@ -10,39 +10,57 @@ plate-pool knows every plate, piece of locking hardware and implement in one hom
 - **List**: every total an implement can reach within a range.
 - **Reverse**: the total of a given loading, with a warning for each rule it breaks.
 
-## Rules you must know
+## The inventory file and the kit
 
-- **A target is a total.** It includes the base weight: bar, handle, locking screws and collars. Ask for `barbell=173`, not for 155 lb of plates.
-- **Barbell totals are 18 lb plus a multiple of 2.5 with the default clamp collars, and 20 lb plus a multiple of 2.5 with spin-lock collars.** The bar counts as 18 lb, a clamp collar as 0 lb and a spin-lock collar as 1 lb. With clamps, 123 and 125.5 lb exist and 125 lb does not. With spin-locks, 125 lb exists.
-- **Implements share one plate pool.** Plates on the barbell are not free for the dumbbells. Put every implement a workout uses at the same time in one request, so the answer never uses a plate twice.
+An inventory file describes one gym: its plate types, plates, locking hardware and implements. Its shape is inventory format 1. The JSON Schema is in the repo at [`inventory/inventory.schema.json`](https://raw.githubusercontent.com/joeuk89/plate-pool/main/inventory/inventory.schema.json) and in the npm package as `plate-pool/inventory.schema.json`. plate-pool itself never loads the schema: its reader checks the file and names the JSON path of every error.
+
+Each implement has an `id`, a `name`, a `unit` and a `kind`. The kind fixes its positions:
+
+| Kind | Positions | JSON position names | Covers |
+| --- | --- | --- | --- |
+| bar | two sides, always the same plates | `left`, `right` | barbells, two-post machines |
+| handle | two ends, which may differ | `a`, `b` | loadable dumbbells |
+| stack | one stack | `stack` | loadable kettlebells, leg attachments, dip belts, landmines |
+| vest | front and back | `front`, `back` | weighted vests, plate carriers |
+
+On the phone, the inventory is stored as the **kit**: one per device. The athlete installs it by opening a set-up link (see [Links](#links)), or by pasting or choosing the file on the kit screen. The app does nothing until a kit is stored.
+
+The examples below run against the owner's file, [`inventory/inventory.json`](../inventory/inventory.json), which is the reference example of format 1. Its implements are `barbell` (a bar), `dumbbell` (a handle the gym has two of), `kettlebell` and `leg` (stacks) and `vest`. Run them against the athlete's own file.
+
+## Rules for every kit
+
+- **A target is a total.** It includes the base weight: the implement and its locking hardware. Ask for `barbell=173`, not for the weight of the plates alone.
+- **Implements share one plate pool.** Plates on one implement are not free for another. Put every implement a workout uses at the same time in one request, so the answer never uses a plate twice.
 - **A request's order is its priority.** The first target gets as close as the plate pool allows. Each later target gets as close as it can without moving an earlier one away from its target. Put the implement that matters most first.
+- **Read `warnings` and `unverified`.** `warnings` say why a target is refused or missed, or which rule a loading breaks. `unverified` lists the values no source or measurement confirms, such as `vest.base`. Tell the athlete when a total depends on one.
 
 Also:
 
-- A bare number means pounds, or kilograms for the vest. Add a unit to be explicit: `175lb`, `80kg`, `vest=12kg`.
-- `dumbbell=40` means a pair. `dumbbell.single=40` means one. `dumbbell.pair=40` is the explicit pair.
+- A bare number reads in the implement's `unit`. Add a unit to be explicit: `175lb`, `80kg`.
+- On a handle the gym has two or more of, `<id>=40` means a pair, `<id>.single=40` means one, and `<id>.pair=40` is the explicit pair.
 - When no loading reaches a target exactly, the result holds the closest loading `below` and `above`, and `recommended` names the nearer one.
-- Every result lists the `unverified` values it used, such as `vest.base`. Tell the user when a total depends on one.
-- Read `warnings`. They say why a target is refused or missed, or which rule a loading breaks.
+- Which totals exist depends on the kit. Plan only totals plate-pool says exist: run `achievable` or `list`, and never work out plates by hand.
 
 ## Command-line tool
 
-Run it with `npx plate-pool`. The package bundles no inventory: name the file with `--inventory <path>` or set `PLATE_POOL_INVENTORY`, and every command below assumes one of them. Add `--json` to every command for structured output.
+Run it with `npx plate-pool`. The package bundles no inventory, so every command needs one: pass `--inventory <path>`, or set `PLATE_POOL_INVENTORY` to the path. When both are set, `--inventory` wins. With neither, the tool exits 1 with "No inventory given. Pass --inventory <path> or set PLATE_POOL_INVENTORY."
+
+The examples below leave the option out and assume `PLATE_POOL_INVENTORY=inventory/inventory.json`. Add `--json` for structured output; `achievable` always writes JSON.
 
 | Option | Meaning |
 | --- | --- |
+| `--inventory <path>` | The inventory file. Required unless `PLATE_POOL_INVENTORY` is set |
 | `--json` | Structured output |
 | `--no-uneven` | Turn uneven loading off for every handle |
-| `--inventory <path>` | The inventory file. Required unless `PLATE_POOL_INVENTORY` is set |
-| `<id>.hardware=<hardware id>` | The hardware for one implement, such as `barbell.hardware=collar-spinlock` or `barbell.hardware=none` |
+| `<id>.hardware=<hardware id>` | The hardware for one implement: an id from its `options`, or `none`, such as `barbell.hardware=collar-spinlock` |
 
 The tool exits with code 0 for any valid request, including one with no exact loading. It exits with code 1 for invalid input and writes the reason to standard error.
 
-Plates in a position are listed from innermost to outermost. Weights are in the implement's unit, which is pounds for everything but the vest. Each `total` and `target` gives both units.
+Implements are named by their inventory `id`. Plates in a position are listed from innermost to outermost. Each position carries `plates`, the weights, and `ids`, the plate ids in the same order; `ids` tells apart two plates of the same weight. Weights are in the implement's unit, and each `total` and `target` gives both units.
 
 ### load
 
-Loadings for one or more targets, in priority order. Implements are named by their inventory id: `barbell`, `dumbbell`, `kettlebell`, `leg`, `vest`.
+Loadings for one or more targets, in priority order.
 
 ```sh
 npx plate-pool load barbell=175 dumbbell=40 --json
@@ -121,18 +139,18 @@ npx plate-pool load barbell=175 dumbbell=40 --json
 ```
 
 - An exact result holds `loading`. A result that is not exact holds `below`, `above` and `recommended`. One side is missing when nothing exists in that direction.
-- A target over an implement's limit gets `refused`, which holds the `limit`, and a `below` loading at the heaviest allowed total. The barbell's limit is 210 lb of plates.
+- A target over an implement's `maxPlateWeight` or `maxTotal` gets `refused`, which holds the `limit`, and a `below` loading at the heaviest allowed total.
 - `alternatives` holds up to five other loadings that reach the same total.
-- For a pair of dumbbells, `hardware` and `positions` describe one dumbbell. The other is the same.
-- A dumbbell loading with `uneven: true` has ends of different weights, and `heavier` names the heavier end.
-- A dumbbell loading whose screw `count` is 1 has its one screw on the `heavier` end. The other end has no screw and no plates.
-- `leftover` counts the plates and hardware still free after the recommended loadings.
+- `hardware` lists the locking hardware the loading uses, by hardware id. Without a `.hardware` argument, plate-pool tries the implement's `default` first, when it has one, then the rest of its `options` in order, and picks the first that fits and is free.
+- For a pair of handles, `hardware` and `positions` describe one handle. The other is the same.
+- A handle loading with `uneven: true` has ends of different weights, and `heavier` names the heavier end. A handle loading whose hardware `count` is 1 has its one piece on the `heavier` end; the other end has no hardware and no plates.
+- `leftover` counts the plates and hardware still free after the recommended loadings, by id.
 
 #### Current loading: `--from`
 
 If an implement already carries plates, tell `load` what is on it now: its current loading. Each loading in the result then gains a `changes` block, and the fewest changes breaks ties between loadings equally close to the target. Closeness to the target still comes first.
 
-Write `--from <implement>` followed by the plate options of `reverse`: `--side`, `--end-a` and `--end-b`, `--stack`, or `--front` and `--back`. The id is the implement's bare id, such as `dumbbell` for `dumbbell=80` or `dumbbell.single=40`. Give one `--from` per implement; an implement without one gets the same answer as with no `--from` at all, and no `changes` block.
+Write `--from <id>` followed by the position options of `reverse`: `--side` for a bar, `--end-a` and `--end-b` for a handle, `--stack` for a stack, or `--front` and `--back` for a vest. The id is the implement's bare id, such as `dumbbell` for `dumbbell=80` or `dumbbell.single=40`. Give one `--from` per implement; an implement without one gets the same answer as with no `--from` at all, and no `changes` block.
 
 ```sh
 npx plate-pool load barbell=175 --from barbell --side 22.5,22.5,5,5,5,5,5,5,2.5 --json
@@ -210,12 +228,12 @@ npx plate-pool load barbell=175 --from barbell --side 22.5,22.5,5,5,5,5,5,5,2.5 
 
 The `changes` block:
 
-- `count` is the number of changes from the current loading. A change is one plate put on or taken off one position, or one locking screw added, removed or swapped for the other kind; a swap counts two. Collars never count. For a pair of dumbbells, `count` covers both dumbbells, while `positions` and `hardware` describe one dumbbell: do the same on the other.
+- `count` is the number of changes from the current loading. A change is one plate put on or taken off one position, or one screw or pin added, removed or swapped for another; a swap counts two. Collars never count. For a pair of handles, `count` covers both, while `positions` and `hardware` describe one handle: do the same on the other.
 - `positions` holds one entry per position. `keep` is the plates that stay on, innermost first. `remove` is the plates to take off, from the current loading. `add` is the plates to put on, outside the kept plates.
-- `hardware` lists screw changes: `{ "from": "screw-standard", "to": "screw-long", "count": 2 }` is a swap on two positions. An entry with only `to` adds screws, and one with only `from` removes them.
+- `hardware` lists screw and pin changes: `{ "from": "screw-standard", "to": "screw-long", "count": 2 }` is a swap on two positions. An entry with only `to` adds hardware, and one with only `from` removes it.
 - `positions[].plates` still lists the whole new loading, innermost first. Plates put on go outside the kept ones, so a heavier plate can sit outside a lighter one.
 - A current loading affects its own implement only. Its plates stay free for the other implements in the request.
-- `--from` takes no screw option. The current loading gets the screw `reverse` picks for the same plates.
+- `--from` takes no hardware option. The current loading gets the hardware `reverse` picks for the same plates.
 
 ### list
 
@@ -271,11 +289,11 @@ npx plate-pool list barbell --from 100 --to 105 --json
 }
 ```
 
-- Each row holds the recommended loading for that total, with its hardware in `loading.hardware`. `smallest` says it uses the lightest plate the implement takes.
+- Each row holds the recommended loading for that total, with its hardware in `loading.hardware`. `smallest` says the row uses the lightest plate the implement takes, and `uneven` says a handle's ends differ.
 
 ### reverse
 
-The total of a loading you describe. Give plates innermost first, separated by commas: `--side` for each barbell side, `--end-a` and `--end-b` for a dumbbell, `--stack` for the kettlebell and leg attachment, and `--front` and `--back` for the vest. Write `2x22.5` for two plates of 22.5.
+The total of a loading you describe. Give each position's plates innermost first, separated by commas, with the position options of the implement's kind: `--side`, `--end-a` and `--end-b`, `--stack`, or `--front` and `--back`. Write `2x22.5` for two plates of 22.5, and `<weight>:<plate id>` where two plates the implement takes share a weight.
 
 ```sh
 npx plate-pool reverse dumbbell.single --end-a 5,5,5,2.5 --end-b 5,5,5 --json
@@ -300,17 +318,17 @@ npx plate-pool reverse dumbbell.single --end-a 5,5,5,2.5 --end-b 5,5,5 --json
 ```
 
 - Reverse always returns the total. It adds a warning for each rule the loading breaks, such as using more plates than the pool holds.
-- `notes` holds fixed notes. The leg attachment's says the total is plate weight only.
+- `notes` holds the implement's fixed `note`, if it has one.
 
 ### inventory
 
-What the owner has: the inventory file. Every weight has a `listed` value, an optional `measured` value that overrides it, and a `status`: `verified` (the manufacturer states it), `owner` (the owner confirmed it on the equipment) or `unverified`.
+The inventory file as read. Every weight and length has a `listed` value, an optional `measured` value that overrides it, and a `status`: `verified` (the manufacturer states it), `owner` (the owner confirmed it on the equipment) or `unverified`.
 
 ```sh
 npx plate-pool inventory --json
 ```
 
-The output has four lists. This shows the first entry of each:
+The output has four lists. This shows the first entry of each, from the owner's file:
 
 ```json
 {
@@ -364,50 +382,132 @@ The output has four lists. This shows the first entry of each:
 }
 ```
 
-## Static JSON
+### achievable
 
-If you have web access but cannot run commands, read these files. They need no login.
+Every total each implement can reach, with the whole pool free, as one document. Run it over the athlete's file and plan from its tables.
 
-| URL | Contents |
-| --- | --- |
-| <https://joeuk89.github.io/plate-pool/api/inventory.json> | The inventory file as deployed. `plate-pool inventory --json` prints the same four lists. |
-| <https://joeuk89.github.io/plate-pool/api/achievable.json> | List results for every implement over its full range, with the whole pool free. |
+```sh
+npx plate-pool achievable
+```
 
-`achievable.json` holds `{ "tables": [...] }`. Each table has the shape of `plate-pool list --json`, and `implement` says which implement it covers. The tables come in this order:
+The output is always JSON. This shows the first row of the first table:
 
-1. `barbell` with `"collars": "clamp"`
-2. `barbell` with `"collars": "spinlock"`
-3. `barbell` with `"collars": "none"`
-4. `dumbbell` with `"pair": true`
-5. `dumbbell` with `"pair": false`
-6. `kettlebell`
-7. `leg`
-8. `vest`
+```json
+{
+  "format": 1,
+  "plate_pool": "1.0.0",
+  "inventory_sha256": "d33b57cca41bdfd2c01c02bd25e0317c93146757ef2e708a869355a955fdba68",
+  "name": "Home gym",
+  "tables": [
+    {
+      "implement": "barbell",
+      "hardware": "collar-clamp",
+      "rows": [
+        {
+          "total": { "lb": 18, "kg": 8.2 },
+          "loading": {
+            "total": { "lb": 18, "kg": 8.2 },
+            "hardware": [{ "id": "collar-clamp", "count": 2 }],
+            "positions": [
+              { "name": "left", "plates": [], "ids": [] },
+              { "name": "right", "plates": [], "ids": [] }
+            ],
+            "uneven": false
+          },
+          "uneven": false,
+          "smallest": false
+        }
+      ]
+    }
+  ]
+}
+```
 
-The static files cannot share the pool between implements. For a request with several implements, run `plate-pool load`.
+- `format` is the inventory format, and `plate_pool` the version of the tool.
+- `inventory_sha256` is the SHA-256 of the file's bytes as read, in lower-case hex. Its first 8 characters are the kit's short hash, which per-line links carry as `kit`.
+- `name` is the kit's name from the file.
+- `tables` holds one table per implement, per entry in its hardware `options` (including `none`), and per pair and single on a handle the gym has two or more of. `hardware` is absent when the implement has no hardware, and `pair` appears on handles only. The rows have the shape of `list --json` rows over the implement's full range.
+- The order is file order, then `options` order, then pair before single. There is no default-hardware marker: the first table for an implement uses its first option.
+- A table cannot share the pool between implements. For a workout with several implements at once, run `load` with every target in one request.
+
+For the owner's file, the tables come in this order:
+
+1. `barbell`, `collar-clamp`
+2. `barbell`, `collar-spinlock`
+3. `barbell`, `none`
+4. `dumbbell`, `screw-standard`, pair
+5. `dumbbell`, `screw-standard`, single
+6. `dumbbell`, `screw-long`, pair
+7. `dumbbell`, `screw-long`, single
+8. `dumbbell`, `none`, pair
+9. `dumbbell`, `none`, single
+10. `kettlebell`, `screw-standard`
+11. `kettlebell`, `screw-long`
+12. `kettlebell`, `none`
+13. `leg`
+14. `vest`
+
+## Links
+
+The web app is at <https://joeuk89.github.io/plate-pool/>. Two links send the athlete there. The set-up link installs their kit; a per-line link opens a workout line against it.
+
+### Set-up link
+
+`https://joeuk89.github.io/plate-pool/#inventory=<payload>`. The payload is the inventory file's bytes compressed with raw deflate (no zlib header or trailer), then base64url without padding. It rides in the fragment, so it never reaches the server. Opening it shows a confirm card that names the kit; one tap stores it on the device and removes the fragment from the URL.
+
+Build it from the file with Node:
+
+```sh
+node -e 'const fs = require("node:fs"), zlib = require("node:zlib"); console.log("https://joeuk89.github.io/plate-pool/#inventory=" + zlib.deflateRawSync(fs.readFileSync(process.argv[1])).toString("base64url"))' "$PLATE_POOL_INVENTORY"
+```
+
+Compress the file's bytes exactly as they are, without parsing and re-writing the JSON, so the kit's hash on the phone matches `inventory_sha256`.
+
+### Per-line link
+
+`https://joeuk89.github.io/plate-pool/?<parameters>`. It carries targets and the short hash of the kit they were worked out for:
+
+| Parameter | Meaning | Example |
+| --- | --- | --- |
+| `<id>` | Target for that implement. A pair on a handle the gym has two or more of. | `barbell=175lb` |
+| `<id>.single` | Target for one of a handle. | `dumbbell.single=12.5lb` |
+| `<id>.pair` | The explicit pair form. An error on a handle the gym has one of. | `dumbbell.pair=40lb` |
+| `<id>.hardware` | The hardware for that implement: an id from its `options`, or `none`. Leave it out when the implement has no hardware. | `barbell.hardware=collar-spinlock` |
+| `uneven` | `0` turns uneven loading off for every handle. | `uneven=0` |
+| `view` | `load` (the default), `list` or `reverse`. | `view=list` |
+| `kit` | The first 8 characters of `inventory_sha256`. | `kit=d33b57cc` |
+
+- Target parameters' order is priority order, as in `load`. `.hardware`, `uneven`, `view` and `kit` do not count toward it.
+- Always give each target a unit suffix: `lb` or `kg`.
+- When `kit` differs from the stored kit's short hash, the app still shows the result, with a banner saying the targets were worked out for a different kit.
+
+For example, the owner's barbell at 173 lb and a pair of dumbbells at 40 lb:
+
+`https://joeuk89.github.io/plate-pool/?barbell=173lb&dumbbell=40lb&kit=d33b57cc`
 
 ## Snippet for agent instructions
 
-Paste this into another repo's agent instructions, such as its `CLAUDE.md` or `AGENTS.md`.
+Paste this into another repo's agent instructions, such as its `CLAUDE.md` or `AGENTS.md`. Replace the example ids with the implement ids in the athlete's file.
 
 ```markdown
 ## Plate loading: plate-pool
 
-Use plate-pool for any weight on the owner's barbell, dumbbells, kettlebell, leg attachment or vest. Never work out plates by hand. Guide: https://github.com/joeuk89/plate-pool/blob/main/docs/agent-guide.md
+Use plate-pool for any weight on a plate-loaded implement. Never work out plates by hand. Guide: https://github.com/joeuk89/plate-pool/blob/main/docs/agent-guide.md
 
-- Name the inventory file: set `PLATE_POOL_INVENTORY`, or add `--inventory <path>` to each command.
-- Load: `npx plate-pool load barbell=173 dumbbell=40 --json`
+- Name the athlete's inventory file: set `PLATE_POOL_INVENTORY`, or add `--inventory <path>` to each command.
+- Tables of every achievable total: `npx plate-pool achievable > achievable.json`. Plan only totals the tables hold.
+- Load several implements at once: `npx plate-pool load barbell=173 dumbbell=40 --json`
 - Load from what is on the bar now: `npx plate-pool load barbell=175 --from barbell --side 22.5,22.5,5,5,5,5,5,5,2.5 --json`
 - List: `npx plate-pool list barbell --from 100 --to 200 --json`
 - Reverse: `npx plate-pool reverse barbell --side 22.5,22.5,5,5 --json`
-- Without a shell, read https://joeuk89.github.io/plate-pool/api/achievable.json
+- Set-up link, which installs the kit on the athlete's phone: `node -e 'const fs = require("node:fs"), zlib = require("node:zlib"); console.log("https://joeuk89.github.io/plate-pool/#inventory=" + zlib.deflateRawSync(fs.readFileSync(process.argv[1])).toString("base64url"))' "$PLATE_POOL_INVENTORY"`. Send it once, and again whenever the file changes.
+- Per-line link, one per workout line: `https://joeuk89.github.io/plate-pool/?barbell=173lb&dumbbell=40lb&kit=d33b57cc`. Use implement ids as parameters in priority order, always with a `lb` or `kg` suffix, and set `kit` to the first 8 characters of `inventory_sha256` from `achievable`.
 
 Rules:
 
-- A target is a total, including the bar, handle, screws and collars.
-- Barbell totals are 18 lb plus a multiple of 2.5 with the default clamp collars, and 20 lb plus a multiple of 2.5 with spin-lock collars. With clamps there is no 125 lb; the nearest are 123 and 125.5 lb.
+- A target is a total, including the implement and its locking hardware.
 - All implements share one plate pool. Put every implement used at the same time in one `load` request.
 - A request's order is its priority. Put the implement that matters most first.
-- Plan only weights plate-pool says exist. When a result is not exact, use the `recommended` loading.
-- Mention any value the result lists under `unverified`.
+- Read `warnings`, and mention any value the result lists under `unverified`.
+- When a result is not exact, use the `recommended` loading.
 ```
