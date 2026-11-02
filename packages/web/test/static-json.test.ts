@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { list, readInventory, type CollarChoice, type ListResponse } from "@plate-pool/core";
+import { list, readInventory, type ListResponse } from "@plate-pool/core";
+import type { CollarChoice } from "../src/settings";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp, type Deployment } from "./build-app";
 
@@ -39,9 +40,9 @@ describe("static JSON (spec 10)", () => {
   });
 
   it("holds the library's List result over each implement's full range, with the whole plate pool free", () => {
-    const inventory = readInventory(JSON.parse(readFileSync(inventoryFile, "utf8")));
+    const inventory = readInventory(readFileSync(inventoryFile, "utf8"));
     for (const { collars, ...table } of achievable().tables) {
-      const request = { implement: table.implement, ...(table.pair === undefined ? {} : { pair: table.pair }), ...(collars ? { collars } : {}) };
+      const request = { implement: table.implement, ...(table.pair === undefined ? {} : { pair: table.pair }), ...(collars ? { hardware: collars === "none" ? "none" : `collar-${collars}` } : {}) };
       expect(table, JSON.stringify(request)).toEqual(list(inventory, request));
     }
   });

@@ -243,7 +243,7 @@ describe("Reverse screen: rule warnings under the total (spec 6.6)", () => {
     openReverse();
     add("Add 1.25 lb to each side", 2);
     expect(total()).toContain("23 lb");
-    expect(text(warnings())).toContain("The left side holds 2 micro plates. It takes at most one.");
+    expect(text(warnings())).toContain("The left side holds 2 × micro plates. It takes at most 1.");
   });
 
   it("warns when a pair of dumbbells needs more plates than the plate pool holds", () => {
@@ -255,12 +255,12 @@ describe("Reverse screen: rule warnings under the total (spec 6.6)", () => {
   it("warns when the vest's blocks are not split evenly", () => {
     openReverse("Vest");
     add("Add 1 kg to the front");
-    expect(text(warnings())).toContain("The blocks split 1 front and 0 back.");
+    expect(text(warnings())).toContain("The plates split 1 kg front and 0 kg back.");
   });
 
   it("names the unverified values the total uses", () => {
     openReverse("Vest");
     add("Add 1 kg to the front");
-    expect(text(notes())).toBe("Unverified: empty vest weight, vest block count");
+    expect(text(notes())).toBe("Unverified: empty vest weight, block count");
   });
 });

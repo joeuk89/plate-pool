@@ -1,7 +1,8 @@
-import { reverse, type CollarChoice, type CurrentLoading, type Loading, type ReverseResult, type ScrewChoice } from "@plate-pool/core";
+import { reverse, type CurrentLoading, type Loading, type ReverseResult } from "@plate-pool/core";
 import { useState } from "react";
 import { blockList, plateList } from "./describe";
 import { inventory } from "./inventory";
+import { collarId, type CollarChoice } from "./settings";
 
 export interface PinnedLoading extends CurrentLoading {
   /** Dumbbells only: whether the loading is on a pair or on one dumbbell. */
@@ -11,17 +12,16 @@ export interface PinnedLoading extends CurrentLoading {
 export type CurrentLoadings = Partial<Record<string, PinnedLoading>>;
 
 const storageKey = "plate-pool:current";
-const screwKinds: Record<string, ScrewChoice> = { "screw-standard": "standard", "screw-long": "long" };
 
 export function pinnedFrom(implement: string, loading: Pick<Loading, "positions" | "hardware" | "heavier">, pair: boolean): PinnedLoading {
   const positions = loading.positions.map(({ name, plates }) => ({ name, plates: [...plates] }));
   if (implement !== "dumbbell" && implement !== "kettlebell") return { positions };
-  const screw = loading.hardware.find(({ id }) => screwKinds[id]);
+  const screw = loading.hardware.find(({ id }) => inventory.hardware.find((item) => item.id === id)?.kind === "screw");
   const oneScrew = implement === "dumbbell" && screw?.count === 1 && loading.heavier !== undefined;
   return {
     positions,
-    screws: screw ? screwKinds[screw.id]! : "none",
-    ...(oneScrew ? { screwOn: loading.heavier! } : {}),
+    hardware: screw?.id ?? "none",
+    ...(oneScrew ? { hardwareOn: loading.heavier! } : {}),
     ...(implement === "dumbbell" ? { pair } : {}),
   };
 }
@@ -34,7 +34,7 @@ export function reverseOf(implement: string, pinned: PinnedLoading, collars: Col
   return reverse(inventory, {
     implement,
     ...currentLoading(pinned),
-    ...(implement === "barbell" ? { collars } : {}),
+    ...(implement === "barbell" ? { hardware: collarId(collars) } : {}),
     ...(implement === "dumbbell" ? { pair: pinned.pair !== false } : {}),
   });
 }
@@ -69,10 +69,17 @@ export function stripPlates(implement: string, positions: PinnedLoading["positio
   }
 }
 
+const positionsByKind: Record<string, string[]> = { bar: ["left", "right"], handle: ["a", "b"], stack: ["stack"], vest: ["front", "back"] };
+
+export function positionNames(implement: string): string[] | undefined {
+  const kind = inventory.implements.find((item) => item.id === implement)?.kind;
+  return kind ? positionsByKind[kind] : undefined;
+}
+
 function isPinned(implement: string, value: unknown): value is PinnedLoading {
   if (typeof value !== "object" || value === null) return false;
   const { positions } = value as { positions?: unknown };
-  const names = inventory.implements.find((item) => item.id === implement)?.positions;
+  const names = positionNames(implement);
   if (!names || !Array.isArray(positions) || positions.length !== names.length) return false;
   const valid = positions.every(
     (position: unknown, index) =>

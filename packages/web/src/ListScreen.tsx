@@ -1,10 +1,11 @@
-import { list, RequestError, type CollarChoice, type ListRequest, type ListResponse, type ListRow, type Unit } from "@plate-pool/core";
+import { list, RequestError, type ListRequest, type ListResponse, type ListRow, type Unit } from "@plate-pool/core";
 import { useId, useMemo, useState } from "react";
 import { collarOptions, dumbbellOptions, unitOf, type DumbbellChoice, type LoadChoice } from "./LoadScreen";
 import { Segmented } from "./Segmented";
 import { Switch } from "./Switch";
 import { blockList, endLabel, plateList, unverifiedList } from "./describe";
 import { inventory } from "./inventory";
+import { collarId, type CollarChoice } from "./settings";
 
 const screwLabels: Record<string, string> = {
   "screw-standard": "Standard screw",
@@ -24,7 +25,8 @@ function calculate(implement: string, from: string, to: string, { collars, uneve
     implement,
     ...(from.trim() === "" ? {} : { from }),
     ...(to.trim() === "" ? {} : { to }),
-    ...(implement === "dumbbell" ? { pair: dumbbells === "pair", uneven } : { collars }),
+    ...(implement === "dumbbell" ? { pair: dumbbells === "pair", uneven } : {}),
+    ...(implement === "barbell" ? { hardware: collarId(collars) } : {}),
   };
   try {
     return { response: list(inventory, request) };
@@ -196,10 +198,10 @@ function positionLabel(implement: string): string {
 }
 
 function flags(implement: string, row: ListRow): string[] {
-  const screw = row.screw && screwLabels[row.screw];
+  const screw = row.loading.hardware.map(({ id }) => screwLabels[id]).find((label) => label !== undefined);
   return [
     ...(row.uneven ? ["Uneven"] : []),
-    ...(row.micro ? ["Micro"] : []),
+    ...(row.smallest && implement !== "vest" ? ["Micro"] : []),
     ...(screw ? [implement === "dumbbell" ? `${screw}s` : screw] : []),
   ];
 }

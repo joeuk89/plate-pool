@@ -36,8 +36,8 @@ describe("vest drawing", () => {
       total: { kg: 0, lb: 0 },
       hardware: [],
       positions: [
-        { name: "front", plates: [] },
-        { name: "back", plates: [] },
+        { name: "front", plates: [], ids: [] },
+        { name: "back", plates: [], ids: [] },
       ],
       uneven: false,
     };

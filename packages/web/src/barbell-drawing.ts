@@ -50,7 +50,7 @@ export function drawBarbell(loading: Loading, inventory: Inventory, options: Dra
   const handleShown = options.sideBySide ? HANDLE_SHOWN_SIDE_BY_SIDE : HANDLE_SHOWN;
   const handle = { x: 0, length: handleShown };
   const stop = { x: handleShown, ...STOP };
-  const sleeve = { x: stop.x + stop.width, length: barbell?.positionLengthIn ? used(barbell.positionLengthIn) : 11.5 };
+  const sleeve = { x: stop.x + stop.width, length: barbell?.positionLength ? used(barbell.positionLength) : 11.5 };
   const width = options.sideBySide
     ? Math.max(height, sleeve.x + Math.max(...options.sideBySide.map((shown) => loadedLength(shown, inventory))) + SLEEVE_BEYOND_COLLAR)
     : sleeve.x + Math.max(sleeve.length, loadedLength(loading, inventory)) + END_MARGIN;
@@ -87,7 +87,7 @@ function collarShape(hardware: Hardware) {
 }
 
 function collarWidth(hardware: Hardware): number {
-  return hardware.widthIn ?? collarShape(hardware).width;
+  return hardware.width ?? collarShape(hardware).width;
 }
 
 function loadedLength(loading: Loading, inventory: Inventory): number {

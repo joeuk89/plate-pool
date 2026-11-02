@@ -2,7 +2,6 @@ import {
   describeWeight,
   RequestError,
   step,
-  type CollarChoice,
   type Display,
   type Loading,
   type LoadResult,
@@ -24,6 +23,7 @@ import { AddImplement } from "./AddImplement";
 import { LeftoverLine } from "./LeftoverLine";
 import { cardLabel, newCard, pinnedFor, plan, targetWithUnit, unitOf, type Card, type DumbbellChoice, type Outcome } from "./plan";
 import { useReorder } from "./reorder";
+import { collarId, type CollarChoice } from "./settings";
 
 export { unitOf, type DumbbellChoice } from "./plan";
 
@@ -64,7 +64,8 @@ function nextWeight(
   const request: StepRequest = {
     implement,
     ...(target.trim() === "" ? {} : { target: targetWithUnit(target, unit) }),
-    ...(implement === "dumbbell" ? { pair: dumbbells === "pair", uneven } : { collars }),
+    ...(implement === "dumbbell" ? { pair: dumbbells === "pair", uneven } : {}),
+    ...(implement === "barbell" ? { hardware: collarId(collars) } : {}),
   };
   try {
     return step(inventory, request, direction);

@@ -9,7 +9,7 @@ export function LeftoverLine({ leftover }: { leftover: Leftover }) {
   const plates = inventory.plates.flatMap((plate) => {
     const count = leftover.plates[plate.id] ?? 0;
     if (count === 0) return [];
-    if (plate.shape === "block") return [`${count} ${plate.name.toLowerCase()}${count === 1 ? "" : "s"}`];
+    if (plate.shape === "block") return [`${count} ${plate.name?.toLowerCase() ?? "block"}${count === 1 ? "" : "s"}`];
     return [`${count} × ${plate.weight.measured ?? plate.weight.listed}`];
   });
   const hardware = inventory.hardware.flatMap((item) => {

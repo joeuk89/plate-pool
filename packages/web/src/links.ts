@@ -1,6 +1,6 @@
-import type { CollarChoice, Unit } from "@plate-pool/core";
+import type { Unit } from "@plate-pool/core";
 import { newCard, unitOf, type Card, type DumbbellChoice } from "./plan";
-import { collarChoices, type Settings } from "./settings";
+import { collarChoices, type CollarChoice, type Settings } from "./settings";
 
 const implementParameters: Record<string, { implement: string; dumbbells: DumbbellChoice }> = {
   barbell: { implement: "barbell", dumbbells: "pair" },

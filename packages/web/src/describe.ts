@@ -1,4 +1,4 @@
-import type { Inventory, Loading } from "@plate-pool/core";
+import type { Inventory, Loading, Plate } from "@plate-pool/core";
 import { used } from "./plate-stack";
 
 export function plateList(plates: number[]): string {
@@ -18,8 +18,8 @@ export function blockList(plates: number[]): string {
 }
 
 const endLetters: Record<string, string> = {
-  "end-a": "A",
-  "end-b": "B",
+  a: "A",
+  b: "B",
 };
 
 export function endLabel(position: string): string {
@@ -57,11 +57,16 @@ export function unverifiedList(keys: string[], inventory: Inventory): string {
       return id === "vest" ? "empty vest weight" : `${inventory.implements.find((item) => item.id === id)?.name.toLowerCase() ?? id} weight`;
     }
     const hardware = inventory.hardware.find((item) => item.id === id);
-    if (hardware && field === "minStackIn") return `shortest stack on a ${hardware.name.toLowerCase()}`;
+    if (hardware && field === "minStack") return `shortest stack on a ${hardware.name.toLowerCase()}`;
     if (hardware) return hardware.kind === "collar" ? "collar weight" : `${hardware.name.toLowerCase()} weight`;
     const plate = inventory.plates.find((item) => item.id === id);
-    if (plate && field === "count") return `${plate.name.toLowerCase()} count`;
-    return plate ? `${plate.name} plate weight` : key;
+    if (plate && field === "count") return `${plateName(plate)} count`;
+    return plate ? `${plateName(plate)} plate weight` : key;
   };
   return [...new Set(keys.map(label))].join(", ");
+}
+
+function plateName(plate: Plate): string {
+  if (plate.shape === "block") return plate.name?.toLowerCase() ?? "block";
+  return plate.name?.toLowerCase() ?? `${plate.weight.measured ?? plate.weight.listed} lb`;
 }

@@ -1,6 +1,7 @@
-import { load, RequestError, type CollarChoice, type Leftover, type LoadResult, type TargetRequest, type Unit } from "@plate-pool/core";
+import { load, RequestError, type Leftover, type LoadResult, type TargetRequest, type Unit } from "@plate-pool/core";
 import { currentLoading, type CurrentLoadings, type PinnedLoading } from "./current";
 import { inventory } from "./inventory";
+import { collarHardware, type CollarChoice } from "./settings";
 
 export type DumbbellChoice = "pair" | "one";
 
@@ -87,7 +88,7 @@ export function plan(cards: Card[], { collars, uneven, current }: Options): Plan
   cards.forEach((card, index) => {
     if (card.target.trim() === "") return;
     try {
-      load(inventory, { targets: [targetOf(card)], collars, uneven });
+      load(inventory, { targets: [targetOf(card)], hardware: collarHardware(collars), uneven });
       requested.push(index);
     } catch (error) {
       outcomes[index] = errorOf(error, card);
@@ -95,7 +96,8 @@ export function plan(cards: Card[], { collars, uneven, current }: Options): Plan
   });
   if (requested.length === 0) return { outcomes };
 
-  const loadAll = (indexes: number[]) => load(inventory, { targets: indexes.map((index) => targetOf(cards[index]!)), collars, uneven });
+  const loadAll = (indexes: number[]) =>
+    load(inventory, { targets: indexes.map((index) => targetOf(cards[index]!)), hardware: collarHardware(collars), uneven });
   let accepted = requested;
   let response;
   try {
