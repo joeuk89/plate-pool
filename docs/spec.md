@@ -290,6 +290,7 @@ This is the main screen.
 
 - An "add implement" button stacks another card under the first.
 - Card order is priority order. The owner drags cards to reorder.
+- Tapping the tab of an implement that a lower card holds moves that card to the top.
 - Each card shows its own result and picture.
 - A line at the bottom shows the plates and hardware left over.
 
