@@ -1,11 +1,12 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { App } from "../src/App";
+import { Calculator } from "../src/Calculator";
+import { owner } from "./kits";
 
 afterEach(cleanup);
 
 function open(tab: string, target: string) {
-  render(<App />);
+  render(<Calculator inventory={owner} />);
   fireEvent.click(screen.getByRole("tab", { name: tab }));
   fireEvent.change(screen.getByLabelText("Target"), { target: { value: target } });
 }

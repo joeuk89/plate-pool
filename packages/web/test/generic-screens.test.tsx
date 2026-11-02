@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { App } from "../src/App";
+import { Calculator } from "../src/Calculator";
 import { olympic, owner } from "./kits";
 
 afterEach(cleanup);
@@ -23,13 +23,13 @@ const result = () => screen.getByRole("region", { name: "Result" });
 
 describe("the Olympic kit: tabs and options (spec 17.5.4)", () => {
   it("shows its four implements in file order, labelled by name", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     expect(tabs().map((tab) => tab.textContent)).toEqual(["Olympic bar", "Loadable dumbbell", "Dip belt", "Plate carrier"]);
     expect(tabs()[0]!.getAttribute("aria-selected")).toBe("true");
   });
 
   it("offers a hardware choice on the bar, labelled by the hardware's name, starting on its default", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     expect(options("Collars")).toEqual(["Spring collar", "None"]);
     expect(within(screen.getByRole("radiogroup", { name: "Collars" })).getByRole("radio", { name: "Spring collar" })).toHaveProperty(
       "checked",
@@ -38,7 +38,7 @@ describe("the Olympic kit: tabs and options (spec 17.5.4)", () => {
   });
 
   it("offers pair or single on the dumbbell, no hardware choice with one option, and no uneven switch with an allowance of 0", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     fireEvent.click(screen.getByRole("tab", { name: "Loadable dumbbell" }));
     expect(options("Pair or single")).toEqual(["Pair", "Single"]);
     expect(screen.queryByRole("radiogroup", { name: "Collars" })).toBeNull();
@@ -46,7 +46,7 @@ describe("the Olympic kit: tabs and options (spec 17.5.4)", () => {
   });
 
   it("offers no options on the dip belt or the plate carrier", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     for (const name of ["Dip belt", "Plate carrier"]) {
       fireEvent.click(screen.getByRole("tab", { name }));
       expect(screen.queryAllByRole("radiogroup").map((group) => group.getAttribute("aria-label"))).toEqual(["Unit"]);
@@ -55,7 +55,7 @@ describe("the Olympic kit: tabs and options (spec 17.5.4)", () => {
   });
 
   it("example 25: 95.5 kg on the Olympic bar, with each side and the spring collars, kilograms first", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     typeTarget("95.5");
     const shown = text(result());
     expect(shown).toContain("Exact");
@@ -65,7 +65,7 @@ describe("the Olympic kit: tabs and options (spec 17.5.4)", () => {
   });
 
   it("example 26: a single dumbbell of 25 kg is not exact, because the ends may not differ", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     fireEvent.click(screen.getByRole("tab", { name: "Loadable dumbbell" }));
     fireEvent.click(within(screen.getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
     typeTarget("25");
@@ -75,14 +75,14 @@ describe("the Olympic kit: tabs and options (spec 17.5.4)", () => {
   });
 
   it("says when the kit cannot load an implement at all: two collars cannot lock a pair of dumbbells", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     fireEvent.click(screen.getByRole("tab", { name: "Loadable dumbbell" }));
     typeTarget("17");
     expect(text(result())).toContain("This kit's plates and hardware cannot load the loadable dumbbell pair.");
   });
 
   it("draws the dip belt as a stack and the plate carrier as front and back", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     fireEvent.click(screen.getByRole("tab", { name: "Dip belt" }));
     typeTarget("20");
     expect(within(result()).getByRole("img").getAttribute("aria-label")).toBe("Stack, inside to outside: 20");
@@ -97,7 +97,7 @@ describe("the Olympic kit: tabs and options (spec 17.5.4)", () => {
 
 describe("the owner's kit: options (spec 17.5.4)", () => {
   it("offers the dumbbell a screw choice that starts on Auto, since its hardware has no default", () => {
-    render(<App inventory={owner} />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     expect(options("Screws")).toEqual(["Auto", "Standard locking screw", "Long locking screw", "None"]);
     expect(within(screen.getByRole("radiogroup", { name: "Screws" })).getByRole("radio", { name: "Auto" })).toHaveProperty("checked", true);
@@ -105,7 +105,7 @@ describe("the owner's kit: options (spec 17.5.4)", () => {
   });
 
   it("loads the dumbbell with the screw chosen, refusing what it cannot hold", () => {
-    render(<App inventory={owner} />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     typeTarget("40");
     fireEvent.click(within(screen.getByRole("radiogroup", { name: "Screws" })).getByRole("radio", { name: "Long locking screw" }));
@@ -113,14 +113,14 @@ describe("the owner's kit: options (spec 17.5.4)", () => {
   });
 
   it("labels the bar's collars by name", () => {
-    render(<App inventory={owner} />);
+    render(<Calculator inventory={owner} />);
     expect(options("Collars")).toEqual(['Mirafit 1" clamp collar', "Ironmaster spin-lock collar", "None"]);
   });
 });
 
 describe("List and Reverse on any kit (spec 17.5.4)", () => {
   it("lists the Olympic bar in kilograms with no screw column", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     view("List");
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["kg", "lb", "Plates", "Flags"]);
@@ -128,7 +128,7 @@ describe("List and Reverse on any kit (spec 17.5.4)", () => {
   });
 
   it("flags the smallest plate as Smallest", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     view("List");
     const row = within(screen.getByRole("table"))
       .getAllByRole("row")
@@ -137,7 +137,7 @@ describe("List and Reverse on any kit (spec 17.5.4)", () => {
   });
 
   it("offers the Olympic bar's accepted plates on Reverse, heaviest first, outlined by shape, with no mirroring switch", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     view("Reverse");
     const buttons = within(screen.getByRole("group", { name: "Each side" })).getAllByRole("button");
     expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual([
@@ -151,7 +151,7 @@ describe("List and Reverse on any kit (spec 17.5.4)", () => {
   });
 
   it("shows the mirroring switch on a handle only", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     view("Reverse");
     fireEvent.click(screen.getByRole("tab", { name: "Loadable dumbbell" }));
     expect(screen.getByRole("switch", { name: "Mirror ends" })).toBeTruthy();
@@ -160,7 +160,7 @@ describe("List and Reverse on any kit (spec 17.5.4)", () => {
   });
 
   it("totals a Reverse loading on the Olympic bar with its collars", () => {
-    render(<App inventory={olympic} />);
+    render(<Calculator inventory={olympic} />);
     view("Reverse");
     fireEvent.click(screen.getByRole("button", { name: "Add 20 kg to each side" }));
     expect(text(screen.getByRole("region", { name: "Total" }))).toContain("60.5 kg");

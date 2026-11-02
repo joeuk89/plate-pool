@@ -1,117 +1,101 @@
-import type { Inventory } from "@plate-pool/core";
-import { useEffect, useId, useState } from "react";
-import { useCurrentLoadings, type PinnedLoading } from "./current";
-import { inventory as builtIn } from "./inventory";
-import { KitContext } from "./kit";
-import { linkQuery, readLink, type View } from "./links";
-import { ListScreen } from "./ListScreen";
-import { LoadScreen, type LoadChoice } from "./LoadScreen";
-import { newCard, type Card } from "./plan";
-import { ReverseScreen } from "./ReverseScreen";
-import { useSettings, type SettingsChange } from "./settings";
+import { useEffect, useState } from "react";
+import { Calculator } from "./Calculator";
+import { kitFromSetupLink, setupPayload, shortHash, type KitFile } from "./kit-file";
+import { ConfirmCard, EmptyKitScreen, KitPage, OpeningLink } from "./KitScreen";
+import { readStoredKit, storeKit } from "./stored-kit";
 
-const views: { id: View; label: string }[] = [
-  { id: "load", label: "Load" },
-  { id: "list", label: "List" },
-  { id: "reverse", label: "Reverse" },
-];
+type Arrival = { state: "opening" } | { state: "ready"; kit: KitFile } | { state: "failed"; errors: string[] };
 
-export function App({ inventory = builtIn }: { inventory?: Inventory }) {
-  return (
-    <KitContext.Provider value={inventory}>
-      <Screens inventory={inventory} />
-    </KitContext.Provider>
-  );
+function replaceUrl(url: URL): void {
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
-function Screens({ inventory }: { inventory: Inventory }) {
-  const [link] = useState(() => readLink(inventory, window.location.search));
-  const [settings, updateSettings] = useSettings(inventory, link.settings);
-  const [cards, setCards] = useState<Card[]>(() => (link.cards.length > 0 ? link.cards : [newCard(inventory, settings.implement)]));
-  const selected = cards[0]?.implement ?? settings.implement;
-  const [view, setView] = useState<View>(link.view);
-  const [current, pin] = useCurrentLoadings(inventory);
+function dropFragment(): void {
+  const url = new URL(window.location.href);
+  url.hash = "";
+  replaceUrl(url);
+}
+
+function dropParameter(name: string): void {
+  const url = new URL(window.location.href);
+  url.searchParams.delete(name);
+  replaceUrl(url);
+}
+
+export function App() {
+  const [kit, setKit] = useState(readStoredKit);
+  const [arrival, setArrival] = useState<Arrival | undefined>(() =>
+    setupPayload(window.location.hash) === undefined ? undefined : { state: "opening" },
+  );
+  const [kitPage, setKitPage] = useState(false);
+
   useEffect(() => {
-    const query = linkQuery(inventory, { cards, settings, view });
-    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${query}${window.location.hash}`);
-  }, [inventory, cards, settings, view]);
-  const tabIds = useId();
-  const tabId = (implement: string) => `${tabIds}-${implement}`;
+    const payload = setupPayload(window.location.hash);
+    if (payload === undefined) return;
+    let open = true;
+    void kitFromSetupLink(payload).then((read) => {
+      if (!open) return;
+      if ("errors" in read) return setArrival({ state: "failed", errors: read.errors });
+      if (read.kit.sha256 === kit?.sha256) {
+        dropFragment();
+        return setArrival(undefined);
+      }
+      setArrival({ state: "ready", kit: read.kit });
+    });
+    return () => {
+      open = false;
+    };
+  }, []);
 
-  const changeCards = (next: Card[]) => {
-    const [first] = next;
-    if (!first) return;
-    setCards(next);
-    if (first.implement !== settings.implement) updateSettings({ implement: first.implement });
+  const install = (next: KitFile) => {
+    const replacing = kit !== undefined;
+    storeKit(next, { replacing });
+    dropFragment();
+    // A replaced kit's hash no longer describes the targets, so the new kit must not see them as a mismatch.
+    if (replacing) dropParameter("kit");
+    setKit(next);
+    setArrival(undefined);
+    setKitPage(false);
   };
-  const selectImplement = (implement: string) => {
-    if (implement !== selected) changeCards([newCard(inventory, implement), ...cards.slice(1)]);
-  };
-  const changePair = (pair: boolean) => changeCards([{ ...cards[0]!, pair }, ...cards.slice(1)]);
-  const openInLoad = (choice: LoadChoice) => {
-    changeCards([{ ...newCard(inventory, selected, choice.pair), target: choice.target }, ...cards.slice(1)]);
-    setView("load");
-  };
-  const pinFromReverse = (pinned: PinnedLoading, choice: LoadChoice) => {
-    pin(selected, pinned);
-    openInLoad(choice);
-  };
-  const sharedOptions = {
-    hardware: settings.hardware,
-    onHardwareChange: (implement: string, choice: string | undefined) => updateSettings({ hardware: { implement, choice } } satisfies SettingsChange),
-    uneven: settings.uneven,
-    onUnevenChange: (uneven: boolean) => updateSettings({ uneven }),
-  };
+  const failed = arrival?.state === "failed" ? arrival.errors : [];
 
+  if (arrival?.state === "opening") return <OpeningLink />;
+  if (arrival?.state === "ready") {
+    return (
+      <ConfirmCard
+        arriving={arrival.kit}
+        {...(kit ? { stored: kit } : {})}
+        onUse={() => {
+          dropParameter("view");
+          install(arrival.kit);
+        }}
+        onKeep={() => {
+          dropFragment();
+          setArrival(undefined);
+        }}
+      />
+    );
+  }
+  if (!kit) return <EmptyKitScreen errors={failed} onKit={install} />;
+  if (kitPage || failed.length > 0) {
+    return (
+      <KitPage
+        kit={kit}
+        errors={failed}
+        onKit={install}
+        onDone={() => {
+          if (failed.length > 0) dropFragment();
+          setArrival(undefined);
+          setKitPage(false);
+        }}
+      />
+    );
+  }
   return (
-    <main className="app">
-      <header className="masthead">
-        <h1>plate-pool</h1>
-        <nav aria-label="Screens" className="views">
-          {views.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              className="view"
-              aria-current={id === view ? "page" : undefined}
-              onClick={() => setView(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-      </header>
-      <nav className="tabs" role="tablist" aria-label="Implements">
-        {inventory.implements.map(({ id, name }) => (
-          <button
-            key={id}
-            id={tabId(id)}
-            type="button"
-            role="tab"
-            aria-selected={id === selected}
-            className="tab"
-            onClick={() => selectImplement(id)}
-          >
-            {name}
-          </button>
-        ))}
-      </nav>
-      <div role="tabpanel" aria-labelledby={tabId(selected)}>
-        {view === "load" ? (
-          <LoadScreen cards={cards} onCardsChange={changeCards} {...sharedOptions} current={current} onPin={pin} />
-        ) : view === "list" ? (
-          <ListScreen
-            key={selected}
-            implement={selected}
-            {...sharedOptions}
-            pair={cards[0]?.pair ?? true}
-            onPairChange={changePair}
-            onOpen={openInLoad}
-          />
-        ) : (
-          <ReverseScreen key={selected} implement={selected} {...sharedOptions} onPin={pinFromReverse} />
-        )}
-      </div>
-    </main>
+    <Calculator
+      key={kit.sha256}
+      inventory={kit.inventory}
+      kit={{ name: kit.inventory.name, hash: shortHash(kit), onOpen: () => setKitPage(true) }}
+    />
   );
 }

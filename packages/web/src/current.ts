@@ -109,6 +109,14 @@ function writeCurrent(current: CurrentLoadings): void {
   }
 }
 
+export function forgetCurrentLoadings(): void {
+  try {
+    localStorage.removeItem(storageKey);
+  } catch {
+    // Storage is blocked: nothing was stored.
+  }
+}
+
 export function useCurrentLoadings(inventory: Inventory): [CurrentLoadings, (implement: string, pinned: PinnedLoading | undefined) => void] {
   const [current, setCurrent] = useState(() => readCurrent(inventory));
   const update = (implement: string, pinned: PinnedLoading | undefined) => {

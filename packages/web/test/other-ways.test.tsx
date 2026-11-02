@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Loading, LoadResult } from "@plate-pool/core";
-import { App } from "../src/App";
+import { Calculator } from "../src/Calculator";
 import { KitContext } from "../src/kit";
 import { OtherWays } from "../src/OtherWays";
 import { owner } from "./kits";
@@ -23,7 +23,7 @@ const otherWays = () => within(screen.getByRole("region", { name: "Result" })).q
 
 describe("Load screen: other ways to make this (spec 8.2)", () => {
   it("example 11: barbell 88 lb lists the other loadings in a collapsed list under the result", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("88");
     const list = otherWays();
     expect(list).not.toBeNull();
@@ -35,7 +35,7 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
   });
 
   it("opens when the owner taps it", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("88");
     const list = otherWays()!;
     fireEvent.click(list.querySelector("summary")!);
@@ -74,7 +74,7 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
   });
 
   it("lists the other loadings of a pair of dumbbells", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     typeTarget("40");
     expect(within(otherWays()!).getAllByRole("listitem").map(text)).toEqual([
@@ -84,7 +84,7 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
   });
 
   it("lists the kettlebell's and the leg attachment's other stacks", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
     typeTarget("50");
     expect(within(otherWays()!).getAllByRole("listitem").map(text)).toEqual([
@@ -99,7 +99,7 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
   });
 
   it("shows nothing when no other loading reaches the target", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("18");
     expect(otherWays()).toBeNull();
     typeTarget("175");

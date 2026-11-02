@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { App } from "../src/App";
+import { Calculator } from "../src/Calculator";
+import { owner } from "./kits";
 
 afterEach(cleanup);
 
@@ -17,7 +18,7 @@ function text(element: HTMLElement): string {
 
 describe("barbell Load screen: worked examples (spec section 7)", () => {
   it("example 2: 173 lb is exact, with each side's plates and the collars to use", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     const result = text(screen.getByRole("region", { name: "Result" }));
     expect(result).toContain("Exact");
@@ -28,7 +29,7 @@ describe("barbell Load screen: worked examples (spec section 7)", () => {
   });
 
   it("example 1: 175 lb shows below and above side by side, with above recommended", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("175");
     const result = screen.getByRole("region", { name: "Result" });
     expect(text(result)).toContain("No exact loading for 175 lb (79.4 kg)");
@@ -46,7 +47,7 @@ describe("barbell Load screen: worked examples (spec section 7)", () => {
   });
 
   it("example 3: 230 lb is refused, showing the 210 lb plate limit and the heaviest allowed loading", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("230");
     const result = screen.getByRole("region", { name: "Result" });
     expect(text(result)).toContain("Refused: over the 210 lb plate limit");
@@ -63,7 +64,7 @@ describe("Load screen: implement tabs", () => {
   const tabs = () => within(screen.getByRole("tablist", { name: "Implements" })).getAllByRole("tab");
 
   it("opens on the first implement, with every implement's tab in file order, labelled by its name", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     expect(tabs().map((tab) => [tab.textContent, tab.getAttribute("aria-selected")])).toEqual([
       ["Straight bar", "true"],
       ["Dumbbell", "false"],
@@ -74,14 +75,14 @@ describe("Load screen: implement tabs", () => {
   });
 
   it("selects the tab that is pressed", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
     expect(tabs().map((tab) => tab.getAttribute("aria-selected"))).toEqual(["false", "false", "true", "false", "false"]);
     expect(screen.getByRole("tabpanel", { name: "Kettlebell" })).toBeTruthy();
   });
 
   it("switches to the vest and back", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Weighted vest" }));
     expect(screen.getByRole("tab", { name: "Weighted vest" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("tab", { name: "Straight bar" }).getAttribute("aria-selected")).toBe("false");
@@ -94,7 +95,7 @@ describe("Load screen: implement tabs", () => {
 
 describe("vest Load screen", () => {
   function openVest() {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Weighted vest" }));
   }
 
@@ -157,7 +158,7 @@ describe("vest Load screen", () => {
 
 describe("kettlebell Load screen", () => {
   function openKettlebell() {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
   }
 
@@ -196,7 +197,7 @@ describe("kettlebell Load screen", () => {
 
 describe("leg attachment Load screen", () => {
   function openLeg() {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Leg attachment" }));
   }
 
@@ -228,7 +229,7 @@ describe("leg attachment Load screen", () => {
 
 describe("barbell Load screen: target", () => {
   it("reads the target in kilograms when the unit switch is on kg", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(within(screen.getByRole("radiogroup", { name: "Unit" })).getByRole("radio", { name: "kg" }));
     typeTarget("80");
     const result = screen.getByRole("region", { name: "Result" });
@@ -238,7 +239,7 @@ describe("barbell Load screen: target", () => {
   });
 
   it("recommends the bare bar, alone, for a target under the base weight", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("5");
     const result = screen.getByRole("region", { name: "Result" });
     expect(text(result)).toContain("No exact loading for 5 lb (2.3 kg)");
@@ -252,12 +253,12 @@ describe("barbell Load screen: target", () => {
   });
 
   it("shows no result until a target is typed", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     expect(screen.getByRole("region", { name: "Result" }).textContent).toBe("");
   });
 
   it("explains a target it cannot read", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("abc");
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain('"abc" is not a weight.');
   });
@@ -267,21 +268,21 @@ describe("barbell Load screen: collars", () => {
   const collars = () => screen.getByRole("radiogroup", { name: "Collars" });
 
   it("uses the clamp collar unless another is picked", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     expect(within(collars()).getByRole("radio", { name: 'Mirafit 1" clamp collar' })).toHaveProperty("checked", true);
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain('Collars 2 × Mirafit 1" clamp collar');
   });
 
   it("switches to spin-lock collars", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     fireEvent.click(within(collars()).getByRole("radio", { name: "Ironmaster spin-lock collar" }));
     expect(text(screen.getByRole("region", { name: "Result" }))).toContain("Collars 2 × Ironmaster spin-lock collar");
   });
 
   it("loads with no collars", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     fireEvent.click(within(collars()).getByRole("radio", { name: "None" }));
     const result = text(screen.getByRole("region", { name: "Result" }));
@@ -292,7 +293,7 @@ describe("barbell Load screen: collars", () => {
 
 describe("barbell Load screen: notes", () => {
   it("names no unverified values, since the owner confirmed the bar and collar weights", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     expect(text(screen.getByRole("region", { name: "Result" }))).not.toContain("Unverified");
   });
@@ -300,7 +301,7 @@ describe("barbell Load screen: notes", () => {
 
 describe("dumbbells Load screen", () => {
   function openDumbbells() {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
   }
   const dumbbells = () => screen.getByRole("radiogroup", { name: "Pair or single" });
