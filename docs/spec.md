@@ -1,10 +1,10 @@
 # plate-pool: specification
 
-Version 1. Agreed 2026-09-30.
+Version 1 agreed 2026-09-30. Version 2 (section 16) agreed 2026-10-30. Version 3 (section 17) agreed 2026-11-02. Sections 1 to 3 describe the app as it stands after version 3; sections 4 to 16 record versions 1 and 2, and section 17 names each rule it replaces.
 
 ## 1. Purpose
 
-plate-pool is a calculator for one home gym. It knows every plate, locking screw, collar and implement the owner has, and it answers three questions:
+plate-pool is a calculator for a plate-loaded gym. Given an inventory file that describes every plate, piece of locking hardware and implement a gym has, it answers three questions:
 
 | Question | Example | Answer |
 | --- | --- | --- |
@@ -12,9 +12,11 @@ plate-pool is a calculator for one home gym. It knows every plate, locking screw
 | **List** | "Every barbell weight from 100 to 200 lb" | A table of achievable weights |
 | **Reverse** | "These plates are on the bar" | The total weight |
 
-It has three users: the owner on a phone in the gym, the owner on a desktop, and software agents that plan training (for example the coach agent in the owner's workout repo).
+It has three users: a person on a phone in their gym, the same person on a desktop, and software agents that plan training (for example the coach in the owner's strength-coach repo). The phone gets its inventory from a set-up link; the desktop and the agents hand the tool a file.
 
 The app needs no agent or AI to work. Every answer comes from a fixed calculation over the inventory file.
+
+The owner's own gym is the reference example: `inventory/inventory.json` is a format 1 file like any other, and every worked example runs against it.
 
 ## 2. Glossary
 
@@ -22,93 +24,62 @@ Code, documents and agents use these words with these meanings.
 
 | Term | Meaning |
 | --- | --- |
-| **Implement** | A piece of equipment that carries weight: barbell, dumbbell, kettlebell, leg attachment, vest. |
+| **Inventory** | The file that describes one gym: its plate types, plates, hardware and implements. Format 1 (section 17.3) is its public shape. |
+| **Format** | The version of the inventory file's shape. A file states its format; the app reads format 1. |
+| **Kit** | A named inventory stored on the device. One at a time. |
+| **Implement** | A piece of equipment that carries plates: a bar, a loadable dumbbell, a loadable kettlebell, a leg attachment, a vest. |
+| **Implement kind** | One of four shapes an implement can have: **bar**, **handle**, **stack**, **vest**. The kind fixes the implement's positions and its drawing. |
+| **Bar** | An implement kind with two sides that always carry the same plates: a barbell, or a two-post machine. |
+| **Handle** | An implement kind with two ends that may carry different plates: a loadable dumbbell. A handle the gym has two or more of can be loaded as a **pair** or as a **single**. |
+| **Stack** | An implement kind with one position: a loadable kettlebell, a leg attachment, a dip belt, a landmine. |
+| **Vest** | An implement kind with a front and a back that share its plates: a weighted vest or plate carrier. |
 | **Plate** | One removable weight. A vest block counts as a plate. |
-| **Plate type** | A family of plates that fit the same implements: Quick-Lock, vest block. Olympic is a future type. |
-| **Plate pool** | Every plate and piece of locking hardware the owner has. All implements draw from it. |
-| **Locking hardware** | What holds plates on: locking screws (dumbbell, kettlebell) and collars (barbell). |
-| **Position** | A place on an implement that holds plates. The barbell has two **sides**. A dumbbell has two **ends**. The kettlebell and leg attachment have one **stack**. The vest has **front** and **back**. |
-| **Base weight** | The weight of an implement with its locking hardware and no plates. |
+| **Plate type** | A family of plates that fit the same implements, with a bore: Olympic, standard, Quick-Lock, vest block. |
+| **Plate pool** | Every plate and piece of locking hardware the gym has. All implements draw from it. |
+| **Locking hardware** | What holds plates on. Its kinds are **screw**, **collar** and **pin**. |
+| **Position** | A place on an implement that holds plates. A bar has two **sides**. A handle has two **ends**. A stack has one **stack**. A vest has **front** and **back**. |
+| **Base weight** | The weight of an implement with no plates. Hardware weight is added unless the file says the base includes it. |
 | **Loading** | A full description of one loaded implement: locking hardware, and the plates on each position in order. |
 | **Target** | The total weight asked for. It includes the base weight. |
 | **Request** | One or more targets, in priority order. |
 | **Listed weight** | The weight the manufacturer states. |
 | **Measured weight** | A weight the owner has measured. It overrides the listed weight. |
 | **Unverified** | A value no reliable source or measurement confirms. |
-| **Uneven** | A dumbbell whose two ends carry different weights. |
-| **Current loading** | The loading that is on an implement right now, as the owner has told the app. |
-| **Change** | One plate put on or taken off one position, or one locking screw added, removed or swapped for the other kind (a swap counts two: one off, one on). Taking hardware off to reach the plates and putting the same piece back does not count. Collars never count. |
+| **Uneven** | A handle whose two ends carry different weights. |
+| **Current loading** | The loading that is on an implement right now, as the user has told the app. |
+| **Change** | One plate put on or taken off one position, or one screw or pin added, removed or swapped for another (a swap counts two: one off, one on). Taking hardware off to reach the plates and putting the same piece back does not count. Collars never count. |
 | **Changes** | The number of changes to get from the current loading to another loading. |
+| **Set-up link** | A link that carries an inventory and installs it as the kit. |
+| **Per-line link** | A link that carries targets and the short hash of the kit they were worked out for. |
+| **Kit screen** | The screen that imports a kit. It is the whole app until a kit is stored, and the kit page afterwards. |
 
 ## 3. Scope
 
-### In version 1
+Version 1 is sections 5 to 15, version 2 is section 16 and version 3 is section 17. Each later version says what it replaces in the earlier sections.
 
-- Load, List and Reverse for five implements: barbell, dumbbells, kettlebell, leg attachment, weighted vest.
+### In scope
+
+- Load, List and Reverse for every implement in a format 1 inventory, over the four implement kinds.
 - Requests that cover several implements and share the plate pool.
-- A web app that installs on a phone and works offline.
-- A command-line tool published to npm.
-- Static JSON files for agents with web access.
+- A current loading per implement and the fewest changes to the next loading.
+- A web app that opens with no inventory, takes a kit from a set-up link, a pasted file or a chosen file, installs on a phone and works offline.
+- A command-line tool published to npm that reads any format 1 file and writes the `achievable` document for agents.
 - A guide that tells agents how to use the tool.
 
-### Out of version 1
+### Out of scope
 
+- Fixed-weight equipment and selectorised machines: fixed dumbbells and kettlebells, pin stacks, bands, bodyweight. The coach's grid handles them (strength-coach ADR 0021).
+- Editing the inventory inside the app. A file is written outside the app and imported.
+- Accounts, sync, or any server. The set-up link carries the inventory itself.
 - Workout logging, rest timers, and any link to Hevy.
-- Accounts, sync, or any server.
-- Editing the inventory inside the app.
-- Remembering what is loaded now, or working out the fewest plate changes between two loadings. Version 2 adds this: see section 16.
 - One-rep-max and percentage calculators.
-- The rack. Mirafit publishes no load rating for the M130, so there is nothing to check against.
 - Typed or spoken sentences as input.
+- Named drawings per product (trap bar, kettlebell, dip belt). The kind draws; the name says what it is.
+- A starter inventory or an in-app preset.
 
 ## 4. Equipment
 
-Full detail, sources and open questions are in [research/equipment-specs.md](research/equipment-specs.md). This section holds the values the app uses.
-
-Status values: **verified** (manufacturer or distributor states it), **owner** (the owner confirmed it on the equipment), **unverified**.
-
-### 4.1 Plates
-
-| Plate | Type | Count | Weight | Stack length per plate | Shape | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| 22.5 lb | Quick-Lock | 5 | 22.5 lb | 1.875 in | Square | Weight verified; length unverified |
-| 5 lb | Quick-Lock | 24 | 5 lb | 0.5 in | Square | Weight verified; length unverified |
-| 2.5 lb | Quick-Lock | 4 | 2.5 lb | 0.25 in | Square | Weight verified; length unverified |
-| Micro | Quick-Lock | 4 | 1.25 lb | 0.25 in | Round | Weight verified; length unverified |
-| Vest block | Vest block | 30 | 1 kg | n/a | Block | Weight verified; count unverified |
-
-Quick-Lock plates total 247.5 lb.
-
-Stack length is how much a plate adds to a stack. Ironmaster publishes no thickness, so these values are calculated from published dumbbell lengths. They set how many plates a locking screw holds and how the picture is drawn.
-
-### 4.2 Locking hardware
-
-| Item | Count | Weight used | Holds | Status |
-| --- | --- | --- | --- | --- |
-| Standard locking screw | 4 | 2.5 lb | Up to 3.25 in of plates (six 5 lb + one 2.5 lb) | Verified |
-| Long locking screw | 5 | 2.5 lb | Up to 5.125 in of plates (one 22.5 lb + six 5 lb + one 2.5 lb) | Listed weight verified. Real weight is about 3 lb |
-| Ironmaster spin-lock collar | 2 | 1 lb | n/a | Owner: weighed at 433 g, counted as 1 lb |
-| Mirafit 1" clamp collar | 4 | 0 lb | n/a. 1.26 in wide | Owner: nylon, weighs next to nothing |
-
-Ironmaster counts the long screw as 2.5 lb, and so does the app. A dumbbell listed at 120 lb weighs about 121 lb.
-
-### 4.3 Implements
-
-| Implement | Count | Base weight | Positions | Plate types | Limit |
-| --- | --- | --- | --- | --- | --- |
-| Straight bar | 1 | 18 lb, plus collars | 2 sides | Quick-Lock | 210 lb of plates |
-| Dumbbell | 2 | 5 lb handle + 2 screws = 10 lb | 2 ends | Quick-Lock | 120 lb per dumbbell |
-| Kettlebell | 1 | 22.5 lb handle + 1 screw = 25 lb | 1 stack | Quick-Lock | 80 lb |
-| Leg attachment | 1 | 0 lb (plates only) | 1 stack | Quick-Lock | 100 lb of plates |
-| Weighted vest | 1 | 0 kg | Front, back | Vest block | 30 blocks |
-
-Notes:
-
-- **Straight bar.** Ironmaster states "about 18 lb". The owner weighed it at 17.7 lb with its collars off and counts it as 18 lb. The app adds the collar weight: 2 lb for two spin-lock collars, 0 lb for two clamp collars. Status: owner. Each side has 11.5 in for plates and the collar.
-- **Bare handles.** A dumbbell with no screws and no plates weighs 5 lb. A kettlebell with no screw and no plates weighs 22.5 lb. Both are valid loadings.
-- **Leg attachment.** Its lever weight is not published. The app reports plate weight only.
-- **Vest.** The empty vest's weight is not published. It counts as 0 kg. Status: unverified.
-- **Leg attachment and Olympic plates.** The attachment also takes Olympic plates. The owner has none, so version 1 lists Quick-Lock only.
+Moved in version 3 to [inventory/README.md](../inventory/README.md), beside the owner's inventory file. The values the worked examples use are in the file itself.
 
 ## 5. Inventory file
 
@@ -460,14 +431,7 @@ Plates in a position are listed from innermost to outermost. `leftover` assumes 
 
 ## 10. Static JSON
 
-The deployment publishes two files beside the web app. Any agent with web access can read them with no login.
-
-| File | Contents |
-| --- | --- |
-| `api/inventory.json` | The inventory file as deployed |
-| `api/achievable.json` | The List result for every implement over its full range, with the whole pool free. The barbell has one table per collar choice. Dumbbells have one table for a pair and one for a single. |
-
-The build generates `achievable.json` from the library, so it cannot disagree with the app.
+Retired in version 3. The `achievable` command replaces it: see section 17.8.
 
 ## 11. Agent guide
 
@@ -533,19 +497,7 @@ Each step ends in something that works and can be reviewed alone.
 
 ## 13. Open items
 
-None of these block the build. Each is one value in the inventory file.
-
-| Item | Value used now | Settled by |
-| --- | --- | --- |
-| Long screw's real weight | 2.5 lb (Ironmaster's convention) | Kitchen scale |
-| Empty vest weight, and block count | 0 kg, 30 blocks | Bathroom scale, and counting |
-| Do 2 × 22.5 + 12 × 5 lb fit on one bar side with the collar on | Allowed. Calculated to fit with a clamp collar, 0.49 in spare | Loading it once |
-| Does a long screw lock on a lightly loaded kettlebell | Allowed, with a warning | Trying it once |
-| Do two 22.5 lb plates fit on the kettlebell | Not allowed: at most one | Trying it once |
-| Shortest stack a long screw locks on a dumbbell | 3.0 in | Trying it once |
-| Plate stack lengths | Calculated values in 4.1 | Measuring a stack of five 5 lb plates |
-
-The research file lists further checks. They affect drawing scale only.
+Moved in version 3 to [inventory/README.md](../inventory/README.md). None blocks a build.
 
 ## 14. Follow-ups outside this build
 
@@ -638,8 +590,416 @@ Properties:
 
 ### 16.7 Tickets
 
-Three, each shippable alone, built unattended as described in CLAUDE.md.
+Three, each shippable alone, built unattended as described in CLAUDE.md at the time.
 
 1. **Library.** Current loading on Load, ranking by changes, relaxed order, Reverse order warning removed, `changes` in the result, examples 16 to 20 as tests.
 2. **Web app.** Loaded and Unload, the strip, the changes block, picture highlight, interactive "other ways", Loaded on Reverse, device storage. The ticket ends with a full check in a real browser, phone-sized and desktop, that every screen looks right and works well.
 3. **Command-line tool and agent guide.** `--from`, JSON `changes`, guide update.
+
+## 17. Version 3: any plate-loaded gym
+
+Agreed 2026-11-02. Everything in sections 1 to 16 stands unless this section says otherwise. Where this section replaces a rule, it names the rule it replaces.
+
+### 17.1 Purpose
+
+plate-pool stops being a calculator for one home gym and becomes one for any plate-loaded gym. The gym is described by an **inventory file** in **format 1**, the public contract. The owner's file is the reference example and the fixture for every worked example, and the owner's own gym reaches the phone the same way anyone's does: through a set-up link.
+
+Three things change for the three users:
+
+- **The phone.** The web app opens with no inventory. A **kit** arrives by set-up link, pasted file or chosen file, and is stored on the device. One kit at a time.
+- **The desktop and the tool.** The command-line tool bundles no inventory. `--inventory <path>` or `PLATE_POOL_INVENTORY` names the file, and an `achievable` command writes the tables that the static JSON used to carry.
+- **Agents.** The static JSON (section 10) retires. An agent that plans training runs `achievable` over the athlete's file, as the coach does (strength-coach ADR 0021), and links the athlete to the app with a set-up link and per-line links.
+
+Nothing else moves: Load, List and Reverse, several implements sharing one pool, current loading, offline, the picture.
+
+### 17.2 Terms
+
+The glossary in section 2 defines **implement kind**, **bar**, **handle**, **stack**, **vest**, **kit**, **kit screen**, **set-up link**, **per-line link** and **format**. Four kinds carry all loading logic. A kind fixes an implement's positions and its drawing; every other difference between implements is a field in the file.
+
+| Kind | Positions | Covers |
+| --- | --- | --- |
+| **bar** | two sides, always mirrored | straight bar, Olympic bar, EZ bar, trap bar, safety squat bar, Swiss bar, a two-post machine such as a belt squat or leg press |
+| **handle** | two ends, may be uneven | loadable dumbbell |
+| **stack** | one stack | loadable kettlebell, leg attachment, dip belt, landmine, a one-post machine |
+| **vest** | front and back | weighted vest, plate carrier |
+
+### 17.3 Inventory format 1
+
+Format 1 replaces the shape in section 5. The file is still the single source of truth for every answer, and still holds equipment only.
+
+#### 17.3.1 The file
+
+```json
+{
+  "$schema": "./inventory.schema.json",
+  "format": 1,
+  "name": "Home gym",
+  "lengthUnit": "in",
+  "plateTypes": [],
+  "plates": [],
+  "hardware": [],
+  "implements": []
+}
+```
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `$schema` | no | For editors. The library never loads it. |
+| `format` | yes | `1`. Any other value is refused by name: "Inventory format 2 is not supported. This version reads format 1." |
+| `name` | yes | The kit's name. Shown on the kit screen and written into the `achievable` header. |
+| `lengthUnit` | yes | `mm` or `in`. One unit for every length in the file: `stackLength`, `capacity`, `minStack`, `width`, `positionLength`, `diameter`, `maxPlateDiameter`. The `In` suffixes of section 5 go. |
+
+Weight units stay where they are: on each plate type, hardware item and implement. Every weight and length keeps the value shape `{ "listed", "measured"?, "status", "note"? }` with `status` required (`verified`, `owner` or `unverified`). Measured beats listed (6.1). There is no bare-number shorthand.
+
+Ids are `[a-z0-9-]+`, unique within each list. An implement id may not be `view`, `uneven`, `kit`, `inventory`, `single`, `pair` or `hardware`, because those words are URL parameters and key suffixes (17.6, 17.8).
+
+#### 17.3.2 Plate types
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `id`, `name`, `unit` | yes | As today. |
+| `bore` | yes | `olympic`, `standard`, `quick-lock` or `block`. It drives the drawing only: a hole or a pocket. Fit is stated by each implement's `accepts` alone, because a dip belt takes two bores and a leg attachment three. Carrier plates are `block`. |
+
+#### 17.3.3 Plates
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `id`, `type`, `count`, `weight` | yes | As today. |
+| `countStatus` | no | As today. |
+| `name` | no | A display name. Plates are named by weight everywhere; a name is for the odd plate such as a micro plate. |
+| `stackLength` | yes, unless the type's bore is `block` | The length the plate adds to a stack. |
+| `diameter` | no | Used by the picture (17.7) and checked against `maxPlateDiameter`. |
+| `colour` | no | A CSS colour. Wins over the palette in 17.7. |
+| `shape` | yes | `square`, `round`, `hexagonal`, `twelve-sided` or `block`. Draws the plate button on Reverse only. |
+
+#### 17.3.4 Hardware
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `id`, `name`, `kind`, `count`, `unit`, `weight` | yes | `kind` is `screw`, `collar` or `pin`. |
+| `capacity` | no, any kind | The longest stack the item holds. |
+| `minStack` | no, any kind | The shortest stack the item locks on. A value object, so it can be unverified. |
+| `width` | no, any kind | The length the item takes on a position. |
+| `note` | no | Shown whenever the item is used as a fallback (17.4). |
+
+#### 17.3.5 Implements
+
+Common fields: `id`, `name`, `kind`, `count`, `unit`, `base`, `accepts`. `kind` is required and is `bar`, `handle`, `stack` or `vest`. `positions` and `symmetric` go: the kind fixes the positions. There is no `picture` field: the kind draws (17.7).
+
+| Field | bar | handle | stack | vest | Meaning |
+| --- | --- | --- | --- | --- | --- |
+| `hardware` (`options`, `default`?, `perPosition`) | optional | optional | optional | no | As today. `"none"` in `options` means hardware is optional. Without `default`, the first option that fits is used. |
+| `positionLength` | optional | optional | optional | no | The length of one position for plates and hardware together. |
+| `unevenAllowance` | no | required | no | no | The most the two ends may differ by, in the implement's unit. `0` means even only. |
+| `unevenAllowanceRelaxed` | no | optional | no | no | The allowance when every plate weighing at most `unevenAllowance` is in use on another implement. Omit to turn the relaxation off. |
+| `maxPlateDiameter` | optional | optional | optional | no | A plate with a larger `diameter` is refused on this implement. |
+| `maxPerPosition` | optional | optional | optional | optional | A map of plate id to the most of that plate one position holds. |
+| `maxPlateWeight`, `maxTotal` | optional | optional | optional | optional | As today. |
+| `note` | optional | optional | optional | optional | A fixed sentence on every result. |
+| `baseIncludesHardware` | optional | optional | optional | no | Default `false`. `true` means `base` already includes the hardware, so no hardware weight is ever added, whichever option is chosen. |
+
+The kinds:
+
+- **bar**: two sides, always mirrored. Hardware optional; one collar per side at most is the usual `perPosition`. A two-post machine is a bar with no hardware.
+- **handle**: two ends. `count` of 2 or more means a request is a pair unless it asks for one; `count` 1 is always single. Hardware on one end only, with the other end empty, is allowed when `unevenAllowance` is above 0, and the hardware counts toward the difference. The result is marked uneven and names the heavier end.
+- **stack**: one position. Hardware optional: a kettlebell's screw or pin; a dip belt has none. A landmine is a stack whose `base` is the bar's weight, with a `note`.
+- **vest**: front and back. Plates split as evenly as possible by weight, with the heavier side at the back on a tie. No hardware. A plate carrier is a vest with every plate capped at 1 per position in `maxPerPosition`.
+
+Example, one implement per kind, in a kilogram and millimetre file:
+
+```json
+{
+  "format": 1,
+  "name": "Olympic kit",
+  "lengthUnit": "mm",
+  "plateTypes": [
+    { "id": "olympic", "name": "Olympic", "unit": "kg", "bore": "olympic" },
+    { "id": "carrier-plate", "name": "Carrier plate", "unit": "kg", "bore": "block" }
+  ],
+  "plates": [
+    { "id": "20", "type": "olympic", "count": 2, "weight": { "listed": 20, "status": "verified" }, "stackLength": { "listed": 55, "status": "verified" }, "diameter": 450, "colour": "#1e5bb8", "shape": "round" },
+    { "id": "carrier-8", "type": "carrier-plate", "count": 2, "weight": { "listed": 8, "status": "verified" }, "shape": "block" }
+  ],
+  "hardware": [
+    { "id": "collar", "name": "Spring collar", "kind": "collar", "count": 2, "unit": "kg", "weight": { "listed": 0.25, "status": "verified" }, "width": 60 }
+  ],
+  "implements": [
+    { "id": "bar", "name": "Olympic bar", "kind": "bar", "count": 1, "unit": "kg", "base": { "listed": 20, "status": "verified" }, "accepts": ["olympic"],
+      "hardware": { "options": ["collar", "none"], "default": "collar", "perPosition": 1 }, "positionLength": { "listed": 415, "status": "verified" } },
+    { "id": "dumbbell", "name": "Loadable dumbbell", "kind": "handle", "count": 2, "unit": "kg", "base": { "listed": 2, "status": "verified" }, "accepts": ["olympic"],
+      "hardware": { "options": ["collar"], "perPosition": 1 }, "positionLength": { "listed": 150, "status": "verified" }, "unevenAllowance": 0 },
+    { "id": "belt", "name": "Dip belt", "kind": "stack", "count": 1, "unit": "kg", "base": { "listed": 0, "status": "verified" }, "accepts": ["olympic"] },
+    { "id": "vest", "name": "Plate carrier", "kind": "vest", "count": 1, "unit": "kg", "base": { "listed": 1.5, "status": "verified" }, "accepts": ["carrier-plate"], "maxPerPosition": { "carrier-8": 1 } }
+  ]
+}
+```
+
+#### 17.3.6 Validation
+
+The library's reader is the one validator, because files now arrive from outside the build. It checks what the JSON Schema checks (shape and enumerations) and what a schema cannot:
+
+- `format` is 1, or the file is refused by name.
+- Ids are unique within each list and match `[a-z0-9-]+`; no implement id is a reserved word.
+- Every `type`, `accepts` entry, `options` entry and `maxPerPosition` key resolves to an id in the file, and `default` is in `options`.
+- `stackLength` is present on every plate whose type's bore is not `block`.
+- Each field appears on a kind that allows it, and `unevenAllowance` is present on every handle.
+
+Errors name the JSON path, for example `implements[1].unevenAllowance: required on a handle`. The reader returns every error it finds, and the web app shows up to three.
+
+The JSON Schema is published in two places only: the repo, beside the example file, so its raw GitHub URL is stable for authors and the coach's kit skill; and the npm package, as `plate-pool/inventory.schema.json`. The site does not serve it. The library does not load it, so no schema dependency ships in the npm package or the web app. The repo's validate script still runs the schema over the example file.
+
+#### 17.3.7 The owner's file
+
+`inventory/inventory.json` migrates to format 1 with every value and note unchanged. It is the reference example for authors and the fixture for the worked examples in sections 7, 16.6 and 17.11. Its equipment detail and open measurement items, formerly sections 4 and 13, live in [inventory/README.md](../inventory/README.md). The migration:
+
+- adds `format`, `name` ("Home gym") and `lengthUnit` ("in"), and drops the `In` suffixes;
+- gives the plate types a `bore` (`quick-lock`, `block`) and the plates a `stackLength`, a `colour` matching today's picture, and `name` "Micro" on the micro plate;
+- gives each implement its `kind` and moves every rule that section 6.2 states in words into fields: `maxPerPosition` for the micro plate and the kettlebell's 22.5 lb plate, `unevenAllowance` 2.5 and `unevenAllowanceRelaxed` 5 on the dumbbell, `note` on the leg attachment, `capacity` and `minStack` on the screws, `width` on the clamp collar, `positionLength` on the bar;
+- gives the long screw the `note` "It may stick out at the top, which Ironmaster's manual calls normal."
+
+Hardware is then chosen by capacity (17.4), not by the 75 lb and 57.5 lb thresholds, and every worked example still passes. The one result that changes is example 19 (17.11).
+
+### 17.4 Calculation rules
+
+These replace section 6.2 and the "all Quick-Lock implements" rules. Sections 6.1, 6.3 to 6.6 and 16.3 stand, with the changes named here. No rule in the library names a plate, hardware or implement id.
+
+**Positions and mirroring, by kind**
+
+- A **bar** carries the same plates in the same order on both sides.
+- A **handle** has two ends that may differ by at most `unevenAllowance`, or by `unevenAllowanceRelaxed` when every plate weighing at most `unevenAllowance` is in use on another implement in the request; the result says why. A handle with `count` 2 or more is loaded as a pair unless the request asks for one; both handles in a pair get the same loading. The uneven switch (8.8) turns uneven loading off for every handle in the request.
+- A **stack** has one position.
+- A **vest** splits its plates between front and back as evenly as possible by weight, the heavier side at the back on a tie. A vest target is read in the vest's unit.
+
+**Hardware**
+
+- The hardware for a position is chosen by capacity. The library takes the first option in `options` order, starting at `default` when set, whose `capacity` (if stated) holds the stack on every position and whose `minStack` (if stated) is met. The same option goes on every position of one implement.
+- When the first option that fits is not free in the pool, the next option that fits is used and the result warns: "No <preferred name> is free, so the <implement name> uses a <chosen name>." followed by the chosen item's `note` if it has one.
+- `"none"` in `options` means hardware is optional; it is chosen only when no other option fits or is free. With `baseIncludesHardware` true no hardware weight is added.
+- A **change** (section 2) counts hardware of kind `screw` and `pin`; a collar never counts. A swap counts two.
+
+**Lengths**
+
+- On every position of every kind, the plates' `stackLength` total plus the chosen hardware's `width` (if stated) must fit `positionLength` (if stated), and the plates' total must fit the hardware's `capacity` (if stated). This generalises the bar-only `positionLength` and the screw-only capacity of version 1.
+- A plate whose `diameter` is above the implement's `maxPlateDiameter` is never loaded on it.
+
+**Caps and limits**
+
+- `maxPerPosition` limits how many of one plate a position holds.
+- `maxPlateWeight` and `maxTotal` work as in 6.2: a target above the limit is refused, and the result states the limit and shows the heaviest allowed loading.
+
+**Order and notes**
+
+- Fresh loadings put the heaviest plate innermost and the lightest outermost. There is no field: the micro plate is outermost because it is lightest. Section 16.3 rule 4 still relaxes this when plates are added to a current loading.
+- An implement's `note` appears on every result for it.
+
+**Units and text**
+
+- A bare target reads in the implement's `unit`; a suffix overrides it (`bar=80kg`). Results show the implement's unit first and the other unit beside it. This replaces "pounds first" in 6.1 rule 4.
+- Text names things by their `name`: the implement, the hardware, the kit. Position labels are "each side" for a bar, "end A" and "end B" for a handle, "stack" for a stack, "front" and "back" for a vest. "No 2.5 lb or micro plate is free" becomes "no plate of <allowance> or less is free". The List flag "micro plates used" becomes "smallest plate used", keyed to the lightest plate the implement accepts.
+
+### 17.5 Web app
+
+Sections 8 and 16.4 stand with these changes.
+
+#### 17.5.1 The kit screen: no kit, no app
+
+- With no kit on the device the app shows the kit screen and nothing else: the masthead, one line saying what the app does, a card explaining that a set-up link installs itself, the import panel, and a pointer for people without a file.
+- **Import panel**: a "Paste your inventory file" field first, then "Use this file" and "Choose a file…". Paste is the route that always works on a phone and in the installed app; the file picker is the desktop route.
+- **Errors** come from the reader (17.3.6) and name the JSON path, up to three at once, shown above the buttons. The pasted text stays so it can be fixed in place.
+- **Pointer**: "No file yet? An inventory describes your plates, hardware and bars. Write one with strength-coach, which also makes your set-up link." linking to the strength-coach README. There is no starter inventory and no preset.
+- Targets in the query (`?barbell=175lb`) are kept while the kit screen shows and applied once a kit is in.
+
+#### 17.5.2 Arrival by set-up link
+
+- Opening a set-up link (17.6) shows a confirm card on the kit screen: "Set-up link opened", the kit's `name`, a one-line summary (implements, plate entries, hardware items) and one button, "Use <name> on this phone". One tap, always: the card names what is about to be installed, and when a kit is already stored it says it replaces it and what that clears.
+- The tap stores the kit, replaces the URL so the fragment is gone (a shared URL never carries an inventory), and lands on the Load screen with any targets the link carried.
+- A fragment that fails to decode or validate shows its error at the top of the kit screen, with the import panel below.
+
+#### 17.5.3 The stored kit
+
+- The kit's name sits under "plate-pool" in the masthead as a chip ("Home gym ▾"). Tapping it opens the **kit page**: name, counts, the short hash as "kit 3f9a1c7e", a Done button and Replace kit. Nothing is editable.
+- **Replace kit** opens the import panel on the kit page with the warning "Replacing the kit clears what is loaded on every implement and forgets the last implement you used." The old kit stays until the new file validates, so there is never a gap with no kit.
+- Storage keeps the file's bytes as received, so the hash the app shows is the hash the coach computed. One kit at a time.
+- Replacing the kit clears every current loading, the last implement used and every per-implement hardware choice. The uneven switch survives.
+
+#### 17.5.4 Generic screens
+
+- **Implement tabs** are the kit's implements in file order, labelled by `name`.
+- **Options per implement**: a hardware choice on any implement with more than one entry in `options`, labelled by `name`; pair or single on a handle with `count` 2 or more.
+- **Settings** (8.8) become: a hardware choice per implement, keyed by implement id; the uneven switch; the last implement used.
+- The current-loading strip (16.4) starts with the implement's `name`: "Straight bar · 173 lb · each side 2 × 22.5, 6 × 5, 1 × 2.5". The per-implement wordings ("On the bar", "In the vest") go.
+- The List screen's flag column uses "smallest" for the smallest plate used and drops the screw column; the hardware shows in the loading.
+- The Reverse screen's plate buttons are the plates the implement accepts, in weight order, outlined by `shape`. The mirroring switch shows on handles only.
+- Nothing in the web app names an implement, plate or hardware id.
+
+#### 17.5.5 Hash mismatch
+
+A per-line link whose `kit` differs from the stored kit's short hash still shows the result, with a yellow banner above the implement tabs: "These targets were worked out for a different kit. Open your set-up link again if your gym has changed." The banner goes when the target changes or the kit is replaced.
+
+#### 17.5.6 Desktop and offline
+
+- The same layout at the app's maximum width; nothing desktop-specific.
+- The first visit caches the shell whether or not a kit is in. A set-up link opened later works offline: the fragment never reaches the network, and the device decodes it with `DecompressionStream("deflate-raw")` and hashes it with `crypto.subtle.digest`. No library is added for either.
+
+### 17.6 Links
+
+This replaces the table in 8.7. Two links, with different jobs, so neither parameter is overloaded.
+
+**Set-up link**: `https://joeuk89.github.io/plate-pool/#inventory=<payload>`. The payload is the inventory file's bytes compressed with raw deflate (no zlib header or trailer), then base64url without padding. It rides in the fragment so it never reaches the server or the service worker's cache key. The owner's file is about 1.4 KB as a link.
+
+**Per-line link**: `https://joeuk89.github.io/plate-pool/?<parameters>`, as today, with these parameters:
+
+| Parameter | Meaning | Example |
+| --- | --- | --- |
+| `<id>` | Target for that implement. A pair on a handle with `count` 2 or more. | `barbell=175lb` |
+| `<id>.single` | Target for one of a handle. | `dumbbell.single=12.5lb` |
+| `<id>.pair` | The explicit pair form. An error on a handle with `count` 1. | `dumbbell.pair=40lb` |
+| `<id>.hardware` | The hardware choice for that implement: an id from its `options`, or `none`. Omitted when the implement has no hardware. | `barbell.hardware=collar-clamp` |
+| `uneven` | `0` turns uneven loading off for every handle. | `uneven=0` |
+| `view` | `load` (default), `list` or `reverse`. | `view=list` |
+| `kit` | The first 8 hex characters of the inventory's SHA-256. | `kit=3f9a1c7e` |
+
+Target parameters' order is priority order; `.hardware`, `uneven`, `view` and `kit` do not count toward it. A bare value reads in the implement's unit; links the app and the coach generate always carry the unit suffix. The `dumbbells` and `collars` parameters go.
+
+### 17.7 The picture
+
+This replaces 8.4's plate and colour rules. The kind draws the implement: there is no `picture` field and no named drawing per product. The implement's `name` on its tab and card says what it is; the picture's job is the plates on their positions.
+
+- **bar**: a faded shaft, a stop and one sleeve, mirrored. **handle**: a grip with two stopped ends. **stack**: a mount, a stop and a post. **vest**: front and back grids. A plate carrier is the vest drawing with one cell per panel; a belt squat or leg press is the bar or stack drawing with no hardware.
+- **Scale**: the picture scales to the largest plate the implement can take: the largest accepted plate's `diameter`, capped by `maxPlateDiameter` when set. The empty sleeve or post draws at `positionLength`, as today.
+- **Plate height** is one of four bands of that reference, by the ratio of the plate's `diameter` to it: at least 0.85 → full height; at least 0.6 → 0.78; at least 0.4 → 0.58; else 0.42. A plate with no `diameter` draws at full height.
+- **Plate width** comes from `stackLength`, with a minimum wide enough for a two-digit label inside. Labels that still do not fit go above with leaders, as today. `shape` does not draw; every plate is the same rounded rectangle seen from the side.
+- **Colour**: a plate's `colour` field wins when set. Otherwise the kit's distinct weights per unit, heaviest first, take a fixed palette in order: red, blue, yellow, green, white, purple, orange, teal, brown, grey, with ink chosen for contrast and a steel outline on near-white plates. The scope is the whole kit, so the same weight has the same colour on every implement (8.4). No standards table ships in the app.
+- **Hardware**: one glyph per `kind`: a collar is the clamp block, a screw is the disc, a pin is a thin rod through the post. `width` sets the collar's drawn width when stated. The label names the item.
+- An uneven handle marks its heavier end, and current-loading highlights (16.4) are unchanged.
+
+### 17.8 Command-line tool and `achievable`
+
+Section 9 stands with these changes.
+
+**Naming**
+
+- Implements are named by inventory id everywhere: `load barbell=173`, `list barbell`, `reverse barbell`. The `dumbbells` alias goes.
+- Pair or single is a key suffix, as in 17.6: `dumbbell=40` is a pair on a handle with `count` 2 or more, `dumbbell.single=12.5` is one, `dumbbell.pair=40` the explicit form. `list dumbbell.single --from 10 --to 60` works the same way.
+- The hardware choice is a per-implement argument: `barbell.hardware=collar-clamp` or `barbell.hardware=none`. Only ids in that implement's `options` are accepted. `--collars` goes.
+- `--no-uneven` stays global.
+- A bare value reads in the implement's unit; a suffix overrides it.
+
+**Positions and plates**
+
+- Position flags by kind: bar `--side`; handle `--end-a`, `--end-b`; stack `--stack`; vest `--front`, `--back`. Each takes a plate list. `--blocks` goes.
+- A plate list is comma-separated weights with `count x weight` shorthand (`--side 2x22.5,6x5`, `--front 12x1`) and `weight:id` where two accepted plates share a weight (`--side 10:bumper-10`).
+- `--from <id>` takes the bare id and the position flags above. A current loading belongs to the implement, not to the pair or single request; for a pair, one description covers both.
+- `reverse` follows the pair rule of `load`: `reverse dumbbell` is the pair total on a handle with `count` 2 or more, `reverse dumbbell.single` is one.
+
+**Commands and options**
+
+| Command | Purpose | Example |
+| --- | --- | --- |
+| `load` | Loadings for one or more targets | `plate-pool load barbell=173 dumbbell=40` |
+| `list` | Achievable weights for one implement | `plate-pool list barbell --from 100 --to 200` |
+| `reverse` | Total for a given loading | `plate-pool reverse barbell --side 2x22.5,2x5` |
+| `inventory` | What the kit holds | `plate-pool inventory` |
+| `achievable` | The tables document for agents | `plate-pool achievable > home.achievable.json` |
+
+| Option | Meaning |
+| --- | --- |
+| `--inventory <path>` | The inventory file. Required unless `PLATE_POOL_INVENTORY` is set; wins when both are set. |
+| `--json` | Structured output for agents. |
+| `--no-uneven` | Turn uneven loading off for every handle. |
+
+- The package bundles no inventory. With neither `--inventory` nor `PLATE_POOL_INVENTORY`, every command exits 1 with "No inventory given. Pass --inventory <path> or set PLATE_POOL_INVENTORY."
+- `inventory` prints the kit's name and length unit, then the plates (count × weight, type, bore), the hardware (kind, capacity) and the implements (kind, positions, hardware options, caps). `--json` prints the file as read.
+- Text output is headed by the implement's `name`, with "pair" or "single" after a handle: `Straight bar  target 175 lb (79.4 kg)`. Position labels and hardware names follow 17.4.
+
+**JSON**
+
+- Position names by kind: `left` and `right`, `a` and `b`, `stack`, `front` and `back`. Each position carries `plates: number[]` as today plus `ids: string[]` in parallel, always present.
+- List rows: `micro` becomes `smallest`; `screw` goes, because `loading.hardware` carries the choice; `uneven` stays on every row.
+- `leftover` is unchanged, keyed by plate and hardware id.
+
+**`achievable`**
+
+`plate-pool achievable --inventory <path>` writes one JSON document to standard output and exits 0; invalid input exits 1 with the reason on standard error.
+
+```json
+{
+  "format": 1,
+  "plate_pool": "1.0.0",
+  "inventory_sha256": "<64 lower-case hex, SHA-256 over the inventory file's bytes as read>",
+  "name": "Home gym",
+  "tables": [
+    { "implement": "barbell", "hardware": "collar-clamp", "rows": [] },
+    { "implement": "barbell", "hardware": "none", "rows": [] },
+    { "implement": "dumbbell", "hardware": "screw-standard", "pair": true, "rows": [] },
+    { "implement": "dumbbell", "hardware": "screw-standard", "pair": false, "rows": [] },
+    { "implement": "leg", "rows": [] }
+  ]
+}
+```
+
+- `format` is the inventory format. `plate_pool` is the package version. `inventory_sha256` is hashed over the file's bytes exactly as read, so the coach's hash of the same file matches it.
+- One table per implement, per entry in its `options` (including `none`), and per pair and single on a handle with `count` 2 or more. `hardware` is absent when the implement has no hardware; `pair` appears on handles only. Rows are the `list --json` rows over the implement's full range with the whole pool free.
+- Order: file order, then `options` order, pair before single.
+- There is no default-hardware marker. If the coach asks for one, it is an additive field.
+
+**Static JSON** (section 10) retires. The deployment serves no `api/inventory.json` or `api/achievable.json`; `achievable` replaces them.
+
+### 17.9 Agent guide, README and site wording
+
+- The agent guide (section 11) is rewritten for any kit: it drops the owner's 18 lb rule and every named implement, says that `--inventory` or `PLATE_POOL_INVENTORY` is required, documents `achievable` and its document, the kit and the two links, and keeps the four rules that hold for every kit: a target is a total; implements share one pool; a request's order is its priority; read `warnings` and `unverified`. The snippet for other repos' agent instructions follows.
+- The README opens "A calculator for any plate-loaded gym", explains the inventory file and where the schema is, and states that the package bundles no inventory and the site opens with no kit.
+- The site's only landing is the kit screen (17.5.1); there is no separate landing page.
+- CLAUDE.md's first line and scope rule name version 3 and section 17.
+
+### 17.10 Build and release
+
+Section 12 stands with these changes.
+
+- **Layout**: `inventory/README.md` joins the example file and schema. `packages/web/api/` (the static JSON plugin) goes. Test fixtures for a second kit in kilograms and millimetres live under `packages/core/test/`; nothing but the owner's file is published as an example.
+- **The library** gains the reader and validator (17.3.6) and loses every named id. It still has no runtime dependencies and no access to files, network or browser features: the command-line tool and the web app read bytes and hand the library a string.
+- **The command-line tool** reads the file named by `--inventory` or `PLATE_POOL_INVENTORY`, and bundles the schema at `plate-pool/inventory.schema.json`.
+- **The web app** stores the kit's bytes on the device, decodes set-up links and hashes the kit with browser APIs (17.5.6). The deploy workflow no longer generates static JSON.
+- **Tests**: examples 1 to 20 and the properties in sections 7 and 16.6 run against the migrated owner file; examples 21 to 28 (17.11) are added. The command-line tool keeps one test per command, including `achievable` and the missing-inventory error. Web tests cover the kit screen's four routes in (set-up link, paste, file, replace), the mismatch banner, and the three Share paths (#45).
+- **Release**: the first npm release is `1.0.0`, and `plate_pool` carries that version. The release workflow and the tag rule in the README are unchanged.
+
+### 17.11 Worked examples
+
+Examples 1 to 20 stand and run against the migrated owner file, with one revision:
+
+| # | Change |
+| --- | --- |
+| 19 | With hardware chosen by capacity, 35 lb of plates per end is 3.125 in and fits a standard screw (capacity 3.25 in). Result: exact, put on 1 × 5 per end outside the 2.5, standard screws kept, 4 changes. |
+
+New examples, acceptance tests for version 3:
+
+| # | Input | Result |
+| --- | --- | --- |
+| 21 | The owner's file with `"format": 2` | Refused: "Inventory format 2 is not supported. This version reads format 1." Exit 1. |
+| 22 | The owner's file with an implement id `kit` | Refused, naming `implements[0].id`. |
+| 23 | `achievable --inventory inventory/inventory.json` | 14 tables in this order: barbell × 3 (collar-clamp, collar-spinlock, none), dumbbell × 6 (screw-standard pair, single; screw-long pair, single; none pair, single), kettlebell × 3, leg × 1, vest × 1. `name` is "Home gym". Every row's total, passed to `load`, is exact. |
+| 24 | `load dumbbell=80` on the owner's file | Exact, pair. Each end 1 × 22.5, 2 × 5, 1 × 2.5. Standard screws. |
+| 25 | `load bar=95.5` on the Olympic kit in 17.3.5 extended with 10, 5 and 2.5 kg plates (two of each) | Exact. Each side 20, 10, 5, 2.5 with a spring collar. Bar 20 kg, collars 0.5 kg, plates 75 kg. Lengths checked in mm. |
+| 26 | `load dumbbell.single=22.5` on the same Olympic kit, `unevenAllowance` 0 | Exact: each end 10 with a spring collar. With `dumbbell.single=25`: not exact, below 22.5, above 27.5 (each end 10, 2.5), because the ends may not differ. |
+| 27 | The owner's file as a set-up link, opened on a device with no kit | The confirm card names "Home gym"; after the tap the URL has no fragment, and `?barbell=173lb` shows example 2. |
+| 28 | `?barbell=173lb&kit=00000000` with the owner's kit stored | Example 2's result with the mismatch banner. Changing the target removes the banner. |
+
+Properties that must hold for every kit:
+
+- Every row from `achievable`, passed to Load with the row's hardware and pair setting, returns an exact result.
+- Reverse of any loading from Load returns the same total.
+- No result exceeds the pool, a `positionLength`, a `capacity` or a `maxPerPosition` cap.
+- A file that passes the reader passes the JSON Schema, and the reader rejects every file the schema rejects.
+
+### 17.12 Tickets
+
+Six build tickets, each shippable alone, built unattended as version 2 was with a copy of the version 2 workflow (the blocked-by table, the rules paragraph, the browser walkthrough and the screenshot list change; no new stage).
+
+1. **Library: inventory format 1** (#63). The reader and validator, the four kinds, every rule as data, generic text, `ids` in positions, list row renames, the migrated owner file and schema, the second-kit fixture. Examples 1 to 26 pass. Blocks every ticket below.
+2. **Command-line tool: generic names, `achievable` and no bundled inventory** (#64). Blocked by #63.
+3. **Web app: generic implements and the picture** (#65). Tabs, options, labels and settings from the kit; the kind draws; banded sizes; the palette; hardware glyphs. Blocked by #63.
+4. **Web app: the kit screen, set-up link, stored kit and retired static JSON** (#66). Blocked by #65.
+5. **README, agent guide and CLAUDE.md for any plate-loaded gym** (#67). Blocked by #64 and #66.
+6. **First npm release** (#21), re-pointed at version 3. Blocked by #64 and #67. The owner does this one.
+
+The Share button (#45) and the tab bug (#44) ride along unblocked.
