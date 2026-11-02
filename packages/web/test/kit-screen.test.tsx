@@ -164,6 +164,7 @@ describe("arrival by set-up link (spec 17.5.2)", () => {
     expect(within(card).getByText(/^It replaces/).textContent).toBe(`It replaces Olympic kit. ${replaceWarning}`);
     fireEvent.click(within(card).getByRole("button", { name: "Use Home gym on this phone" }));
     expect((await screen.findAllByRole("tab")).map((tab) => tab.textContent)).toContain("Straight bar");
+    expect(screen.getByRole("button", { name: /^Home gym/ })).toBeTruthy();
   });
 
   it("Keep leaves the stored kit in place and drops the fragment", async () => {
@@ -189,6 +190,18 @@ describe("arrival by set-up link (spec 17.5.2)", () => {
     const alert = await screen.findByRole("alert");
     expect(text(alert)).toContain("This set-up link is damaged");
     expect(alert.compareDocumentPosition(pasteField()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("with a kit stored, a damaged fragment opens the kit page with the error and the Replace panel, and Done keeps the kit", async () => {
+    await install(ownerText);
+    window.history.replaceState(null, "", "/?barbell=173lb#inventory=not-a-deflate-stream");
+    render(<App />);
+    expect(text(await screen.findByRole("alert"))).toContain("This set-up link is damaged");
+    expect(text(screen.getByRole("region", { name: "Kit on this device" }))).toContain("Home gym");
+    expect(text(screen.getByRole("region", { name: "Replace kit" }))).toContain(replaceWarning);
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    await exampleTwoShows();
+    expect(window.location.hash).toBe("");
   });
 
   it("a fragment that fails to validate shows the reader's errors", async () => {
