@@ -20,21 +20,21 @@ plate-pool knows every plate, piece of locking hardware and implement in one hom
 Also:
 
 - A bare number means pounds, or kilograms for the vest. Add a unit to be explicit: `175lb`, `80kg`, `vest=12kg`.
-- `dumbbells` means a pair. `dumbbell` means one.
+- `dumbbell=40` means a pair. `dumbbell.single=40` means one. `dumbbell.pair=40` is the explicit pair.
 - When no loading reaches a target exactly, the result holds the closest loading `below` and `above`, and `recommended` names the nearer one.
 - Every result lists the `unverified` values it used, such as `vest.base`. Tell the user when a total depends on one.
 - Read `warnings`. They say why a target is refused or missed, or which rule a loading breaks.
 
 ## Command-line tool
 
-Run it with `npx plate-pool`. It needs no setup: the package bundles the owner's inventory file. Add `--json` to every command for structured output.
+Run it with `npx plate-pool`. The package bundles no inventory: name the file with `--inventory <path>` or set `PLATE_POOL_INVENTORY`, and every command below assumes one of them. Add `--json` to every command for structured output.
 
 | Option | Meaning |
 | --- | --- |
 | `--json` | Structured output |
-| `--collars <clamp\|spinlock\|none>` | Barbell collar choice. Default: `clamp` |
-| `--no-uneven` | Turn uneven dumbbell loading off |
-| `--inventory <path>` | Use a different inventory file |
+| `--no-uneven` | Turn uneven loading off for every handle |
+| `--inventory <path>` | The inventory file. Required unless `PLATE_POOL_INVENTORY` is set |
+| `<id>.hardware=<hardware id>` | The hardware for one implement, such as `barbell.hardware=collar-spinlock` or `barbell.hardware=none` |
 
 The tool exits with code 0 for any valid request, including one with no exact loading. It exits with code 1 for invalid input and writes the reason to standard error.
 
@@ -42,10 +42,10 @@ Plates in a position are listed from innermost to outermost. Weights are in the 
 
 ### load
 
-Loadings for one or more targets, in priority order. Implement names: `barbell`, `dumbbells`, `dumbbell`, `kettlebell`, `leg`, `vest`.
+Loadings for one or more targets, in priority order. Implements are named by their inventory id: `barbell`, `dumbbell`, `kettlebell`, `leg`, `vest`.
 
 ```sh
-npx plate-pool load barbell=175 dumbbells=40 --json
+npx plate-pool load barbell=175 dumbbell=40 --json
 ```
 
 ```json
@@ -132,7 +132,7 @@ npx plate-pool load barbell=175 dumbbells=40 --json
 
 If an implement already carries plates, tell `load` what is on it now: its current loading. Each loading in the result then gains a `changes` block, and the fewest changes breaks ties between loadings equally close to the target. Closeness to the target still comes first.
 
-Write `--from <implement>` followed by the plate options of `reverse`: `--side`, `--end-a` and `--end-b`, `--stack` or `--blocks`. The implement name matches a target's name, such as `dumbbells` for `dumbbells=80`. Give one `--from` per implement; an implement without one gets the same answer as with no `--from` at all, and no `changes` block.
+Write `--from <implement>` followed by the plate options of `reverse`: `--side`, `--end-a` and `--end-b`, `--stack`, or `--front` and `--back`. The id is the implement's bare id, such as `dumbbell` for `dumbbell=80` or `dumbbell.single=40`. Give one `--from` per implement; an implement without one gets the same answer as with no `--from` at all, and no `changes` block.
 
 ```sh
 npx plate-pool load barbell=175 --from barbell --side 22.5,22.5,5,5,5,5,5,5,2.5 --json
@@ -275,10 +275,10 @@ npx plate-pool list barbell --from 100 --to 105 --json
 
 ### reverse
 
-The total of a loading you describe. Give plates innermost first, separated by commas: `--side` for each barbell side, `--end-a` and `--end-b` for a dumbbell, `--stack` for the kettlebell and leg attachment, and `--blocks` for the number of vest blocks.
+The total of a loading you describe. Give plates innermost first, separated by commas: `--side` for each barbell side, `--end-a` and `--end-b` for a dumbbell, `--stack` for the kettlebell and leg attachment, and `--front` and `--back` for the vest. Write `2x22.5` for two plates of 22.5.
 
 ```sh
-npx plate-pool reverse dumbbell --end-a 5,5,5,2.5 --end-b 5,5,5 --json
+npx plate-pool reverse dumbbell.single --end-a 5,5,5,2.5 --end-b 5,5,5 --json
 ```
 
 ```json
@@ -394,7 +394,8 @@ Paste this into another repo's agent instructions, such as its `CLAUDE.md` or `A
 
 Use plate-pool for any weight on the owner's barbell, dumbbells, kettlebell, leg attachment or vest. Never work out plates by hand. Guide: https://github.com/joeuk89/plate-pool/blob/main/docs/agent-guide.md
 
-- Load: `npx plate-pool load barbell=173 dumbbells=40 --json`
+- Name the inventory file: set `PLATE_POOL_INVENTORY`, or add `--inventory <path>` to each command.
+- Load: `npx plate-pool load barbell=173 dumbbell=40 --json`
 - Load from what is on the bar now: `npx plate-pool load barbell=175 --from barbell --side 22.5,22.5,5,5,5,5,5,5,2.5 --json`
 - List: `npx plate-pool list barbell --from 100 --to 200 --json`
 - Reverse: `npx plate-pool reverse barbell --side 22.5,22.5,5,5 --json`
