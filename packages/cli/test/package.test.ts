@@ -10,7 +10,7 @@ const packageDirectory = fileURLToPath(new URL("..", import.meta.url));
 const inventoryFile = JSON.parse(
   readFileSync(fileURLToPath(new URL("../../../inventory/inventory.json", import.meta.url)), "utf8"),
 );
-const inventory = readInventory(inventoryFile);
+const inventory = readInventory(JSON.stringify(inventoryFile));
 
 let workDirectory: string;
 let installDirectory: string;

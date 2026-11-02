@@ -6,7 +6,6 @@ import {
   readInventory,
   RequestError,
   reverse,
-  type CollarChoice,
   type CurrentLoading,
   type Inventory,
   type ReverseRequest,
@@ -60,7 +59,17 @@ const implementNames: Record<string, string> = {
 
 const implementChoices = "Use barbell, dumbbells, dumbbell, kettlebell, leg or vest.";
 
+type CollarChoice = "clamp" | "spinlock" | "none";
+
 const collarChoices: CollarChoice[] = ["clamp", "spinlock", "none"];
+
+function collarId(collars: CollarChoice): string {
+  return collars === "none" ? "none" : `collar-${collars}`;
+}
+
+function collarHardware(implement: string, collars: CollarChoice | undefined): { hardware?: string } {
+  return collars !== undefined && implement === "barbell" ? { hardware: collarId(collars) } : {};
+}
 
 type PlateOption = "side" | "end-a" | "end-b" | "stack";
 
@@ -129,7 +138,7 @@ export function run(args: string[], environment: Environment): number {
         ...(name === "dumbbell" ? { pair: false } : {}),
         ...(options.from === undefined ? {} : { from: options.from }),
         ...(options.to === undefined ? {} : { to: options.to }),
-        ...(options.collars ? { collars: options.collars } : {}),
+        ...collarHardware(implement, options.collars),
         ...(options.uneven ? {} : { uneven: false }),
       });
       environment.stdout(options.json ? json(response) : listText(response, inventory, options));
@@ -146,7 +155,7 @@ export function run(args: string[], environment: Environment): number {
     const targets = withCurrents(options.positional.map(parseTarget), options.currents, inventory);
     const response = load(inventory, {
       targets,
-      ...(options.collars ? { collars: options.collars } : {}),
+      ...(options.collars ? { hardware: { barbell: collarId(options.collars) } } : {}),
       ...(options.uneven ? {} : { uneven: false }),
     });
     environment.stdout(options.json ? json(response) : loadText(response, inventory));
@@ -281,7 +290,7 @@ function reverseRequest(options: Options, inventory: Inventory): ReverseRequest 
     implement,
     ...(implement === "dumbbell" ? { pair: name === "dumbbells" } : {}),
     positions,
-    ...(options.collars ? { collars: options.collars } : {}),
+    ...collarHardware(implement, options.collars),
     ...(options.uneven ? {} : { uneven: false }),
   };
 }
@@ -304,8 +313,8 @@ function positionsFor(name: string, given: Plates, inventory: Inventory): Pick<R
         ]
       : implement === "dumbbell"
         ? [
-            { name: "end-a", plates: plates("end-a") },
-            { name: "end-b", plates: plates("end-b") },
+            { name: "a", plates: plates("end-a") },
+            { name: "b", plates: plates("end-b") },
           ]
         : implement === "vest"
           ? vestPositions(inventory, given.blocks ?? 0)
@@ -326,13 +335,13 @@ function vestPositions(inventory: Inventory, blocks: number): ReverseRequest["po
 }
 
 function readInventoryFile(path: string): Inventory {
-  let data: unknown;
+  let text: string;
   try {
-    data = JSON.parse(readFileSync(path, "utf8"));
+    text = readFileSync(path, "utf8");
   } catch (error) {
     throw new InputError(`Cannot read ${path}: ${(error as Error).message}`);
   }
-  return readInventory(data);
+  return readInventory(text);
 }
 
 function json(value: unknown): string {
