@@ -2,88 +2,51 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
+import { InventoryError, readInventory } from "../packages/core/src/index.js";
 
 const schemaPath = fileURLToPath(new URL("../inventory/inventory.schema.json", import.meta.url));
 const defaultInventoryPath = fileURLToPath(new URL("../inventory/inventory.json", import.meta.url));
 
-interface Identified {
-  id: string;
-}
-
-interface SchemaValidInventory {
-  plateTypes: Identified[];
-  plates: (Identified & { type: string })[];
-  hardware: Identified[];
-  implements: (Identified & {
-    accepts: string[];
-    hardware?: { options: string[]; default?: string };
-  })[];
-}
-
-export function inventoryErrors(inventory: unknown): string[] {
+/** What the JSON Schema finds wrong with a parsed file, by JSON pointer. */
+export function schemaErrors(inventory: unknown): string[] {
   const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
   const ajv = new Ajv2020.default({ allErrors: true });
-  const matchesSchema = ajv.compile<SchemaValidInventory>(schema);
-  if (!matchesSchema(inventory)) {
-    return (matchesSchema.errors ?? []).map(
-      (error) => `${error.instancePath || "/"} ${error.message ?? "is invalid"}`,
-    );
-  }
-  return referenceErrors(inventory);
+  const matchesSchema = ajv.compile(schema);
+  if (matchesSchema(inventory)) return [];
+  return (matchesSchema.errors ?? []).map((error) => `${error.instancePath || "/"} ${error.message ?? "is invalid"}`);
 }
 
-function referenceErrors(inventory: SchemaValidInventory): string[] {
-  const errors: string[] = [];
-
-  for (const list of ["plateTypes", "plates", "hardware", "implements"] as const) {
-    const seen = new Set<string>();
-    inventory[list].forEach((item, index) => {
-      if (seen.has(item.id)) errors.push(`/${list}/${index}/id repeats "${item.id}"`);
-      seen.add(item.id);
-    });
+/** What the library's reader finds wrong with a file's text, by JSON path. */
+export function readerErrors(text: string): string[] {
+  try {
+    readInventory(text);
+    return [];
+  } catch (error) {
+    if (error instanceof InventoryError) return error.errors;
+    throw error;
   }
+}
 
-  const plateTypes = new Set(inventory.plateTypes.map((plateType) => plateType.id));
-  const hardwareIds = new Set([...inventory.hardware.map((item) => item.id), "none"]);
-
-  inventory.plates.forEach((plate, index) => {
-    if (!plateTypes.has(plate.type)) {
-      errors.push(`/plates/${index}/type names unknown plate type "${plate.type}"`);
-    }
-  });
-
-  inventory.implements.forEach((implement, index) => {
-    implement.accepts.forEach((type, typeIndex) => {
-      if (!plateTypes.has(type)) {
-        errors.push(`/implements/${index}/accepts/${typeIndex} names unknown plate type "${type}"`);
-      }
-    });
-    const hardware = implement.hardware;
-    if (!hardware) return;
-    hardware.options.forEach((option, optionIndex) => {
-      if (!hardwareIds.has(option)) {
-        errors.push(`/implements/${index}/hardware/options/${optionIndex} names unknown hardware "${option}"`);
-      }
-    });
-    if (hardware.default !== undefined && !hardwareIds.has(hardware.default)) {
-      errors.push(`/implements/${index}/hardware/default names unknown hardware "${hardware.default}"`);
-    } else if (hardware.default !== undefined && !hardware.options.includes(hardware.default)) {
-      errors.push(`/implements/${index}/hardware/default "${hardware.default}" is not one of its options`);
-    }
-  });
-
-  return errors;
+export function inventoryErrors(text: string): string[] {
+  let inventory: unknown;
+  try {
+    inventory = JSON.parse(text);
+  } catch (error) {
+    return [`not valid JSON: ${(error as Error).message}`];
+  }
+  const fromSchema = schemaErrors(inventory);
+  return fromSchema.length > 0 ? fromSchema : readerErrors(text);
 }
 
 function main(path: string): number {
-  let inventory: unknown;
+  let text: string;
   try {
-    inventory = JSON.parse(readFileSync(resolve(path), "utf8"));
+    text = readFileSync(resolve(path), "utf8");
   } catch (error) {
     console.error(`Cannot read ${path}: ${(error as Error).message}`);
     return 1;
   }
-  const errors = inventoryErrors(inventory);
+  const errors = inventoryErrors(text);
   if (errors.length > 0) {
     console.error(`${path} does not match the inventory schema:`);
     for (const error of errors) console.error(`  ${error}`);

@@ -64,7 +64,7 @@ None of these block a build. Each is one value in the inventory file.
 | Long screw's real weight | 2.5 lb (Ironmaster's convention) | Kitchen scale |
 | Empty vest weight, and block count | 0 kg, 30 blocks | Bathroom scale, and counting |
 | Do 2 × 22.5 + 12 × 5 lb fit on one bar side with the collar on | Allowed. Calculated to fit with a clamp collar, 0.49 in spare | Loading it once |
-| Does a long screw lock on a lightly loaded kettlebell | Allowed, with a warning | Trying it once |
+| Does a long screw lock on a kettlebell stack shorter than 3.0 in | Not allowed: the long screw's `minStack` applies on every implement. Allowed, with a warning, from 3.0 in when no standard screw is free | Trying it once |
 | Do two 22.5 lb plates fit on the kettlebell | Not allowed: at most one | Trying it once |
 | Shortest stack a long screw locks on a dumbbell | 3.0 in | Trying it once |
 | Plate stack lengths | Calculated values in the plates table above | Measuring a stack of five 5 lb plates |
