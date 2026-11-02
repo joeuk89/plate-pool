@@ -20,4 +20,4 @@ export const ownerIds = (plates: number[]) => plates.map((plate) => ownerPlateId
 
 export const placed = (name: string, plates: number[]) => ({ name, plates, ids: ownerIds(plates) });
 
-export const byId =<T extends { id: string }>(list: T[], id: string) => list.find((item) => item.id === id)!;
+export const byId = <T extends { id: string }>(list: T[], id: string) => list.find((item) => item.id === id)!;

@@ -203,8 +203,8 @@ export function readInventory(text: string): Inventory {
   } catch {
     throw new InventoryError(["inventory: not valid JSON"]);
   }
-  if (isObject(file) && file.format !== 1) {
-    throw new InventoryError([`Inventory format ${JSON.stringify(file.format ?? null)} is not supported. This version reads format 1.`]);
+  if (isObject(file) && file.format !== undefined && file.format !== 1) {
+    throw new InventoryError([`Inventory format ${JSON.stringify(file.format)} is not supported. This version reads format 1.`]);
   }
   const errors: string[] = [];
   shape(file, "", errors);

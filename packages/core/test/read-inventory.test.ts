@@ -41,6 +41,10 @@ describe("readInventory: the acceptance cases (spec 17.11, examples 21 and 22)",
     ]);
   });
 
+  it("asks for a missing format by its path, rather than naming a format", () => {
+    expect(errorsOf(edited(owner, (file) => delete file.format))).toEqual(["format: required"]);
+  });
+
   it("example 22: refuses an implement id kit, naming implements[0].id", () => {
     const errors = errorsOf(edited(owner, (file) => (file.implements[0].id = "kit")));
     expect(errors).toHaveLength(1);
