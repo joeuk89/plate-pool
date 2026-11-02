@@ -1386,8 +1386,19 @@ ul {
 }
 
 .masthead > .brand {
+  min-width: 0;
   margin-right: auto;
   white-space: nowrap;
+}
+
+.masthead > .brand .kit-chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.masthead > .views {
+  flex: none;
 }
 
 @media (max-width: 24rem) {
