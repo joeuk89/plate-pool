@@ -1,15 +1,15 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { load, RequestError, type CollarChoice, type Inventory } from "../src/index.js";
+import { load, RequestError, type Inventory } from "../src/index.js";
 
-const inventory: Inventory = JSON.parse(
-  readFileSync(new URL("../../../inventory/inventory.json", import.meta.url), "utf8"),
-);
+type CollarChoice = "clamp" | "spinlock" | "none";
+const collarIds: Record<CollarChoice, string> = { clamp: "collar-clamp", spinlock: "collar-spinlock", none: "none" };
+
+import { owner as inventory, placed } from "./kits.js";
 
 function loadBarbell(target: string, options: { collars?: CollarChoice; inventory?: Inventory } = {}) {
   const request = {
     targets: [{ implement: "barbell", target }],
-    ...(options.collars ? { collars: options.collars } : {}),
+    ...(options.collars ? { hardware: { barbell: collarIds[options.collars] } } : {}),
   };
   const [result] = load(options.inventory ?? inventory, request).results;
   return result!;
@@ -24,8 +24,8 @@ function changed(edit: (copy: Inventory) => void): Inventory {
 const byId = <T extends { id: string }>(list: T[], id: string) => list.find((item) => item.id === id)!;
 
 const eachSide = (...plates: number[]) => [
-  { name: "left", plates },
-  { name: "right", plates },
+  placed("left", plates),
+  placed("right", plates),
 ];
 
 describe("barbell Load: worked examples (spec section 7)", () => {
@@ -147,7 +147,7 @@ describe("barbell Load: weights (spec 6.1 rules 2, 3 and 5)", () => {
     });
     const result = loadBarbell("20.3", { inventory: oddWeights });
     expect(result.exact).toBe(true);
-    expect(result.loading).toMatchObject({ total: { lb: 20.3, kg: 9.2 }, positions: eachSide(1.1) });
+    expect(result.loading).toMatchObject({ total: { lb: 20.3, kg: 9.2 }, positions: [{ name: "left", plates: [1.1], ids: ["ql-micro"] }, { name: "right", plates: [1.1], ids: ["ql-micro"] }] });
   });
 
   it("shows pounds to two decimals and kilograms to one", () => {
@@ -186,7 +186,7 @@ describe("barbell Load: collars and fit (spec 6.2, 4.3 notes)", () => {
 
   it("fits the plates and the collar within the length of a side", () => {
     const shortBar = changed((copy) => {
-      byId(copy.implements, "barbell").positionLengthIn = { listed: 3.26, status: "verified" };
+      byId(copy.implements, "barbell").positionLength = { listed: 3.26, status: "verified" };
     });
     const clamp = loadBarbell("68", { inventory: shortBar });
     expect(clamp.exact).toBe(false);

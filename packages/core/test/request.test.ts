@@ -1,10 +1,7 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { load, RequestError, type Inventory, type Loading, type LoadResponse, type TargetRequest } from "../src/index.js";
 
-const inventory: Inventory = JSON.parse(
-  readFileSync(new URL("../../../inventory/inventory.json", import.meta.url), "utf8"),
-);
+import { owner as inventory, placed } from "./kits.js";
 
 function request(...targets: TargetRequest[]) {
   return load(inventory, { targets });
@@ -18,12 +15,12 @@ const leg = (target: string): TargetRequest => ({ implement: "leg", target });
 const vest = (target: string): TargetRequest => ({ implement: "vest", target });
 
 const sides = (...plates: number[]) => [
-  { name: "left", plates },
-  { name: "right", plates },
+  placed("left", plates),
+  placed("right", plates),
 ];
 const ends = (...plates: number[]) => [
-  { name: "end-a", plates },
-  { name: "end-b", plates },
+  placed("a", plates),
+  placed("b", plates),
 ];
 
 describe("requests with several implements: worked examples (spec section 7)", () => {
@@ -85,27 +82,36 @@ describe("requests with several implements: choosing the loading set (spec 6.3)"
     expect(platesUsed(response)).toBe(14);
   });
 
-  it("then the fewest uneven dumbbells: one dumbbell 102.5 lb gives up its fewest-plate loading so a second at 77.5 lb is even", () => {
+  it("puts fewest plates before fewest uneven: a second dumbbell at 77.5 lb is uneven on 7 plates, not even on 8", () => {
     const response = request(dumbbell("102.5"), dumbbell("77.5"));
     const [first, second] = response.results;
     expect(first).toMatchObject({
       exact: true,
-      loading: { uneven: true, positions: [{ name: "end-a", plates: [22.5, 5, 5, 5, 5, 5] }, { name: "end-b", plates: [22.5, 22.5] }] },
+      loading: { uneven: true, positions: [{ name: "a", plates: [22.5, 5, 5, 5, 5, 5] }, { name: "b", plates: [22.5, 22.5] }] },
     });
-    expect(second).toMatchObject({ exact: true, loading: { uneven: false, positions: ends(22.5, 5, 5, 1.25) } });
-    expect(platesUsed(response)).toBe(16);
+    expect(second).toMatchObject({
+      exact: true,
+      loading: { uneven: true, positions: [placed("a", [22.5, 5, 5, 2.5]), placed("b", [22.5, 5, 5])] },
+    });
+    expect(platesUsed(response)).toBe(15);
   });
 
-  it("gives a light kettlebell a long screw when later dumbbells need every standard screw: kettlebell 40 lb then dumbbells 40 lb", () => {
-    const [bell, pair] = request(kettlebell("40"), dumbbells("40")).results;
-    expect(bell).toMatchObject({ exact: true, loading: { hardware: [{ id: "screw-long", count: 1 }], positions: [{ plates: [5, 5, 5] }] } });
+  it("gives a kettlebell a long screw when later dumbbells need every standard screw: kettlebell 60 lb then dumbbells 40 lb", () => {
+    const [bell, pair] = request(kettlebell("60"), dumbbells("40")).results;
+    expect(bell).toMatchObject({ exact: true, loading: { hardware: [{ id: "screw-long", count: 1 }], positions: [{ plates: [22.5, 5, 5, 2.5] }] } });
     expect(bell!.warnings[0]).toMatch(/^No standard locking screw is free, so the kettlebell uses a long locking screw\./);
     expect(pair).toMatchObject({ exact: true, loading: { hardware: [{ id: "screw-standard", count: 2 }], positions: ends(5, 5, 5) } });
     expect(pair!.warnings).toEqual([]);
   });
 
-  it("keeps the standard screw on a light kettlebell when one is still free: kettlebell 40 lb then one dumbbell 40 lb", () => {
-    const response = request(kettlebell("40"), dumbbell("40"));
+  it("keeps the standard screw on a kettlebell whose stack is too short for a long one: kettlebell 40 lb then dumbbells 40 lb", () => {
+    const [bell, pair] = request(kettlebell("40"), dumbbells("40")).results;
+    expect(bell).toMatchObject({ exact: true, loading: { hardware: [{ id: "screw-standard", count: 1 }] }, warnings: [] });
+    expect(pair).toMatchObject({ exact: false });
+  });
+
+  it("keeps the standard screw on a kettlebell when one is still free: kettlebell 60 lb then one dumbbell 40 lb", () => {
+    const response = request(kettlebell("60"), dumbbell("40"));
     expect(response.results[0]).toMatchObject({ exact: true, loading: { hardware: [{ id: "screw-standard", count: 1 }] }, warnings: [] });
     expect(response.results[1]).toMatchObject({ exact: true, loading: { hardware: [{ id: "screw-standard", count: 2 }] } });
     expect(response.leftover.hardware).toMatchObject({ "screw-standard": 1, "screw-long": 5 });
@@ -173,20 +179,20 @@ describe("requests with several implements: the plate pool (spec 6.1 and 6.4)", 
     const [, bar] = request(dumbbells("120"), barbell("175")).results;
     expect(bar).toMatchObject({ exact: false, recommended: "below" });
     expect(bar!.warnings[0]).toBe(
-      "Further from 175 lb than it could be, because the dumbbells use the 22.5 lb plates, 5 lb plates and 2.5 lb plates the barbell needs to get closer.",
+      "Further from 175 lb than it could be, because the dumbbells use the 22.5 lb plates, 5 lb plates and 2.5 lb plates the straight bar needs to get closer.",
     );
   });
 
   it("names two single dumbbells as the dumbbells in the warning", () => {
     const [, , bar] = request(dumbbell("101.25"), dumbbell("98.75"), barbell("150")).results;
     expect(bar!.warnings[0]).toBe(
-      "Further from 150 lb than it could be, because the dumbbells use the 22.5 lb plates the barbell needs to get closer.",
+      "Further from 150 lb than it could be, because the dumbbells use the 22.5 lb plates the straight bar needs to get closer.",
     );
   });
 
   it("refuses a request for more of an implement than the inventory holds", () => {
     expect(() => request(barbell("100"), barbell("120"))).toThrow(RequestError);
-    expect(() => request(barbell("100"), barbell("120"))).toThrow("The request needs 2 × barbell. The inventory holds 1.");
+    expect(() => request(barbell("100"), barbell("120"))).toThrow("The request needs 2 × straight bar. The inventory holds 1.");
     expect(() => request(dumbbells("40"), dumbbell("20"))).toThrow("The request needs 3 × dumbbell. The inventory holds 2.");
   });
 

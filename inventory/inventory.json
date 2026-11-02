@@ -1,35 +1,38 @@
 {
   "$schema": "./inventory.schema.json",
+  "format": 1,
+  "name": "Home gym",
+  "lengthUnit": "in",
   "plateTypes": [
-    { "id": "quick-lock", "name": "Ironmaster Quick-Lock", "unit": "lb" },
-    { "id": "vest-block", "name": "Mirafit vest block", "unit": "kg" }
+    { "id": "quick-lock", "name": "Ironmaster Quick-Lock", "unit": "lb", "bore": "quick-lock" },
+    { "id": "vest-block", "name": "Mirafit vest block", "unit": "kg", "bore": "block" }
   ],
   "plates": [
     {
       "id": "ql-22.5",
-      "name": "22.5 lb",
       "type": "quick-lock",
       "count": 5,
       "weight": { "listed": 22.5, "status": "verified" },
-      "stackLengthIn": { "listed": 1.875, "status": "unverified" },
+      "stackLength": { "listed": 1.875, "status": "unverified" },
+      "colour": "#c9353f",
       "shape": "square"
     },
     {
       "id": "ql-5",
-      "name": "5 lb",
       "type": "quick-lock",
       "count": 24,
       "weight": { "listed": 5, "status": "verified" },
-      "stackLengthIn": { "listed": 0.5, "status": "unverified" },
+      "stackLength": { "listed": 0.5, "status": "unverified" },
+      "colour": "#2f67cc",
       "shape": "square"
     },
     {
       "id": "ql-2.5",
-      "name": "2.5 lb",
       "type": "quick-lock",
       "count": 4,
       "weight": { "listed": 2.5, "status": "verified" },
-      "stackLengthIn": { "listed": 0.25, "status": "unverified" },
+      "stackLength": { "listed": 0.25, "status": "unverified" },
+      "colour": "#1c8a55",
       "shape": "square"
     },
     {
@@ -38,16 +41,17 @@
       "type": "quick-lock",
       "count": 4,
       "weight": { "listed": 1.25, "status": "verified" },
-      "stackLengthIn": { "listed": 0.25, "status": "unverified" },
+      "stackLength": { "listed": 0.25, "status": "unverified" },
+      "colour": "#7a4fc4",
       "shape": "round"
     },
     {
       "id": "vest-block",
-      "name": "Vest block",
       "type": "vest-block",
       "count": 30,
       "countStatus": "unverified",
       "weight": { "listed": 1, "status": "verified" },
+      "colour": "#a4521f",
       "shape": "block"
     }
   ],
@@ -59,7 +63,7 @@
       "count": 4,
       "unit": "lb",
       "weight": { "listed": 2.5, "status": "verified" },
-      "capacityIn": 3.25
+      "capacity": 3.25
     },
     {
       "id": "screw-long",
@@ -68,8 +72,9 @@
       "count": 5,
       "unit": "lb",
       "weight": { "listed": 2.5, "status": "verified", "note": "Real weight is about 3 lb" },
-      "capacityIn": 5.125,
-      "minStackIn": { "listed": 3, "status": "unverified", "note": "On a dumbbell end" }
+      "capacity": 5.125,
+      "minStack": { "listed": 3, "status": "unverified", "note": "On a dumbbell end" },
+      "note": "It may stick out at the top, which Ironmaster's manual calls normal."
     },
     {
       "id": "collar-spinlock",
@@ -86,13 +91,14 @@
       "count": 4,
       "unit": "lb",
       "weight": { "listed": 0, "status": "owner", "note": "Nylon. Weighs next to nothing, so it counts as 0." },
-      "widthIn": 1.26
+      "width": 1.26
     }
   ],
   "implements": [
     {
       "id": "barbell",
       "name": "Straight bar",
+      "kind": "bar",
       "count": 1,
       "unit": "lb",
       "base": {
@@ -100,8 +106,6 @@
         "status": "owner",
         "note": "Ironmaster states about 18 lb. The owner weighed it at 17.7 lb with its collars off and counts it as 18 lb. Collars are added."
       },
-      "positions": ["left", "right"],
-      "symmetric": true,
       "accepts": ["quick-lock"],
       "hardware": {
         "options": ["collar-clamp", "collar-spinlock", "none"],
@@ -109,34 +113,39 @@
         "perPosition": 1
       },
       "maxPlateWeight": 210,
-      "positionLengthIn": { "listed": 11.5, "status": "verified", "note": "For plates and the collar" }
+      "maxPerPosition": { "ql-micro": 1 },
+      "positionLength": { "listed": 11.5, "status": "verified", "note": "For plates and the collar" }
     },
     {
       "id": "dumbbell",
       "name": "Dumbbell",
+      "kind": "handle",
       "count": 2,
       "unit": "lb",
       "base": { "listed": 5, "status": "verified", "note": "Handle only. Two screws make it 10 lb." },
-      "positions": ["end-a", "end-b"],
-      "symmetric": false,
       "accepts": ["quick-lock"],
       "hardware": { "options": ["screw-standard", "screw-long", "none"], "perPosition": 1 },
-      "maxTotal": 120
+      "maxTotal": 120,
+      "maxPerPosition": { "ql-micro": 1 },
+      "unevenAllowance": 2.5,
+      "unevenAllowanceRelaxed": 5
     },
     {
       "id": "kettlebell",
       "name": "Kettlebell",
+      "kind": "stack",
       "count": 1,
       "unit": "lb",
       "base": { "listed": 22.5, "status": "verified", "note": "Handle only. One screw makes it 25 lb." },
-      "positions": ["stack"],
       "accepts": ["quick-lock"],
       "hardware": { "options": ["screw-standard", "screw-long", "none"], "perPosition": 1 },
-      "maxTotal": 80
+      "maxTotal": 80,
+      "maxPerPosition": { "ql-micro": 1, "ql-22.5": 1 }
     },
     {
       "id": "leg",
       "name": "Leg attachment",
+      "kind": "stack",
       "count": 1,
       "unit": "lb",
       "base": {
@@ -144,18 +153,17 @@
         "status": "verified",
         "note": "Plate weight only. The lever's weight is not published and is not counted."
       },
-      "positions": ["stack"],
       "accepts": ["quick-lock"],
-      "maxPlateWeight": 100
+      "maxPlateWeight": 100,
+      "note": "Plate weight only. The lever changes the resistance you feel."
     },
     {
       "id": "vest",
       "name": "Weighted vest",
+      "kind": "vest",
       "count": 1,
       "unit": "kg",
       "base": { "listed": 0, "status": "unverified", "note": "The empty vest's weight is not published." },
-      "positions": ["front", "back"],
-      "symmetric": false,
       "accepts": ["vest-block"],
       "maxPlateWeight": 30
     }

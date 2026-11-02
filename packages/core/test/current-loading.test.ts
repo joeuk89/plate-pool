@@ -1,14 +1,11 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { load, reverse, type CurrentLoading, type Inventory, type Loading, type LoadRequest, type LoadResult, type ReverseRequest } from "../src/index.js";
 
-const inventory: Inventory = JSON.parse(
-  readFileSync(new URL("../../../inventory/inventory.json", import.meta.url), "utf8"),
-);
+import { owner as inventory, placed } from "./kits.js";
 
 const eachSide = (...plates: number[]) => [
-  { name: "left", plates },
-  { name: "right", plates },
+  placed("left", plates),
+  placed("right", plates),
 ];
 
 function range(from: number, to: number, step: number): string[] {
@@ -28,18 +25,14 @@ function loadingsOf(result: LoadResult): Loading[] {
   return [result.loading, result.below, result.above, ...result.alternatives].filter((loading) => loading !== undefined);
 }
 
-const screwsOf: Record<string, ReverseRequest["screws"]> = { "screw-standard": "standard", "screw-long": "long" };
-
 function reverseRequestFor(result: LoadResult, loading: Loading): ReverseRequest {
   const [hardware] = loading.hardware;
   return {
     implement: result.implement,
     ...(result.pair !== undefined ? { pair: result.pair } : {}),
     positions: loading.positions,
-    ...(result.implement === "dumbbell" || result.implement === "kettlebell"
-      ? { screws: hardware ? screwsOf[hardware.id]! : "none" }
-      : {}),
-    ...(result.implement === "dumbbell" && hardware?.count === 1 ? { screwOn: loading.heavier! } : {}),
+    hardware: hardware?.id ?? "none",
+    ...(result.implement === "dumbbell" && hardware?.count === 1 ? { hardwareOn: loading.heavier! } : {}),
   };
 }
 
@@ -108,31 +101,47 @@ describe("Load with a current loading: worked examples (spec section 16.6)", () 
     });
   });
 
-  it("example 19: dumbbells 70 lb pair to 80 lb swaps to long screws and puts on 1 × 5 per end outside the 2.5, 12 changes", () => {
+  it("example 19 (revised in 17.11): dumbbells 70 lb pair to 80 lb keep standard screws and put on 1 × 5 per end outside the 2.5, 4 changes", () => {
     const result = loadFrom("dumbbell", "80", {
       positions: [
-        { name: "end-a", plates: [22.5, 5, 2.5] },
-        { name: "end-b", plates: [22.5, 5, 2.5] },
+        { name: "a", plates: [22.5, 5, 2.5] },
+        { name: "b", plates: [22.5, 5, 2.5] },
       ],
-      screws: "standard",
+      hardware: "screw-standard",
     });
     expect(result.exact).toBe(true);
     expect(result.loading).toMatchObject({
       total: { lb: 80 },
-      hardware: [{ id: "screw-long", count: 2 }],
+      hardware: [{ id: "screw-standard", count: 2 }],
       positions: [
-        { name: "end-a", plates: [22.5, 5, 2.5, 5] },
-        { name: "end-b", plates: [22.5, 5, 2.5, 5] },
+        { name: "a", plates: [22.5, 5, 2.5, 5] },
+        { name: "b", plates: [22.5, 5, 2.5, 5] },
       ],
       changes: {
-        count: 12,
+        count: 4,
         positions: [
-          { name: "end-a", keep: [22.5, 5, 2.5], remove: [], add: [5] },
-          { name: "end-b", keep: [22.5, 5, 2.5], remove: [], add: [5] },
+          { name: "a", keep: [22.5, 5, 2.5], remove: [], add: [5] },
+          { name: "b", keep: [22.5, 5, 2.5], remove: [], add: [5] },
         ],
-        hardware: [{ from: "screw-standard", to: "screw-long", count: 2 }],
+        hardware: [],
       },
     });
+  });
+
+  it("counts a screw swap as two changes per screw: dumbbells 70 lb pair to 85 lb swap to long screws", () => {
+    const result = loadFrom("dumbbell", "85", {
+      positions: [
+        { name: "a", plates: [22.5, 5, 2.5] },
+        { name: "b", plates: [22.5, 5, 2.5] },
+      ],
+      hardware: "screw-standard",
+    });
+    expect(result.loading).toMatchObject({
+      hardware: [{ id: "screw-long", count: 2 }],
+      changes: { hardware: [{ from: "screw-standard", to: "screw-long", count: 2 }] },
+    });
+    const plateChanges = result.loading!.changes!.positions.reduce((sum, { remove, add }) => sum + remove.length + add.length, 0);
+    expect(result.loading!.changes!.count).toBe(2 * (plateChanges + 4));
   });
 
   it("example 20: with no current loading there is no changes block and the result is identical to version 1", () => {
@@ -235,16 +244,16 @@ describe("Load with a current loading: rules (spec 16.3)", () => {
   it("turns an uneven dumbbell round so its heavier end stays where the plates already are", () => {
     const result = loadFrom("dumbbell", "12.5", {
       positions: [
-        { name: "end-a", plates: [] },
-        { name: "end-b", plates: [2.5] },
+        { name: "a", plates: [] },
+        { name: "b", plates: [2.5] },
       ],
     });
     expect(result.loading).toMatchObject({
       positions: [
-        { name: "end-a", plates: [] },
-        { name: "end-b", plates: [2.5] },
+        { name: "a", plates: [] },
+        { name: "b", plates: [2.5] },
       ],
-      heavier: "end-b",
+      heavier: "b",
       changes: { count: 0 },
     });
   });
@@ -254,16 +263,16 @@ describe("Load with a current loading: rules (spec 16.3)", () => {
       load(inventory, { targets: [{ implement: "dumbbell", target, pair: false, current }] }).results[0]!.loading!;
     const fiveEachEnd = {
       positions: [
-        { name: "end-a", plates: [5] },
-        { name: "end-b", plates: [5] },
+        { name: "a", plates: [5] },
+        { name: "b", plates: [5] },
       ],
     };
 
-    expect(single({ positions: [], screws: "none" }, "10").changes).toEqual({
+    expect(single({ positions: [], hardware: "none" }, "10").changes).toEqual({
       count: 2,
       positions: [
-        { name: "end-a", keep: [], remove: [], add: [] },
-        { name: "end-b", keep: [], remove: [], add: [] },
+        { name: "a", keep: [], remove: [], add: [] },
+        { name: "b", keep: [], remove: [], add: [] },
       ],
       hardware: [{ to: "screw-standard", count: 2 }],
     });
@@ -274,8 +283,8 @@ describe("Load with a current loading: rules (spec 16.3)", () => {
   it("counts both dumbbells of a pair", () => {
     const current = {
       positions: [
-        { name: "end-a", plates: [5] },
-        { name: "end-b", plates: [5] },
+        { name: "a", plates: [5] },
+        { name: "b", plates: [5] },
       ],
     };
     const [pair] = load(inventory, { targets: [{ implement: "dumbbell", target: "30", current }] }).results;

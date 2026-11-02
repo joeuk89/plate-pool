@@ -1,10 +1,7 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { load, type Inventory } from "../src/index.js";
 
-const inventory: Inventory = JSON.parse(
-  readFileSync(new URL("../../../inventory/inventory.json", import.meta.url), "utf8"),
-);
+import { owner as inventory } from "./kits.js";
 
 function loadVest(target: string, options: { inventory?: Inventory } = {}) {
   const [result] = load(options.inventory ?? inventory, { targets: [{ implement: "vest", target }] }).results;
@@ -14,8 +11,8 @@ function loadVest(target: string, options: { inventory?: Inventory } = {}) {
 const blocks = (count: number) => Array<number>(count).fill(1);
 
 const frontAndBack = (front: number, back: number) => [
-  { name: "front", plates: blocks(front) },
-  { name: "back", plates: blocks(back) },
+  { name: "front", plates: blocks(front), ids: Array<string>(front).fill("vest-block") },
+  { name: "back", plates: blocks(back), ids: Array<string>(back).fill("vest-block") },
 ];
 
 describe("vest Load: worked examples (spec section 7)", () => {
@@ -96,7 +93,7 @@ describe("vest Load: the 30 block limit (spec 4.3)", () => {
       below: { total: { kg: 30, lb: 66.14 }, positions: frontAndBack(15, 15) },
     });
     expect(result.above).toBeUndefined();
-    expect(result.warnings).toEqual(["Refused: over the 30 block limit. Heaviest allowed: 30 kg (66.14 lb)."]);
+    expect(result.warnings).toEqual(["Refused: over the 30 kg plate limit. Heaviest allowed: 30 kg (66.14 lb)."]);
   });
 
   it("refuses any target above 30 kg, and accepts 30 kg", () => {

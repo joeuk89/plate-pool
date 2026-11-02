@@ -1,10 +1,7 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { list, load, RequestError, step, type Inventory, type ListRequest } from "../src/index.js";
 
-const inventory: Inventory = JSON.parse(
-  readFileSync(new URL("../../../inventory/inventory.json", import.meta.url), "utf8"),
-);
+import { owner as inventory, placed } from "./kits.js";
 
 const totals = (response: ReturnType<typeof list>) => response.rows.map((row) => row.total.lb);
 
@@ -24,25 +21,39 @@ describe("List (spec 6.5)", () => {
         total: { lb: 173, kg: 78.5 },
         hardware: [{ id: "collar-clamp", count: 2 }],
         positions: [
-          { name: "left", plates: side },
-          { name: "right", plates: side },
+          placed("left", side),
+          placed("right", side),
         ],
         uneven: false,
       },
       uneven: false,
-      micro: false,
+      smallest: false,
     });
-    expect(withMicro).toMatchObject({ total: { lb: 175.5 }, uneven: false, micro: true });
+    expect(withMicro).toMatchObject({ total: { lb: 175.5 }, uneven: false, smallest: true });
     expect(withMicro?.loading.positions[0]?.plates).toEqual([...side, 1.25]);
   });
 
-  it("flags an uneven dumbbell and names the screw kind (examples 5 and 7)", () => {
-    const [single] = list(inventory, { implement: "dumbbell", pair: false, from: "12.5", to: "12.5" }).rows;
-    expect(single).toMatchObject({ total: { lb: 12.5 }, uneven: true, micro: false, screw: "screw-standard" });
-    expect(single?.loading.heavier).toBe("end-a");
+  it("flags an uneven dumbbell, with the screws in the loading (examples 5 and 7)", () => {
+    const response = list(inventory, { implement: "dumbbell", pair: false, from: "12.5", to: "12.5" });
+    expect(response.pair).toBe(false);
+    const [single] = response.rows;
+    expect(single).toMatchObject({ total: { lb: 12.5 }, uneven: true, smallest: false, loading: { hardware: [{ id: "screw-standard" }] } });
+    expect(single).not.toHaveProperty("screw");
+    expect(single?.loading.heavier).toBe("a");
 
     const [heaviest] = list(inventory, { implement: "dumbbell", from: "120", to: "120" }).rows;
-    expect(heaviest).toMatchObject({ total: { lb: 120 }, uneven: false, screw: "screw-long" });
+    expect(heaviest).toMatchObject({ total: { lb: 120 }, uneven: false, loading: { hardware: [{ id: "screw-long" }] } });
+  });
+
+  it("marks the rows that use the lightest plate the implement takes (spec 17.4)", () => {
+    const vest = list(inventory, { implement: "vest", to: "2" });
+    expect(vest.rows.map((row) => row.smallest)).toEqual([true, true]);
+    const bar = list(inventory, { implement: "barbell", from: "18", to: "23" });
+    expect(bar.rows.map((row) => [row.total.lb, row.smallest])).toEqual([
+      [18, false],
+      [20.5, true],
+      [23, false],
+    ]);
   });
 
   it("lists the vest in kilograms, one row per block count", () => {
@@ -64,11 +75,11 @@ describe("List (spec 6.5)", () => {
   });
 
   it("loads the barbell with the chosen collars", () => {
-    const spinlock = list(inventory, { implement: "barbell", collars: "spinlock", from: "18", to: "23" });
+    const spinlock = list(inventory, { implement: "barbell", hardware: "collar-spinlock", from: "18", to: "23" });
     expect(totals(spinlock)).toEqual([20, 22.5]);
     expect(spinlock.rows[0]?.loading.hardware).toEqual([{ id: "collar-spinlock", count: 2 }]);
 
-    const none = list(inventory, { implement: "barbell", collars: "none", from: "18", to: "18" });
+    const none = list(inventory, { implement: "barbell", hardware: "none", from: "18", to: "18" });
     expect(none.rows[0]?.loading.hardware).toEqual([]);
   });
 
@@ -77,7 +88,7 @@ describe("List (spec 6.5)", () => {
 
     const even = list(inventory, { implement: "dumbbell", pair: false, uneven: false, from: "10", to: "12.5" });
     expect(totals(even)).toEqual([10, 12.5]);
-    expect(even.rows[1]).toMatchObject({ uneven: false, micro: true });
+    expect(even.rows[1]).toMatchObject({ uneven: false, smallest: true });
   });
 
   it("accepts 0 as the start of the range, and leaves out an empty leg attachment because Load takes no 0 target", () => {
@@ -110,8 +121,10 @@ describe("List (spec 6.5)", () => {
 describe("List: every row, passed to Load as a target, returns an exact result (spec section 7 properties)", () => {
   const requests: ListRequest[] = [
     { implement: "barbell" },
-    { implement: "barbell", collars: "spinlock" },
-    { implement: "barbell", collars: "none" },
+    { implement: "barbell", hardware: "collar-spinlock" },
+    { implement: "barbell", hardware: "none" },
+    { implement: "dumbbell", hardware: "screw-long" },
+    { implement: "kettlebell", hardware: "screw-standard" },
     { implement: "dumbbell" },
     { implement: "dumbbell", pair: false },
     { implement: "dumbbell", uneven: false },
@@ -129,7 +142,7 @@ describe("List: every row, passed to Load as a target, returns an exact result (
       if (i > 0) expect(row.total[unit]).toBeGreaterThan(rows[i - 1]!.total[unit]);
       const [result] = load(inventory, {
         targets: [{ implement: request.implement, target: `${row.total[unit]}${unit}`, ...(request.pair === undefined ? {} : { pair: request.pair }) }],
-        ...(request.collars === undefined ? {} : { collars: request.collars }),
+        ...(request.hardware === undefined ? {} : { hardware: { [request.implement]: request.hardware } }),
         ...(request.uneven === undefined ? {} : { uneven: request.uneven }),
       }).results;
       expect(result?.exact).toBe(true);

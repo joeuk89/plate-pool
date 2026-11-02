@@ -1,0 +1,34 @@
+{
+  "format": 1,
+  "name": "Olympic kit",
+  "lengthUnit": "mm",
+  "plateTypes": [
+    { "id": "olympic", "name": "Olympic", "unit": "kg", "bore": "olympic" },
+    { "id": "carrier-plate", "name": "Carrier plate", "unit": "kg", "bore": "block" }
+  ],
+  "plates": [
+    { "id": "20", "type": "olympic", "count": 2, "weight": { "listed": 20, "status": "verified" }, "stackLength": { "listed": 55, "status": "verified" }, "diameter": 450, "colour": "#1e5bb8", "shape": "round" },
+    { "id": "10", "type": "olympic", "count": 2, "weight": { "listed": 10, "status": "verified" }, "stackLength": { "listed": 40, "status": "verified" }, "diameter": 450, "shape": "round" },
+    { "id": "5", "type": "olympic", "count": 2, "weight": { "listed": 5, "status": "verified" }, "stackLength": { "listed": 25, "status": "verified" }, "diameter": 230, "shape": "round" },
+    { "id": "2.5", "type": "olympic", "count": 2, "weight": { "listed": 2.5, "status": "verified" }, "stackLength": { "listed": 20, "status": "verified" }, "diameter": 190, "shape": "round" },
+    { "id": "carrier-8", "type": "carrier-plate", "count": 2, "weight": { "listed": 8, "status": "verified" }, "shape": "block" }
+  ],
+  "hardware": [
+    { "id": "collar", "name": "Spring collar", "kind": "collar", "count": 2, "unit": "kg", "weight": { "listed": 0.25, "status": "verified" }, "width": 60 }
+  ],
+  "implements": [
+    {
+      "id": "bar", "name": "Olympic bar", "kind": "bar", "count": 1, "unit": "kg", "base": { "listed": 20, "status": "verified" }, "accepts": ["olympic"],
+      "hardware": { "options": ["collar", "none"], "default": "collar", "perPosition": 1 }, "positionLength": { "listed": 415, "status": "verified" }
+    },
+    {
+      "id": "dumbbell", "name": "Loadable dumbbell", "kind": "handle", "count": 2, "unit": "kg", "base": { "listed": 2, "status": "verified" }, "accepts": ["olympic"],
+      "hardware": { "options": ["collar"], "perPosition": 1 }, "positionLength": { "listed": 150, "status": "verified" }, "unevenAllowance": 0
+    },
+    { "id": "belt", "name": "Dip belt", "kind": "stack", "count": 1, "unit": "kg", "base": { "listed": 0, "status": "verified" }, "accepts": ["olympic"] },
+    {
+      "id": "vest", "name": "Plate carrier", "kind": "vest", "count": 1, "unit": "kg", "base": { "listed": 1.5, "status": "verified" }, "accepts": ["carrier-plate"],
+      "maxPerPosition": { "carrier-8": 1 }
+    }
+  ]
+}
