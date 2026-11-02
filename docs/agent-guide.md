@@ -141,7 +141,7 @@ npx plate-pool load barbell=175 dumbbell=40 --json
 - An exact result holds `loading`. A result that is not exact holds `below`, `above` and `recommended`. One side is missing when nothing exists in that direction.
 - A target over an implement's `maxPlateWeight` or `maxTotal` gets `refused`, which holds the `limit`, and a `below` loading at the heaviest allowed total.
 - `alternatives` holds up to five other loadings that reach the same total.
-- `hardware` lists the locking hardware the loading uses, by hardware id. Without a `.hardware` argument, plate-pool picks the first option in the implement's `options` that fits and is free.
+- `hardware` lists the locking hardware the loading uses, by hardware id. Without a `.hardware` argument, plate-pool tries the implement's `default` first, when it has one, then the rest of its `options` in order, and picks the first that fits and is free.
 - For a pair of handles, `hardware` and `positions` describe one handle. The other is the same.
 - A handle loading with `uneven: true` has ends of different weights, and `heavier` names the heavier end. A handle loading whose hardware `count` is 1 has its one piece on the `heavier` end; the other end has no hardware and no plates.
 - `leftover` counts the plates and hardware still free after the recommended loadings, by id.
