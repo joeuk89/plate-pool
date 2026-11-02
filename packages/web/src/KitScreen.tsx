@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from "react";
-import { kitFromBytes, kitFromText, kitSummary, shortHash, type KitFile, type KitRead } from "./kit-file";
+import { kitFromBytes, kitFromText, kitSummary, shortHash, type KitFile } from "./kit-file";
 
 const coachReadme = "https://github.com/joeuk89/strength-coach#readme";
 const shownErrors = 3;
@@ -27,43 +27,52 @@ function Card({ title, children, tone }: { title: string; children: ReactNode; t
   );
 }
 
-export function Errors({ errors }: { errors: string[] }) {
+function Errors({ errors }: { errors: string[] }) {
   if (errors.length === 0) return null;
   const more = errors.length - shownErrors;
   return (
     <div role="alert" className="kit-errors">
-      <ul>
-        {errors.slice(0, shownErrors).map((error) => (
-          <li key={error}>{error}</li>
-        ))}
-      </ul>
+      {errors.length === 1 ? (
+        <p>{errors[0]}</p>
+      ) : (
+        <ul>
+          {errors.slice(0, shownErrors).map((error) => (
+            <li key={error}>{error}</li>
+          ))}
+        </ul>
+      )}
       {more > 0 && <p>And {more === 1 ? "1 more problem" : `${more} more problems`}.</p>}
     </div>
   );
 }
 
+interface ChosenFile {
+  name: string;
+  bytes: Uint8Array<ArrayBuffer>;
+  text: string;
+}
+
 function ImportPanel({ onKit }: { onKit: (kit: KitFile) => void }) {
   const [text, setText] = useState("");
+  const [chosen, setChosen] = useState<ChosenFile>();
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const fieldId = useId();
-  const fileId = useId();
-  const settle = (read: KitRead, fileText?: string) => {
+  const submit = async () => {
+    if (text.trim() === "") return setErrors(["Paste the inventory file first, or choose one."]);
+    setBusy(true);
+    const read = chosen?.text === text ? await kitFromBytes(chosen.bytes) : await kitFromText(text);
     setBusy(false);
-    if ("kit" in read) return onKit(read.kit);
-    setErrors(read.errors);
-    if (fileText !== undefined) setText(fileText);
+    if ("kit" in read) onKit(read.kit);
+    else setErrors(read.errors);
   };
-  const readPasted = () => {
-    if (text.trim() === "") return setErrors(["Paste the inventory file first, from its first { to its last }."]);
-    setBusy(true);
-    void kitFromText(text).then((read) => settle(read));
-  };
-  const readChosen = async (file: File | undefined) => {
+  const choose = async (file: File | undefined) => {
     if (!file) return;
-    setBusy(true);
     const bytes = new Uint8Array(await file.arrayBuffer());
-    settle(await kitFromBytes(bytes), new TextDecoder().decode(bytes));
+    const fileText = new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes);
+    setChosen({ name: file.name, bytes, text: fileText });
+    setText(fileText);
+    setErrors([]);
   };
   return (
     <div className="import">
@@ -81,19 +90,19 @@ function ImportPanel({ onKit }: { onKit: (kit: KitFile) => void }) {
           setErrors([]);
         }}
       />
+      {chosen && chosen.text === text && <p className="muted">From {chosen.name}</p>}
       <Errors errors={errors} />
       <div className="import-actions">
-        <button type="button" className="primary" disabled={busy} onClick={readPasted}>
+        <button type="button" className="primary" disabled={busy} onClick={() => void submit()}>
           Use this file
         </button>
         <label className="secondary file-button">
           <input
-            id={fileId}
             type="file"
             accept=".json,application/json"
             className="visually-hidden"
             onChange={(event) => {
-              void readChosen(event.target.files?.[0]);
+              void choose(event.target.files?.[0]);
               event.target.value = "";
             }}
           />

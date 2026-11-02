@@ -90,11 +90,19 @@ describe("the kit screen with no kit stored (spec 17.5.1)", () => {
     ]);
   });
 
-  it("a chosen file stores the kit", async () => {
+  it("a chosen file fills the field, and Use this file stores it with the hash of the file's bytes", async () => {
     render(<App />);
     const input = screen.getByLabelText("Choose a file…") as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [new File([olympicText], "olympic.json", { type: "application/json" })] } });
-    expect(await screen.findByRole("button", { name: /^Olympic kit/ })).toBeTruthy();
+    const bytes = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(olympicText)]);
+    fireEvent.change(input, { target: { files: [new File([bytes], "olympic.json", { type: "application/json" })] } });
+    await screen.findByText("From olympic.json");
+    expect(pasteField().value).toContain('"name": "Olympic kit"');
+    fireEvent.click(screen.getByRole("button", { name: "Use this file" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Olympic kit/ }));
+    expect(text(screen.getByRole("region", { name: "Kit on this device" }))).toContain(
+      `kit ${createHash("sha256").update(bytes).digest("hex").slice(0, 8)}`,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Olympic bar", "Loadable dumbbell", "Dip belt", "Plate carrier"]);
   });
 });
