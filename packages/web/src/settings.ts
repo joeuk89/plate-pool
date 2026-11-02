@@ -40,12 +40,23 @@ export function readSettings(inventory: Inventory): Settings {
   };
 }
 
-function writeSettings(settings: Settings): void {
+function writeSettings(settings: Partial<Settings>): void {
   try {
     localStorage.setItem(storageKey, JSON.stringify(settings));
   } catch {
     // Storage is blocked or full: the app carries on with the settings it holds in memory.
   }
+}
+
+/** Forgets the last implement and every hardware choice, which belong to one kit, and keeps the uneven switch. */
+export function forgetKitSettings(): void {
+  let uneven: unknown;
+  try {
+    uneven = JSON.parse(localStorage.getItem(storageKey) ?? "{}")?.uneven;
+  } catch {
+    uneven = undefined;
+  }
+  writeSettings(typeof uneven === "boolean" ? { uneven } : {});
 }
 
 export interface SettingsChange {

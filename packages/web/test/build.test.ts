@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp, type Deployment } from "./build-app";
@@ -37,6 +37,24 @@ describe("web app build", () => {
     const urls = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map((match) => match[1]);
     expect(urls.length).toBeGreaterThan(0);
     for (const url of urls) expect(url).toMatch(/^\/plate-pool\/assets\//);
+  });
+});
+
+describe("no bundled inventory (spec 17.10)", () => {
+  it("serves no static JSON", () => {
+    expect(existsSync(join(outDir, "api/inventory.json"))).toBe(false);
+    expect(existsSync(join(outDir, "api/achievable.json"))).toBe(false);
+    expect(existsSync(join(outDir, "api"))).toBe(false);
+  });
+
+  it("holds nothing from the owner's file", () => {
+    const scripts = readdirSync(join(outDir, "assets")).filter((file) => file.endsWith(".js"));
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const file of scripts) {
+      const code = read(`assets/${file}`);
+      expect(code.includes("Home gym"), file).toBe(false);
+      expect(code.includes("collar-clamp"), file).toBe(false);
+    }
   });
 });
 

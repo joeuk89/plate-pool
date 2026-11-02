@@ -1,7 +1,7 @@
 import { load, type Loading, type LoadRequest } from "@plate-pool/core";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { App } from "../src/App";
+import { Calculator } from "../src/Calculator";
 import { plateList } from "../src/describe";
 import { olympic, owner } from "./kits";
 
@@ -16,7 +16,7 @@ function text(element: HTMLElement): string {
 
 function open(link: string, inventory = owner) {
   window.history.replaceState(null, "", link);
-  render(<App inventory={inventory} />);
+  render(<Calculator inventory={inventory} />);
 }
 
 const card = (priority: number) => screen.getByRole("region", { name: new RegExp(`^${priority}\\. `) });

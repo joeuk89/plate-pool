@@ -1,7 +1,7 @@
 import { load, type Loading, type LoadResponse, type TargetRequest } from "@plate-pool/core";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { App } from "../src/App";
+import { Calculator } from "../src/Calculator";
 import { plateList } from "../src/describe";
 import { owner } from "./kits";
 
@@ -49,7 +49,7 @@ function expectSameAsLibrary(response: LoadResponse) {
 
 describe("several implements: worked examples (spec section 7)", () => {
   it("example 9: dumbbells 120 lb then kettlebell 40 lb recommends 47.5 lb, with a warning that names the dumbbells", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     typeTarget(1, "120");
     addImplement("Kettlebell");
@@ -69,7 +69,7 @@ describe("several implements: worked examples (spec section 7)", () => {
   });
 
   it("example 10: barbell 173 lb then dumbbells 40 lb are both exact, and the line at the bottom shows what is left over", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget(1, "173");
     addImplement("Dumbbell pair");
     typeTarget(2, "40");
@@ -86,7 +86,7 @@ describe("several implements: worked examples (spec section 7)", () => {
   });
 
   it("example 11: barbell 88 lb gives up its fewest-plate loading so dumbbells 75 lb are exact", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget(1, "88");
     addImplement("Dumbbell pair");
     typeTarget(2, "75");
@@ -100,20 +100,20 @@ describe("several implements: worked examples (spec section 7)", () => {
 
 describe("several implements: cards (spec 8.3)", () => {
   it("stacks a new card under the first when an implement is added", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     expect(cards()).toHaveLength(1);
     addImplement("Kettlebell");
     expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Straight bar", "2. Kettlebell"]);
   });
 
   it("puts the cursor in the new card's target", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     addImplement("Weighted vest");
     expect(document.activeElement).toBe(within(card(2)).getByLabelText("Target"));
   });
 
   it("closes the list of implements to add on Cancel", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("button", { name: "Add implement" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(cards()).toHaveLength(1);
@@ -132,7 +132,7 @@ describe("several implements: priority order (spec 8.3)", () => {
   }
 
   function planDumbbellsThenKettlebell() {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     typeTarget(1, "120");
     addImplement("Kettlebell");
@@ -215,14 +215,14 @@ describe("several implements: the plate pool", () => {
   const choices = () => within(screen.getByRole("group", { name: "Implement to add" })).getAllByRole("button").map((button) => button.textContent);
 
   it("offers only the implements that are still free", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     addImplement("Dumbbell pair");
     fireEvent.click(screen.getByRole("button", { name: "Add implement" }));
     expect(choices()).toEqual(["Kettlebell", "Leg attachment", "Weighted vest", "Cancel"]);
   });
 
   it("offers one dumbbell when the other is in use", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     addImplement("Dumbbell pair");
     fireEvent.click(within(within(card(2)).getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
     addImplement("Dumbbell single");
@@ -230,7 +230,7 @@ describe("several implements: the plate pool", () => {
   });
 
   it("explains a card that asks for more of an implement than the inventory holds, and serves the cards above it", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     addImplement("Dumbbell pair");
     typeTarget(2, "40");
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
@@ -240,7 +240,7 @@ describe("several implements: the plate pool", () => {
   });
 
   it("explains a target it cannot read on its own card only", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget(1, "173");
     addImplement("Kettlebell");
     typeTarget(2, "abc");
@@ -249,7 +249,7 @@ describe("several implements: the plate pool", () => {
   });
 
   it("shows vest blocks in the line at the bottom", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget(1, "173");
     addImplement("Weighted vest");
     typeTarget(2, "12");

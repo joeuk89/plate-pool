@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { App } from "../src/App";
+import { Calculator } from "../src/Calculator";
+import { owner } from "./kits";
 
 afterEach(cleanup);
 
@@ -15,7 +16,7 @@ function pictureIn(name: RegExp) {
 
 describe("barbell picture on the Load screen: worked examples (spec section 7)", () => {
   it("example 2: 173 lb draws one side of the bar, inside to outside, with the clamp collar", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     const picture = pictureIn(/Exact/);
     expect(picture.tagName.toLowerCase()).toBe("svg");
@@ -25,14 +26,14 @@ describe("barbell picture on the Load screen: worked examples (spec section 7)",
   });
 
   it("example 2: labels each plate with its weight and names the collar in the picture", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     const labels = [...pictureIn(/Exact/).querySelectorAll("text")].map((text) => text.textContent);
     expect(labels).toEqual(["22.5", "22.5", "5", "5", "5", "5", "5", "5", "2.5", 'Mirafit 1" clamp collar']);
   });
 
   it("example 1: 175 lb draws a picture for the loading below and for the loading above", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("175");
     expect(pictureIn(/Below/).getAttribute("aria-label")).toBe(
       'Each side, inside to outside: 22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, then the Mirafit 1" clamp collar',
@@ -43,7 +44,7 @@ describe("barbell picture on the Load screen: worked examples (spec section 7)",
   });
 
   it("example 3: 230 lb draws the heaviest allowed loading", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("230");
     expect(pictureIn(/Heaviest allowed/).getAttribute("aria-label")).toBe(
       'Each side, inside to outside: 22.5, 22.5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, then the Mirafit 1" clamp collar',
@@ -53,7 +54,7 @@ describe("barbell picture on the Load screen: worked examples (spec section 7)",
 
 describe("barbell picture on the Load screen: collars", () => {
   it("draws and names no collar when the collar choice is none", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     fireEvent.click(within(screen.getByRole("radiogroup", { name: "Collars" })).getByRole("radio", { name: "None" }));
     const picture = pictureIn(/Exact/);
@@ -68,7 +69,7 @@ describe("barbell picture on the Load screen: other implements", () => {
     ["Kettlebell", "80"],
     ["Dumbbell", "40"],
   ])("draws its own picture, not the barbell picture, for the %s", (tab, target) => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: tab }));
     typeTarget(target);
     const result = screen.getByRole("region", { name: "Result" });

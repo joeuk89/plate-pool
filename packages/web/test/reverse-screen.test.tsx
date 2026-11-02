@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { App } from "../src/App";
+import { Calculator } from "../src/Calculator";
+import { owner } from "./kits";
 
 afterEach(cleanup);
 
@@ -12,7 +13,7 @@ function text(element: HTMLElement): string {
 }
 
 function openReverse(tab = "Straight bar") {
-  render(<App />);
+  render(<Calculator inventory={owner} />);
   fireEvent.click(screen.getByRole("tab", { name: tab }));
   fireEvent.click(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "Reverse" }));
 }

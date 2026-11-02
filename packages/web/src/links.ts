@@ -12,6 +12,8 @@ export interface Link {
   cards: Card[];
   settings: Partial<Settings>;
   view: View;
+  /** The short hash of the kit the targets were worked out for. */
+  kit?: string;
 }
 
 function cardFrom(inventory: Inventory, parameter: string, value: string): Card | undefined {
@@ -30,16 +32,18 @@ export function readLink(inventory: Inventory, search: string): Link {
   const hardware: Record<string, string> = {};
   const settings: Partial<Settings> = {};
   let view: View = "load";
+  let kit: string | undefined;
   for (const [parameter, value] of new URLSearchParams(search)) {
     const card = cardFrom(inventory, parameter, value);
     if (card) cards.push(card);
     const hardwareFor = /^(.+)\.hardware$/.exec(parameter)?.[1];
     if (hardwareFor && hardwareOptions(inventory, hardwareFor).includes(value)) hardware[hardwareFor] = value;
     if (parameter === "view" && views.includes(value)) view = value as View;
+    if (parameter === "kit") kit = value.toLowerCase();
     if (parameter === "uneven" && Object.hasOwn(unevenValues, value)) settings.uneven = unevenValues[value]!;
   }
   if (Object.keys(hardware).length > 0) settings.hardware = hardware;
-  return { cards, settings, view };
+  return { cards, settings, view, ...(kit !== undefined ? { kit } : {}) };
 }
 
 function parameterOf(inventory: Inventory, card: Card): string {
@@ -52,7 +56,10 @@ function valueOf(card: Card): string {
   return `${target}${card.unit}`;
 }
 
-export function linkQuery(inventory: Inventory, { cards, settings, view }: { cards: Card[]; settings: Settings; view: View }): string {
+export function linkQuery(
+  inventory: Inventory,
+  { cards, settings, view, kit }: { cards: Card[]; settings: Settings; view: View; kit?: string | undefined },
+): string {
   const parameters: [string, string][] = cards.map((card) => [parameterOf(inventory, card), valueOf(card)]);
   for (const implement of new Set(cards.map((card) => card.implement))) {
     const choice = hardwareChoice(inventory, settings, implement);
@@ -60,5 +67,6 @@ export function linkQuery(inventory: Inventory, { cards, settings, view }: { car
   }
   if (cards.some((card) => canBeUneven(inventory, card.implement))) parameters.push(["uneven", settings.uneven ? "1" : "0"]);
   if (view !== "load") parameters.push(["view", view]);
+  if (kit !== undefined) parameters.push(["kit", kit]);
   return parameters.map(([name, value]) => (value === "" ? name : `${name}=${encodeURIComponent(value)}`)).join("&");
 }

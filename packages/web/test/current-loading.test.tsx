@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { App } from "../src/App";
+import { Calculator } from "../src/Calculator";
+import { owner } from "./kits";
 
 afterEach(() => {
   cleanup();
@@ -16,7 +17,7 @@ function text(element: Element): string {
 
 function reopen() {
   cleanup();
-  render(<App />);
+  render(<Calculator inventory={owner} />);
 }
 
 function typeTarget(value: string) {
@@ -46,14 +47,14 @@ function pinOtherWay(rowText: string) {
 
 describe("current loading: Loaded and the strip (spec 16.4)", () => {
   it("shows no strip and no changes without a current loading", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     expect(strip()).toBeNull();
     expect(changesOf(result())).toBeNull();
   });
 
   it("pins the exact result and shows it in a strip with an Unload button", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     pin(loadingCard("Exact"));
     expect(text(strip()!)).toBe("Straight bar · 173 lb · each side 2 × 22.5, 6 × 5, 1 × 2.5 Unload");
@@ -61,7 +62,7 @@ describe("current loading: Loaded and the strip (spec 16.4)", () => {
   });
 
   it("pinning a row under Other ways promotes it to the main result", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("88");
     pinOtherWay("7 × 5");
     expect(text(strip()!)).toContain("Straight bar · 88 lb · each side 7 × 5");
@@ -71,7 +72,7 @@ describe("current loading: Loaded and the strip (spec 16.4)", () => {
   });
 
   it("pinning below or above moves the target to that loading and promotes it", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("175");
     pin(loadingCard("Above"));
     expect(targetValue()).toBe("175.5");
@@ -80,7 +81,7 @@ describe("current loading: Loaded and the strip (spec 16.4)", () => {
   });
 
   it("starts the strip with the implement's name (spec 17.5.4)", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openTab("Dumbbell");
     typeTarget("40");
     pin(loadingCard("Exact"));
@@ -103,7 +104,7 @@ describe("current loading: Loaded and the strip (spec 16.4)", () => {
   });
 
   it("starts the strip with the handle's name for a single too", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openTab("Dumbbell");
     fireEvent.click(within(screen.getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
     typeTarget("12.5");
@@ -112,7 +113,7 @@ describe("current loading: Loaded and the strip (spec 16.4)", () => {
   });
 
   it("Unload clears the current loading and the changes block", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     pin(loadingCard("Exact"));
     unload();
@@ -124,7 +125,7 @@ describe("current loading: Loaded and the strip (spec 16.4)", () => {
 
 describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
   it("example 16: from 88 lb (7 × 5 per side) to 98 lb puts on 1 × 5 per side, 2 changes", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("88");
     pinOtherWay("7 × 5");
     typeTarget("98");
@@ -134,7 +135,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
   });
 
   it("example 17: from 68 lb (5 × 5 per side) to 113 lb puts the 22.5 outside the 5s", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("68");
     pinOtherWay("5 × 5");
     typeTarget("113");
@@ -145,7 +146,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
   });
 
   it("example 18: below and above each carry their own changes block", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     pin(loadingCard("Exact"));
     typeTarget("175");
@@ -157,7 +158,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
   });
 
   it("example 19 (revised in 17.11): dumbbells 70 lb to 80 lb keep standard screws and put on 1 × 5 per end, 4 changes", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openTab("Dumbbell");
     typeTarget("70");
     pin(loadingCard("Exact"));
@@ -169,7 +170,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
   });
 
   it("names a screw swap by the screws' names", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openTab("Kettlebell");
     typeTarget("50");
     pin(loadingCard("Exact"));
@@ -178,7 +179,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
   });
 
   it("names plates taken off before plates put on", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     pin(loadingCard("Exact"));
     typeTarget("170.5");
@@ -186,7 +187,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
   });
 
   it("counts vest blocks per panel", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openTab("Weighted vest");
     typeTarget("12");
     pin(loadingCard("Exact"));
@@ -195,7 +196,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
   });
 
   it("reads unchanged for a position with nothing to do", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openTab("Dumbbell");
     fireEvent.click(within(screen.getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
     typeTarget("40");
@@ -205,7 +206,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
   });
 
   it("prefixes each row under Other ways with its count, fewest first", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("88");
     pinOtherWay("7 × 5");
     const counts = otherRows().map((row) => Number(/^(\d+) changes?/.exec(text(row))?.[1]));
@@ -214,7 +215,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
   });
 
   it("step buttons still move to the next achievable weight", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     pin(loadingCard("Exact"));
     fireEvent.click(screen.getByRole("button", { name: "Next heavier weight" }));
@@ -224,7 +225,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
 
 describe("current loading: Reverse (spec 16.4)", () => {
   it("Loaded on Reverse pins the built loading and opens the Load screen at its total", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "Reverse" }));
     const add = (name: string, times: number) => {
       for (let i = 0; i < times; i++) fireEvent.click(screen.getByRole("button", { name }));
@@ -240,7 +241,7 @@ describe("current loading: Reverse (spec 16.4)", () => {
 
 describe("current loading: storage, links and scope (spec 16.4)", () => {
   it("keeps the current loading after a reload", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     pin(loadingCard("Exact"));
     reopen();
@@ -250,7 +251,7 @@ describe("current loading: storage, links and scope (spec 16.4)", () => {
   });
 
   it("keeps the current loading only until Unload", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     pin(loadingCard("Exact"));
     unload();
@@ -265,7 +266,7 @@ describe("current loading: storage, links and scope (spec 16.4)", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("blocked");
     });
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     pin(loadingCard("Exact"));
     expect(text(strip()!)).toContain("Straight bar · 173 lb");
@@ -273,20 +274,20 @@ describe("current loading: storage, links and scope (spec 16.4)", () => {
 
   it("ignores a stored current loading it cannot read", () => {
     localStorage.setItem("plate-pool:current", '{"barbell": {"positions": "nonsense"}}');
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     expect(strip()).toBeNull();
   });
 
   it("leaves the current loading out of the URL", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     pin(loadingCard("Exact"));
     expect(window.location.search).toBe("?barbell=173lb&barbell.hardware=collar-clamp");
   });
 
   it("affects its own implement only", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     typeTarget("173");
     pin(loadingCard("Exact"));
     openTab("Kettlebell");

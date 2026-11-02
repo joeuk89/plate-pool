@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { App } from "../src/App";
+import { Calculator } from "../src/Calculator";
+import { owner } from "./kits";
 
 afterEach(cleanup);
 
@@ -29,7 +30,7 @@ function rows(): string[][] {
 
 describe("List screen (spec 8.5)", () => {
   it("shows one table for the selected implement, with the columns in 8.5", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openList();
     setRange("170", "176");
     expect(rows()).toEqual([
@@ -41,7 +42,7 @@ describe("List screen (spec 8.5)", () => {
   });
 
   it("lists the implement's full range when the filter is empty", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openList();
     fireEvent.click(screen.getByRole("tab", { name: "Kettlebell" }));
     const all = rows();
@@ -50,7 +51,7 @@ describe("List screen (spec 8.5)", () => {
   });
 
   it("lists one dumbbell with its ends and the screws in the loading, and the uneven flag", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openList();
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     fireEvent.click(screen.getByRole("radio", { name: "Single" }));
@@ -59,7 +60,7 @@ describe("List screen (spec 8.5)", () => {
   });
 
   it("shows the vest in kilograms first", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openList();
     fireEvent.click(screen.getByRole("tab", { name: "Weighted vest" }));
     setRange("12", "12");
@@ -70,7 +71,7 @@ describe("List screen (spec 8.5)", () => {
   });
 
   it("uses the collar choice", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openList();
     fireEvent.click(screen.getByRole("radio", { name: "None" }));
     setRange("18", "18");
@@ -78,7 +79,7 @@ describe("List screen (spec 8.5)", () => {
   });
 
   it("shares the collar choice with the Load screen", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("radio", { name: "Ironmaster spin-lock collar" }));
     openList();
     expect((screen.getByRole("radio", { name: "Ironmaster spin-lock collar" }) as HTMLInputElement).checked).toBe(true);
@@ -88,7 +89,7 @@ describe("List screen (spec 8.5)", () => {
   });
 
   it("leaves out the weights that need uneven dumbbells when uneven loading is off", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openList();
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     fireEvent.click(screen.getByRole("radio", { name: "Single" }));
@@ -99,7 +100,7 @@ describe("List screen (spec 8.5)", () => {
   });
 
   it("explains a range it cannot read", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openList();
     setRange("200", "100");
     expect(screen.queryByRole("table")).toBeNull();
@@ -107,7 +108,7 @@ describe("List screen (spec 8.5)", () => {
   });
 
   it("opens a tapped row's weight in the Load screen", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openList();
     setRange("170", "176");
     fireEvent.click(screen.getAllByRole("row")[2]!);
@@ -118,7 +119,7 @@ describe("List screen (spec 8.5)", () => {
   });
 
   it("opens a row with the same implement and options it was listed with", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     openList();
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     fireEvent.click(screen.getByRole("radio", { name: "Single" }));
@@ -136,7 +137,7 @@ describe("Load screen: step buttons (spec 8.2)", () => {
   const down = () => fireEvent.click(screen.getByRole("button", { name: "Next lighter weight" }));
 
   it("moves to the next achievable weight on each press", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.change(screen.getByLabelText("Target"), { target: { value: "173" } });
     up();
     expect(target()).toBe("175.5");
@@ -147,21 +148,21 @@ describe("Load screen: step buttons (spec 8.2)", () => {
   });
 
   it("moves from a target no loading reaches to the nearest achievable weight (example 1)", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.change(screen.getByLabelText("Target"), { target: { value: "175" } });
     down();
     expect(target()).toBe("173");
   });
 
   it("starts at the lightest weight, and cannot go below it", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     up();
     expect(target()).toBe("18");
     expect((screen.getByRole("button", { name: "Next lighter weight" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("switches to the implement's unit, so each press lands on an exact weight", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("radio", { name: "kg" }));
     fireEvent.change(screen.getByLabelText("Target"), { target: { value: "79" } });
     up();
@@ -170,7 +171,7 @@ describe("Load screen: step buttons (spec 8.2)", () => {
   });
 
   it("follows the dumbbell choice", () => {
-    render(<App />);
+    render(<Calculator inventory={owner} />);
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
     fireEvent.click(screen.getByRole("radio", { name: "Single" }));
     fireEvent.change(screen.getByLabelText("Target"), { target: { value: "10" } });

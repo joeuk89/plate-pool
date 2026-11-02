@@ -151,6 +151,18 @@ describe("offline", () => {
     }
   });
 
+  it("opens a set-up link with no network: the fragment never reaches the worker, so the shell answers", async () => {
+    const browser = new Browser();
+    browser.server.deployment = first;
+    await browser.visit("./");
+    await browser.install(first);
+
+    browser.server.online = false;
+    const setupLink = new URL("./?barbell=173lb#inventory=payload", scope);
+    setupLink.hash = "";
+    expect(await browser.visit(setupLink.href)).toBe(text(first, "index.html"));
+  });
+
   it("falls back to the cached copy when the network does not answer", async () => {
     const browser = new Browser();
     browser.server.deployment = first;
