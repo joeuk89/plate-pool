@@ -92,7 +92,7 @@ export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
   const results: LoadResult[] = [];
   const earlier: { label: Label; usage: Usage | undefined }[] = [];
   let pool = inventory;
-  request.targets.forEach((target, index) => {
+  request.targets.forEach((_, index) => {
     const implement = implementsUsed[index]!;
     const outcome = chosen.outcomes[index]!;
     const pick = chosen.picks[index]!;

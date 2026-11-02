@@ -2,7 +2,7 @@ import { arrange, type Changes, type Resolved } from "./changes.js";
 import type { Implement, Inventory } from "./inventory.js";
 import type { Loading, LoadResult } from "./load.js";
 import { lower, NONE, positionNames, type HardwareOption, type PlateOption } from "./parts.js";
-import { describeWeight, display, parseWeight, convert, thousandths, used } from "./weight.js";
+import { convert, describeWeight, display, parseWeight, thousandths, used } from "./weight.js";
 
 const MAX_ALTERNATIVES = 5;
 
@@ -11,12 +11,13 @@ export interface Candidate {
   /** Plates per position, innermost first. */
   positions: PlateOption[][];
   hardware?: HardwareOption;
-  /** Which positions carry the hardware. */
   hardwareOn: boolean[];
   plateCount: number;
   uneven: boolean;
   difference: number;
+  /** On a handle, the position of the end built as the heavier one. */
   heavier?: number;
+  /** Hardware that fit but was not free, so a later option was used. */
   skipped: HardwareOption[];
   ids?: string[][];
   changes?: Changes;
@@ -75,12 +76,12 @@ function choose(candidates: Candidate[], target: number): Choice {
   const at = (total: number) => ranked(candidates.filter((candidate) => candidate.total === total));
   const exact = at(target);
   if (exact.length > 0) return { exact: true, picks: exact };
-  const lower = Math.max(...candidates.map((candidate) => candidate.total).filter((total) => total < target));
-  const higher = Math.min(...candidates.map((candidate) => candidate.total).filter((total) => total > target));
-  const below = Number.isFinite(lower) ? at(lower) : [];
-  const above = Number.isFinite(higher) ? at(higher) : [];
+  const under = Math.max(...candidates.map((candidate) => candidate.total).filter((total) => total < target));
+  const over = Math.min(...candidates.map((candidate) => candidate.total).filter((total) => total > target));
+  const below = Number.isFinite(under) ? at(under) : [];
+  const above = Number.isFinite(over) ? at(over) : [];
   const belowWins = () => {
-    const nearer = higher - target - (target - lower);
+    const nearer = over - target - (target - under);
     return nearer !== 0 ? nearer > 0 : changesOf(below[0]!) <= changesOf(above[0]!);
   };
   const recommended = below.length > 0 && (above.length === 0 || belowWins()) ? "below" : above.length > 0 ? "above" : undefined;
