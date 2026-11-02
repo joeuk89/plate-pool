@@ -1,7 +1,7 @@
 {
   "name": "plate-pool",
   "version": "1.0.0",
-  "description": "Plate loading calculator for one home gym",
+  "description": "A calculator for any plate-loaded gym",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,7 +17,8 @@
     "plate-pool": "./dist/bin.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "inventory.schema.json"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node build.js",

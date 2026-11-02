@@ -16,4 +16,4 @@ await build({
   target: "node22",
 });
 
-copyFileSync(path("../../inventory/inventory.json"), path("dist/inventory.json"));
+copyFileSync(path("../../inventory/inventory.schema.json"), path("inventory.schema.json"));
