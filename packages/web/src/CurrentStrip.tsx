@@ -1,4 +1,4 @@
-import type { CollarChoice } from "@plate-pool/core";
+import type { CollarChoice } from "./settings";
 import { reverseOf, stripPlace, stripPlates, type PinnedLoading } from "./current";
 import { unitOf } from "./plan";
 

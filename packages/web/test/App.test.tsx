@@ -136,7 +136,7 @@ describe("vest Load screen", () => {
     openVest();
     typeTarget("35");
     const result = screen.getByRole("region", { name: "Result" });
-    expect(text(result)).toContain("Refused: over the 30 block limit");
+    expect(text(result)).toContain("Refused: over the 30 kg plate limit");
     expect(text(within(result).getByRole("article", { name: /Heaviest allowed/ }))).toContain("30 kg 66.14 lb");
     expect(text(result).match(/Refused/g)).toHaveLength(1);
   });
@@ -145,7 +145,7 @@ describe("vest Load screen", () => {
     openVest();
     typeTarget("12");
     const notes = within(screen.getByRole("region", { name: "Result" })).getByRole("list", { name: "Notes" });
-    expect(text(notes)).toBe("Unverified: empty vest weight, vest block count");
+    expect(text(notes)).toBe("Unverified: empty vest weight, block count");
   });
 
   it("names one block in the singular and an empty position as no blocks", () => {

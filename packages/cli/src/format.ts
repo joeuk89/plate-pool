@@ -9,6 +9,7 @@ import {
   type Loading,
   type LoadResponse,
   type LoadResult,
+  type Plate,
   type ReverseResult,
   type Unit,
   type Value,
@@ -32,8 +33,8 @@ const hardwareLabels: Record<string, string> = {
 const positionLabels: Record<string, string> = {
   left: "left side",
   right: "right side",
-  "end-a": "end A",
-  "end-b": "end B",
+  a: "end A",
+  b: "end B",
 };
 
 export function loadText(response: LoadResponse, inventory: Inventory): string {
@@ -47,7 +48,7 @@ function leftoverText(leftover: Leftover, inventory: Inventory): string {
     .filter(([, count]) => count > 0)
     .map(([id, count]) => {
       const plate = inventory.plates.find((item) => item.id === id);
-      if (plate?.shape === "block") return `${count} ${plate.name.toLowerCase()}${count === 1 ? "" : "s"}`;
+      if (plate?.shape === "block") return `${count} ${plate.name?.toLowerCase() ?? "block"}${count === 1 ? "" : "s"}`;
       return `${count} × ${plate ? (plate.weight.measured ?? plate.weight.listed) : id}`;
     });
   const hardware = Object.entries(leftover.hardware)
@@ -118,7 +119,7 @@ export function listText(response: ListResponse, inventory: Inventory, range: { 
 
   const lines = [`${resultLabel(response)}  ${rows.length} ${rows.length === 1 ? "weight" : "weights"} ${span}`, ""];
   for (const row of rows) {
-    const flags = [row.uneven ? "uneven" : "", row.micro ? "micro" : ""].filter((flag) => flag !== "");
+    const flags = [row.uneven ? "uneven" : "", row.smallest ? "smallest" : ""].filter((flag) => flag !== "");
     lines.push(`  ${[describeWeight(row.total, unit), ...flags].join("  ")}`);
     for (const line of positionLines(response.implement, row.loading)) lines.push(`      ${line}`);
   }
@@ -205,12 +206,12 @@ function unverifiedLabels(keys: string[], inventory: Inventory): string[] {
       return id === "vest" ? "empty vest weight" : `${(implementLabels[id] ?? id).toLowerCase()} weight`;
     }
     const hardware = inventory.hardware.find((item) => item.id === id);
-    if (hardware && field === "minStackIn") return `shortest stack on a ${hardware.name.toLowerCase()}`;
+    if (hardware && field === "minStack") return `shortest stack on a ${hardware.name.toLowerCase()}`;
     if (hardware?.kind === "collar") return "collar weight";
     if (hardware) return `${hardware.name.toLowerCase()} weight`;
     const plate = inventory.plates.find((item) => item.id === id);
-    if (plate && field === "count") return `${plate.name.toLowerCase()} count`;
-    return plate ? `${plate.name} plate weight` : key;
+    if (plate && field === "count") return `${plateName(plate, inventory)} plate count`;
+    return plate ? `${plateName(plate, inventory)} plate weight` : key;
   };
   return [...new Set(keys.map(label))];
 }
@@ -221,7 +222,7 @@ export function inventoryText(inventory: Inventory): string {
     [
       "Plates",
       inventory.plates.map((plate) => [
-        plate.name,
+        plate.name ?? plateName(plate, inventory),
         `× ${plate.count}`,
         [`${amount(plate.weight, unitOf(plate.type))} each`, ...marks(plate.weight), ...(plate.countStatus === "unverified" ? ["count unverified"] : [])].join(", "),
       ]),
@@ -252,6 +253,12 @@ export function inventoryText(inventory: Inventory): string {
         `${heading}\n${list.map(([name, count, detail]) => `  ${name.padEnd(nameWidth)}  ${count.padEnd(countWidth)}  ${detail}\n`).join("")}`,
     )
     .join("\n");
+}
+
+function plateName(plate: Plate, inventory: Inventory): string {
+  if (plate.name) return plate.name.toLowerCase();
+  const unit = inventory.plateTypes.find((type) => type.id === plate.type)?.unit ?? "lb";
+  return `${plate.weight.measured ?? plate.weight.listed} ${unit}`;
 }
 
 function amount(value: Value, unit: Unit): string {

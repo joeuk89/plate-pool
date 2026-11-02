@@ -1,17 +1,14 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { load, type Inventory } from "../src/index.js";
 
-const inventory: Inventory = JSON.parse(
-  readFileSync(new URL("../../../inventory/inventory.json", import.meta.url), "utf8"),
-);
+import { owner as inventory, placed } from "./kits.js";
 
 function loadKettlebell(target: string, options: { inventory?: Inventory } = {}) {
   const [result] = load(options.inventory ?? inventory, { targets: [{ implement: "kettlebell", target }] }).results;
   return result!;
 }
 
-const stack = (...plates: number[]) => [{ name: "stack", plates }];
+const stack = (...plates: number[]) => [placed("stack", plates)];
 
 describe("kettlebell Load: worked examples (spec section 7)", () => {
   it("example 8: 80 lb is exact with 1 × 22.5, 6 × 5, 1 × 2.5 on a long screw", () => {
@@ -37,18 +34,18 @@ const byId = <T extends { id: string }>(list: T[], id: string) => list.find((ite
 const stickOutWarning =
   "No standard locking screw is free, so the kettlebell uses a long locking screw. It may stick out at the top, which Ironmaster's manual calls normal.";
 
-describe("kettlebell Load: locking screw (spec 6.2)", () => {
-  it("uses a standard screw up to 57.5 lb", () => {
-    expect(loadKettlebell("57.5")).toMatchObject({
+describe("kettlebell Load: locking screw by capacity (spec 17.4)", () => {
+  it("uses a standard screw while the stack fits its 3.25 in", () => {
+    expect(loadKettlebell("60")).toMatchObject({
       exact: true,
-      loading: { hardware: [{ id: "screw-standard", count: 1 }], positions: stack(22.5, 5, 5) },
+      loading: { hardware: [{ id: "screw-standard", count: 1 }], positions: stack(22.5, 5, 5, 2.5) },
     });
   });
 
-  it("uses a long screw above 57.5 lb", () => {
-    expect(loadKettlebell("60")).toMatchObject({
+  it("uses a long screw on a longer stack", () => {
+    expect(loadKettlebell("62.5")).toMatchObject({
       exact: true,
-      loading: { hardware: [{ id: "screw-long", count: 1 }], positions: stack(22.5, 5, 5, 2.5) },
+      loading: { hardware: [{ id: "screw-long", count: 1 }], positions: stack(22.5, 5, 5, 5) },
     });
   });
 
@@ -59,19 +56,28 @@ describe("kettlebell Load: locking screw (spec 6.2)", () => {
     });
   });
 
-  it("takes a long screw when no standard screw is free, and warns that it may stick out at the top", () => {
+  it("takes a long screw when no standard screw is free, and warns with the long screw's note", () => {
     const noStandard = changed((copy) => {
       byId(copy.hardware, "screw-standard").count = 0;
     });
-    const result = loadKettlebell("40", { inventory: noStandard });
+    const result = loadKettlebell("60", { inventory: noStandard });
     expect(result).toMatchObject({
       exact: true,
-      loading: { total: { lb: 40, kg: 18.1 }, hardware: [{ id: "screw-long", count: 1 }], positions: stack(5, 5, 5) },
+      loading: { total: { lb: 60 }, hardware: [{ id: "screw-long", count: 1 }], positions: stack(22.5, 5, 5, 2.5) },
     });
     expect(result.warnings).toEqual([stickOutWarning]);
   });
 
-  it("gives no stick-out warning when a standard screw is free or the long screw is due anyway", () => {
+  it("puts no long screw on a stack shorter than its 3.0 in minimum, even with no standard screw free", () => {
+    const noStandard = changed((copy) => {
+      byId(copy.hardware, "screw-standard").count = 0;
+    });
+    const result = loadKettlebell("40", { inventory: noStandard });
+    expect(result.exact).toBe(false);
+    expect(result).toMatchObject({ below: { total: { lb: 22.5 }, hardware: [] }, above: { hardware: [{ id: "screw-long", count: 1 }] } });
+  });
+
+  it("gives no fallback warning when a standard screw is free or the long screw is due anyway", () => {
     expect(loadKettlebell("40").warnings).toEqual([]);
     const noStandard = changed((copy) => {
       byId(copy.hardware, "screw-standard").count = 0;
@@ -87,7 +93,7 @@ describe("kettlebell Load: locking screw (spec 6.2)", () => {
     const result = loadKettlebell("40", { inventory: noScrews });
     expect(result).toMatchObject({ exact: false, recommended: "below", below: { total: { lb: 22.5 }, hardware: [] } });
     expect(result.above).toBeUndefined();
-    expect(result.warnings).toEqual(["No locking screw is free, so the kettlebell can only be the bare handle."]);
+    expect(result.warnings).toEqual(["No locking hardware is free, so the kettlebell can carry no plates."]);
   });
 });
 
@@ -126,12 +132,12 @@ describe("kettlebell Load: stack (spec 6.2)", () => {
 
   it("fits the plates within the locking screw's capacity", () => {
     const shortScrew = changed((copy) => {
-      byId(copy.hardware, "screw-standard").capacityIn = 0.5;
+      byId(copy.hardware, "screw-standard").capacity = 0.5;
     });
     expect(loadKettlebell("35", { inventory: shortScrew })).toMatchObject({
       exact: false,
       below: { total: { lb: 30 }, positions: stack(5) },
-      above: { total: { lb: 58.75 }, hardware: [{ id: "screw-long", count: 1 }] },
+      above: { total: { lb: 53.75 }, hardware: [{ id: "screw-long", count: 1 }], positions: stack(5, 5, 5, 5, 5, 2.5, 1.25) },
     });
   });
 });
@@ -156,8 +162,8 @@ describe("kettlebell Load: 80 lb limit (spec 4.3)", () => {
 });
 
 describe("kettlebell Load: rules that hold for every target", () => {
-  const lengthOf = new Map(inventory.plates.map((plate) => [plate.weight.listed, plate.stackLengthIn?.listed ?? 0]));
-  const capacityOf = new Map(inventory.hardware.map((item) => [item.id, item.capacityIn ?? 0]));
+  const lengthOf = new Map(inventory.plates.map((plate) => [plate.weight.listed, plate.stackLength?.listed ?? 0]));
+  const capacityOf = new Map(inventory.hardware.map((item) => [item.id, item.capacity ?? 0]));
   const pool = new Map(
     inventory.plates.filter((plate) => plate.type === "quick-lock").map((plate) => [plate.weight.listed, plate.count]),
   );
@@ -182,9 +188,10 @@ describe("kettlebell Load: rules that hold for every target", () => {
           expect(loading.hardware, target).toEqual([]);
           continue;
         }
-        const screw = total <= 57.5 ? "screw-standard" : "screw-long";
-        expect(loading.hardware, target).toEqual([{ id: screw, count: 1 }]);
         const length = plates.reduce((sum, plate) => sum + lengthOf.get(plate)!, 0);
+        const screw = length <= 3.25 ? "screw-standard" : "screw-long";
+        expect(loading.hardware, target).toEqual([{ id: screw, count: 1 }]);
+        if (screw === "screw-long") expect(length, target).toBeGreaterThanOrEqual(3);
         expect(length, target).toBeLessThanOrEqual(capacityOf.get(screw)!);
         expect(total, target).toBe(25 + plates.reduce((sum, plate) => sum + plate, 0));
       }
@@ -200,8 +207,9 @@ describe("kettlebell Load: the plate pool (spec 6.1 rule 6)", () => {
     });
   });
 
-  it("names no unverified values, because every kettlebell weight is verified", () => {
-    expect(loadKettlebell("80").unverified).toEqual([]);
+  it("names the long screw's unverified minimum stack when it uses one, and nothing when it does not", () => {
+    expect(loadKettlebell("80").unverified).toEqual(["screw-long.minStack"]);
+    expect(loadKettlebell("40").unverified).toEqual([]);
   });
 });
 

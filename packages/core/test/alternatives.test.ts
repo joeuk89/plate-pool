@@ -1,20 +1,17 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { load, RequestError, type CollarChoice, type Implement, type Inventory, type Loading, type Unit } from "../src/index.js";
+import { load, RequestError, type Implement, type Inventory, type Loading, type Unit } from "../src/index.js";
 
-const inventory: Inventory = JSON.parse(
-  readFileSync(new URL("../../../inventory/inventory.json", import.meta.url), "utf8"),
-);
+import { owner as inventory, placed } from "./kits.js";
 
-function loadBarbell(target: string, options: { collars?: CollarChoice; inventory?: Inventory } = {}) {
-  const request = { targets: [{ implement: "barbell", target }], ...(options.collars ? { collars: options.collars } : {}) };
+function loadBarbell(target: string, options: { collars?: string; inventory?: Inventory } = {}) {
+  const request = { targets: [{ implement: "barbell", target }], ...(options.collars ? { hardware: { barbell: options.collars } } : {}) };
   const [result] = load(options.inventory ?? inventory, request).results;
   return result!;
 }
 
 const eachSide = (...plates: number[]) => [
-  { name: "left", plates },
-  { name: "right", plates },
+  placed("left", plates),
+  placed("right", plates),
 ];
 
 describe("other ways to make this (spec 6.3)", () => {
@@ -56,7 +53,7 @@ describe("other ways to make this (spec 6.3)", () => {
   });
 
   it("uses the collars asked for", () => {
-    const result = loadBarbell("90", { collars: "spinlock" });
+    const result = loadBarbell("90", { collars: "collar-spinlock" });
     expect(result.alternatives.map((loading) => loading.hardware)).toEqual([
       [{ id: "collar-spinlock", count: 2 }],
       [{ id: "collar-spinlock", count: 2 }],

@@ -1,10 +1,11 @@
-import { load, type CollarChoice, type Loading } from "@plate-pool/core";
+import { load, type Loading } from "@plate-pool/core";
 import { describe, expect, it } from "vitest";
 import { drawBarbell } from "../src/barbell-drawing";
 import { inventory } from "../src/inventory";
+import { collarHardware, type CollarChoice } from "../src/settings";
 
 function loadingFor(target: string, collars: CollarChoice = "clamp", pick: "loading" | "below" | "above" = "loading"): Loading {
-  const [result] = load(inventory, { targets: [{ implement: "barbell", target }], collars }).results;
+  const [result] = load(inventory, { targets: [{ implement: "barbell", target }], hardware: collarHardware(collars) }).results;
   const loading = result?.[pick];
   if (!loading) throw new Error(`No ${pick} loading for ${target}`);
   return loading;
@@ -137,7 +138,7 @@ describe("barbell drawing: collars", () => {
     const tooLong: Loading = {
       total: { lb: 243, kg: 110.2 },
       hardware: [{ id: "collar-clamp", count: 2 }],
-      positions: ["left", "right"].map((name) => ({ name, plates: [22.5, 22.5, 22.5, 22.5, 22.5, 22.5] })),
+      positions: ["left", "right"].map((name) => ({ name, plates: [22.5, 22.5, 22.5, 22.5, 22.5, 22.5], ids: Array<string>(6).fill("ql-22.5") })),
       uneven: false,
     };
     const { collar, width } = drawBarbell(tooLong, inventory);

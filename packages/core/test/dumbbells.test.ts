@@ -1,10 +1,7 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { load, type Inventory } from "../src/index.js";
 
-const inventory: Inventory = JSON.parse(
-  readFileSync(new URL("../../../inventory/inventory.json", import.meta.url), "utf8"),
-);
+import { owner as inventory, placed } from "./kits.js";
 
 function loadDumbbells(target: string, options: { pair?: boolean; uneven?: boolean; inventory?: Inventory } = {}) {
   const request = {
@@ -23,8 +20,8 @@ function changed(edit: (copy: Inventory) => void): Inventory {
 const byId = <T extends { id: string }>(list: T[], id: string) => list.find((item) => item.id === id)!;
 
 const ends = (endA: number[], endB: number[] = endA) => [
-  { name: "end-a", plates: endA },
-  { name: "end-b", plates: endB },
+  placed("a", endA),
+  placed("b", endB),
 ];
 
 describe("dumbbells Load: worked examples (spec section 7)", () => {
@@ -57,7 +54,7 @@ describe("dumbbells Load: worked examples (spec section 7)", () => {
         hardware: [{ id: "screw-standard", count: 2 }],
         positions: ends([2.5], []),
         uneven: true,
-        heavier: "end-a",
+        heavier: "a",
       },
     });
   });
@@ -71,7 +68,7 @@ describe("dumbbells Load: worked examples (spec section 7)", () => {
         hardware: [{ id: "screw-standard", count: 2 }],
         positions: ends([5, 5, 5, 5], [5, 5, 5, 2.5]),
         uneven: true,
-        heavier: "end-a",
+        heavier: "a",
       },
     });
   });
@@ -116,34 +113,35 @@ describe("dumbbells Load: pair or one (spec 6.2)", () => {
 });
 
 describe("dumbbells Load: locking screws (spec 6.2)", () => {
-  it("uses standard screws up to 75 lb per dumbbell and long screws above", () => {
-    const [at75] = loadDumbbells("75").results;
-    expect(at75?.loading).toMatchObject({ hardware: [{ id: "screw-standard", count: 2 }], positions: ends([22.5, 5, 5]) });
-    expect(at75?.unverified).toEqual([]);
+  it("uses standard screws while each end's plates fit their 3.25 in, and long screws beyond (spec 17.4)", () => {
+    const [at80] = loadDumbbells("80").results;
+    expect(at80?.loading).toMatchObject({ hardware: [{ id: "screw-standard", count: 2 }], positions: ends([22.5, 5, 5, 2.5]) });
+    expect(at80?.alternatives.some((loading) => loading.hardware[0]?.id === "screw-long")).toBe(true);
+    expect(at80?.unverified).toEqual(["screw-long.minStack"]);
 
-    const [at77point5] = loadDumbbells("77.5").results;
-    expect(at77point5?.loading).toMatchObject({ hardware: [{ id: "screw-long", count: 2 }], positions: ends([22.5, 5, 5, 1.25]) });
+    const [at85] = loadDumbbells("85").results;
+    expect(at85?.loading).toMatchObject({ hardware: [{ id: "screw-long", count: 2 }], positions: ends([22.5, 5, 5, 5]) });
   });
 
   it("flags the long screw's shortest stack as unverified when it uses long screws", () => {
-    expect(loadDumbbells("120").results[0]?.unverified).toEqual(["screw-long.minStackIn"]);
+    expect(loadDumbbells("120").results[0]?.unverified).toEqual(["screw-long.minStack"]);
     expect(loadDumbbells("40").results[0]?.unverified).toEqual([]);
   });
 
   it("puts at least the long screw's shortest stack on each end, using a measured value when there is one", () => {
-    expect(loadDumbbells("80", { pair: false }).results[0]?.loading?.positions).toEqual(ends([22.5, 5, 5, 2.5]));
+    expect(loadDumbbells("85", { pair: false }).results[0]?.loading?.positions).toEqual(ends([22.5, 5, 5, 5]));
 
     const longerStack = changed((copy) => {
-      byId(copy.hardware, "screw-long").minStackIn = { listed: 3, measured: 3.5, status: "owner" };
+      byId(copy.hardware, "screw-long").minStack = { listed: 3, measured: 3.75, status: "owner" };
     });
-    const [result] = loadDumbbells("80", { pair: false, inventory: longerStack }).results;
-    expect(result?.loading?.positions).toEqual(ends([5, 5, 5, 5, 5, 5, 5]));
+    const [result] = loadDumbbells("85", { pair: false, inventory: longerStack }).results;
+    expect(result?.loading?.positions).toEqual(ends([5, 5, 5, 5, 5, 5, 5, 2.5]));
     expect(result?.unverified).toEqual([]);
   });
 
   it("fits the plates on each end within the screw's capacity", () => {
     const shortStandard = changed((copy) => {
-      byId(copy.hardware, "screw-standard").capacityIn = 1;
+      byId(copy.hardware, "screw-standard").capacity = 1;
     });
     const [result] = loadDumbbells("40", { inventory: shortStandard }).results;
     expect(result).toMatchObject({ exact: false, below: { total: { lb: 30 }, positions: ends([5, 5]) } });
@@ -164,8 +162,8 @@ describe("dumbbells Load: uneven ends (spec 6.2)", () => {
     const [result] = loadDumbbells("15", { pair: false, inventory: noSmallPlates }).results;
     expect(result).toMatchObject({
       exact: true,
-      loading: { positions: ends([5], []), uneven: true, heavier: "end-a" },
-      warnings: ["The ends differ by 5 lb because no 2.5 lb or micro plate is free."],
+      loading: { positions: ends([5], []), uneven: true, heavier: "a" },
+      warnings: ["The ends differ by 5 lb because no plate of 2.5 lb or less is free."],
     });
   });
 
@@ -215,7 +213,7 @@ describe("dumbbells Load: the bare handle and the limit (spec 4.3, 6.2)", () => 
     const [result] = loadDumbbells("7.5", { pair: false }).results;
     expect(result).toMatchObject({
       exact: true,
-      loading: { total: { lb: 7.5 }, hardware: [{ id: "screw-standard", count: 1 }], positions: ends([]), uneven: true, heavier: "end-a" },
+      loading: { total: { lb: 7.5 }, hardware: [{ id: "screw-standard", count: 1 }], positions: ends([]), uneven: true, heavier: "a" },
     });
   });
 
@@ -290,7 +288,7 @@ describe("dumbbells Load: other ways to make this (spec 6.3)", () => {
 
 describe("dumbbells Load: rules that hold for every target", () => {
   const targets = Array.from({ length: (130 - 5) * 4 + 1 }, (_, i) => String(5 + i / 4));
-  const stackLength = new Map(inventory.plates.map((plate) => [plate.weight.listed, plate.stackLengthIn?.listed ?? 0]));
+  const stackLength = new Map(inventory.plates.map((plate) => [plate.weight.listed, plate.stackLength?.listed ?? 0]));
   const count = new Map(inventory.plates.filter((plate) => plate.type === "quick-lock").map((plate) => [plate.weight.listed, plate.count]));
   const sum = (plates: number[], of: (plate: number) => number = (plate) => plate) => plates.reduce((total, plate) => total + of(plate), 0);
 
@@ -319,7 +317,8 @@ describe("dumbbells Load: rules that hold for every target", () => {
           expect(loading.total.lb, target).toBe(5);
           continue;
         }
-        expect(screw.id, target).toBe(loading.total.lb <= 75 ? "screw-standard" : "screw-long");
+        const longestEnd = Math.max(...[endA, endB].map((end) => sum(end, (plate) => stackLength.get(plate)!)));
+        expect(screw.id, target).toBe(longestEnd <= 3.25 ? "screw-standard" : "screw-long");
         if (oneScrew) expect(endB, target).toEqual([]);
         else expect(screw.count, target).toBe(2);
         expect(loading.total.lb, target).toBe(5 + 2.5 * screw.count + sum(endA) + sum(endB));

@@ -41,21 +41,21 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
   });
 
   it("names each position for implements whose positions differ, and marks an uneven loading", () => {
-    const loading = (positions: { name: string; plates: number[] }[], uneven = false): Loading => ({
+    const loading = (positions: { name: string; plates: number[]; ids?: string[] }[], uneven = false): Loading => ({
       total: { lb: 47.5, kg: 21.5 },
       hardware: [{ id: "screw-standard", count: 2 }],
-      positions,
+      positions: positions.map((position) => ({ ids: [], ...position })),
       uneven,
-      ...(uneven ? { heavier: "end-a" } : {}),
+      ...(uneven ? { heavier: "a" } : {}),
     });
     const result: LoadResult = {
       implement: "dumbbell",
       target: { lb: 47.5, kg: 21.5 },
       exact: true,
-      loading: loading([{ name: "end-a", plates: [5, 5, 5, 5] }, { name: "end-b", plates: [5, 5, 5, 2.5] }], true),
+      loading: loading([{ name: "a", plates: [5, 5, 5, 5] }, { name: "b", plates: [5, 5, 5, 2.5] }], true),
       alternatives: [
-        loading([{ name: "end-a", plates: [5, 5, 5, 2.5, 1.25] }, { name: "end-b", plates: [5, 5, 5, 2.5, 1.25] }]),
-        loading([{ name: "end-a", plates: [22.5] }, { name: "end-b", plates: [5, 5, 2.5] }], true),
+        loading([{ name: "a", plates: [5, 5, 5, 2.5, 1.25] }, { name: "b", plates: [5, 5, 5, 2.5, 1.25] }]),
+        loading([{ name: "a", plates: [22.5] }, { name: "b", plates: [5, 5, 2.5] }], true),
       ],
       warnings: [],
       unverified: [],
@@ -89,7 +89,7 @@ describe("Load screen: other ways to make this (spec 8.2)", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Leg attachment" }));
     typeTarget("30");
-    expect(text(otherWays()!.querySelector("summary")!)).toBe("Other ways to make this (4)");
+    expect(text(otherWays()!.querySelector("summary")!)).toBe("Other ways to make this (5)");
   });
 
   it("shows nothing when no other loading reaches the target", () => {

@@ -15,8 +15,8 @@ export function changesText(implement: string, loading: Loading, current: Pinned
   if (!changes) return undefined;
   const pair = implement === "dumbbell" && current.pair !== false;
   const nowScrews = screwsOf(
-    current.screws,
-    current.screwOn,
+    current.hardware?.replace(/^screw-/, ""),
+    current.hardwareOn,
     current.positions.map(({ name }) => name),
   );
   const nextScrews = screwsOf(

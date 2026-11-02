@@ -262,6 +262,6 @@ describe("several implements: the plate pool", () => {
     typeTarget(1, "173");
     addImplement("Vest");
     typeTarget(2, "12");
-    expect(text(leftover())).toContain("Plates 1 × 22.5, 12 × 5, 2 × 2.5, 4 × 1.25, 18 vest blocks");
+    expect(text(leftover())).toContain("Plates 1 × 22.5, 12 × 5, 2 × 2.5, 4 × 1.25, 18 blocks");
   });
 });

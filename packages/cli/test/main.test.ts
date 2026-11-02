@@ -8,7 +8,7 @@ import { run } from "../src/main.js";
 
 const inventoryPath = fileURLToPath(new URL("../../../inventory/inventory.json", import.meta.url));
 const inventoryFile = JSON.parse(readFileSync(inventoryPath, "utf8"));
-const inventory = readInventory(inventoryFile);
+const inventory = readInventory(JSON.stringify(inventoryFile));
 
 function runWith(args: string[]) {
   const output = { stdout: "", stderr: "" };
@@ -47,7 +47,7 @@ describe("plate-pool load", () => {
     const [expected] = load(inventory, { targets: [{ implement: "barbell", target: "88" }] }).results;
     expect(result.alternatives).toHaveLength(2);
     expect(result.alternatives).toEqual(expected!.alternatives);
-    expect(result.alternatives[0].positions[0]).toEqual({ name: "left", plates: [5, 5, 5, 5, 5, 5, 5] });
+    expect(result.alternatives[0].positions[0]).toEqual({ name: "left", plates: [5, 5, 5, 5, 5, 5, 5], ids: Array(7).fill("ql-5") });
   });
 
   it("orders each result's fields as the JSON example in spec section 9 does", () => {
@@ -156,10 +156,10 @@ describe("plate-pool load", () => {
 
   it("exits 1 for an inventory file that does not match the inventory's shape", () => {
     const path = join(mkdtempSync(join(tmpdir(), "plate-pool-")), "inventory.json");
-    writeFileSync(path, JSON.stringify({ plates: [] }));
+    writeFileSync(path, JSON.stringify({ format: 1, plates: [] }));
     const result = runWith(["load", "barbell=175", "--inventory", path]);
     expect(result.code).toBe(1);
-    expect(result.stderr).toContain("Inventory /plateTypes is missing");
+    expect(result.stderr).toContain("plateTypes: required");
   });
 });
 
@@ -245,7 +245,7 @@ describe("plate-pool load vest=", () => {
         "         front: 6 blocks",
         "         back: 6 blocks",
         "",
-        "Unverified: empty vest weight, vest block count",
+        "Unverified: empty vest weight, 1 kg plate count",
         "",
       ].join("\n"),
     );
@@ -263,7 +263,7 @@ describe("plate-pool load vest=", () => {
         "         front: 7 blocks",
         "         back: 7 blocks",
         "",
-        "Unverified: empty vest weight, vest block count",
+        "Unverified: empty vest weight, 1 kg plate count",
         "",
       ].join("\n"),
     );
@@ -284,8 +284,8 @@ describe("plate-pool load vest=", () => {
         "         front: 15 blocks",
         "         back: 15 blocks",
         "",
-        "Refused: over the 30 block limit. Heaviest allowed: 30 kg (66.14 lb).",
-        "Unverified: empty vest weight, vest block count",
+        "Refused: over the 30 kg plate limit. Heaviest allowed: 30 kg (66.14 lb).",
+        "Unverified: empty vest weight, 1 kg plate count",
         "",
       ].join("\n"),
     );
@@ -312,6 +312,8 @@ describe("plate-pool load kettlebell= and leg=", () => {
         "",
         "  exact  80 lb (36.3 kg)",
         "         stack: 22.5 5 5 5 5 5 5 2.5 | long screw",
+        "",
+        "Unverified: shortest stack on a long locking screw",
         "",
       ].join("\n"),
     );
@@ -403,7 +405,7 @@ describe("plate-pool load with several targets", () => {
 
   it("counts vest blocks left over", () => {
     expect(runWith(["load", "vest=12", "leg=50"]).stdout).toContain(
-      ["Left over", "  plates: 3 × 22.5, 23 × 5, 4 × 2.5, 4 × 1.25, 18 vest blocks", ""].join("\n"),
+      ["Left over", "  plates: 3 × 22.5, 23 × 5, 4 × 2.5, 4 × 1.25, 18 blocks", ""].join("\n"),
     );
   });
 
@@ -411,7 +413,7 @@ describe("plate-pool load with several targets", () => {
     const result = runWith(["load", "barbell=100", "barbell=120"]);
     expect(result.code).toBe(1);
     expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("The request needs 2 × barbell. The inventory holds 1.\n");
+    expect(result.stderr).toBe("The request needs 2 × straight bar. The inventory holds 1.\n");
   });
 });
 
@@ -469,8 +471,8 @@ describe("plate-pool load --from", () => {
     );
 
     const end = "22.5,5,2.5";
-    expect(runWith(["load", "dumbbells=80", "--from", "dumbbells", "--end-a", end, "--end-b", end]).stdout).toContain(
-      "12 changes. Each end: put on 5. Swap 2 standard screws for long screws on each dumbbell.",
+    expect(runWith(["load", "dumbbells=85", "--from", "dumbbells", "--end-a", end, "--end-b", end]).stdout).toContain(
+      "Swap 2 standard screws for long screws on each dumbbell.",
     );
     expect(runWith(["load", "dumbbell=45", "--from", "dumbbell", "--end-a", "5,5,5,2.5", "--end-b", "5,5,5"]).stdout).toContain(
       "1 change. End A: unchanged. End B: put on 2.5.",
@@ -484,13 +486,13 @@ describe("plate-pool load --from", () => {
     expect(runWith(["load", "kettlebell=40", "--from", "kettlebell", "--stack", "5,5"]).stdout).toContain("1 change. Stack: put on 5.");
   });
 
-  it("gives a dumbbell pair's current loading with --end-a and --end-b (spec 16.6 example 19)", () => {
+  it("gives a dumbbell pair's current loading with --end-a and --end-b (spec 17.11 example 19)", () => {
     const end = "22.5,5,2.5";
     const result = runWith(["load", "dumbbells=80", "--from", "dumbbells", "--end-a", end, "--end-b", end, "--json"]);
     expect(result.stderr).toBe("");
     const [dumbbells] = JSON.parse(result.stdout).results;
-    expect(dumbbells.loading.changes.count).toBe(12);
-    expect(dumbbells.loading.changes.hardware).toEqual([{ from: "screw-standard", to: "screw-long", count: 2 }]);
+    expect(dumbbells.loading.changes.count).toBe(4);
+    expect(dumbbells.loading.changes.hardware).toEqual([]);
   });
 
   it("gives each implement its own current loading, matched by name", () => {
@@ -505,8 +507,8 @@ describe("plate-pool load --from", () => {
             target: "40",
             current: {
               positions: [
-                { name: "end-a", plates: [5, 5] },
-                { name: "end-b", plates: [5, 5] },
+                { name: "a", plates: [5, 5] },
+                { name: "b", plates: [5, 5] },
               ],
             },
           },
@@ -629,7 +631,14 @@ describe("plate-pool reverse", () => {
 
   it("reads --stack for the kettlebell and the leg attachment", () => {
     expect(runWith(["reverse", "kettlebell", "--stack", "22.5,5,5,5,5,5,5,2.5"]).stdout).toBe(
-      ["Kettlebell  total 80 lb (36.3 kg)", "", "  stack: 22.5 5 5 5 5 5 5 2.5 | long screw", ""].join("\n"),
+      [
+        "Kettlebell  total 80 lb (36.3 kg)",
+        "",
+        "  stack: 22.5 5 5 5 5 5 5 2.5 | long screw",
+        "",
+        "Unverified: shortest stack on a long locking screw",
+        "",
+      ].join("\n"),
     );
     expect(runWith(["reverse", "leg", "--stack", "22.5,22.5,5"]).stdout).toBe(
       [
@@ -651,7 +660,7 @@ describe("plate-pool reverse", () => {
         "  front: 6 blocks",
         "  back: 7 blocks",
         "",
-        "Unverified: empty vest weight, vest block count",
+        "Unverified: empty vest weight, 1 kg plate count",
         "",
       ].join("\n"),
     );
@@ -703,7 +712,7 @@ describe("plate-pool list", () => {
 
   it("changes the list with --collars and --no-uneven the way they change Load", () => {
     const spinlock = JSON.parse(runWith(["list", "barbell", "--from", "18", "--to", "20.5", "--collars", "spinlock", "--json"]).stdout);
-    expect(spinlock).toEqual(list(inventory, { implement: "barbell", collars: "spinlock", from: "18", to: "20.5" }));
+    expect(spinlock).toEqual(list(inventory, { implement: "barbell", hardware: "collar-spinlock", from: "18", to: "20.5" }));
 
     const even = JSON.parse(runWith(["list", "dumbbell", "--from=10", "--to=15", "--no-uneven", "--json"]).stdout);
     expect(even).toEqual(list(inventory, { implement: "dumbbell", pair: false, uneven: false, from: "10", to: "15" }));
@@ -720,11 +729,11 @@ describe("plate-pool list", () => {
       [
         "Barbell  3 weights from 170 lb to 176 lb",
         "",
-        "  170.5 lb (77.3 kg)  micro",
+        "  170.5 lb (77.3 kg)  smallest",
         "      each side: 22.5 22.5 5 5 5 5 5 5 1.25 | clamp collar",
         "  173 lb (78.5 kg)",
         "      each side: 22.5 22.5 5 5 5 5 5 5 2.5 | clamp collar",
-        "  175.5 lb (79.6 kg)  micro",
+        "  175.5 lb (79.6 kg)  smallest",
         "      each side: 22.5 22.5 5 5 5 5 5 5 2.5 1.25 | clamp collar",
         "",
       ].join("\n"),
@@ -784,7 +793,7 @@ describe("plate-pool inventory", () => {
     expect(lines).toContain("Implements");
     expect(result.stdout).toMatch(/22\.5 lb +× 5 +22\.5 lb each\n/);
     expect(result.stdout).toMatch(/Micro +× 4 +1\.25 lb each\n/);
-    expect(result.stdout).toMatch(/Vest block +× 30 +1 kg each, count unverified\n/);
+    expect(result.stdout).toMatch(/1 kg +× 30 +1 kg each, count unverified\n/);
     expect(result.stdout).toMatch(/Ironmaster spin-lock collar +× 2 +1 lb each, measured\n/);
     expect(result.stdout).toMatch(/Mirafit 1" clamp collar +× 4 +0 lb each\n/);
     expect(result.stdout).toMatch(/Straight bar +× 1 +base 18 lb\n/);

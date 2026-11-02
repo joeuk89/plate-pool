@@ -1,10 +1,7 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { load, type Inventory } from "../src/index.js";
 
-const inventory: Inventory = JSON.parse(
-  readFileSync(new URL("../../../inventory/inventory.json", import.meta.url), "utf8"),
-);
+import { owner as inventory, placed } from "./kits.js";
 
 function loadLeg(target: string, options: { inventory?: Inventory } = {}) {
   const [result] = load(options.inventory ?? inventory, { targets: [{ implement: "leg", target }] }).results;
@@ -19,7 +16,7 @@ function changed(edit: (copy: Inventory) => void): Inventory {
 
 const byId = <T extends { id: string }>(list: T[], id: string) => list.find((item) => item.id === id)!;
 
-const stack = (...plates: number[]) => [{ name: "stack", plates }];
+const stack = (...plates: number[]) => [placed("stack", plates)];
 
 const legNote = "Plate weight only. The lever changes the resistance you feel.";
 
@@ -61,15 +58,11 @@ describe("leg attachment Load: rules (spec 6.2)", () => {
     });
   });
 
-  it("puts at most one micro plate on the stack", () => {
+  it("may carry more than one micro plate, since the file caps them on other implements only", () => {
     const no2point5 = changed((copy) => {
       byId(copy.plates, "ql-2.5").count = 0;
     });
-    expect(loadLeg("2.5", { inventory: no2point5 })).toMatchObject({
-      exact: false,
-      below: { total: { lb: 1.25 }, positions: stack(1.25) },
-      above: { total: { lb: 5 }, positions: stack(5) },
-    });
+    expect(loadLeg("2.5", { inventory: no2point5 })).toMatchObject({ exact: true, loading: { positions: stack(1.25, 1.25) } });
   });
 
   it("uses no more plates than the pool holds", () => {
@@ -117,10 +110,11 @@ describe("leg attachment Load: other ways to make this (spec 6.3)", () => {
     const result = loadLeg("30");
     expect(result.loading?.positions).toEqual(stack(22.5, 5, 2.5));
     expect(result.alternatives.map((loading) => loading.positions)).toEqual([
+      stack(22.5, 5, 1.25, 1.25),
       stack(22.5, 2.5, 2.5, 2.5),
+      stack(22.5, 2.5, 2.5, 1.25, 1.25),
+      stack(22.5, 2.5, 1.25, 1.25, 1.25, 1.25),
       stack(5, 5, 5, 5, 5, 5),
-      stack(5, 5, 5, 5, 5, 2.5, 2.5),
-      stack(5, 5, 5, 5, 2.5, 2.5, 2.5, 2.5),
     ]);
     expect(result.alternatives.every((loading) => loading.hardware.length === 0)).toBe(true);
   });

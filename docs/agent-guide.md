@@ -60,8 +60,16 @@ npx plate-pool load barbell=175 dumbbells=40 --json
         "total": { "lb": 173, "kg": 78.5 },
         "hardware": [{ "id": "collar-clamp", "count": 2 }],
         "positions": [
-          { "name": "left", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5] },
-          { "name": "right", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5] }
+          {
+            "name": "left",
+            "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5],
+            "ids": ["ql-22.5", "ql-22.5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-2.5"]
+          },
+          {
+            "name": "right",
+            "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5],
+            "ids": ["ql-22.5", "ql-22.5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-2.5"]
+          }
         ],
         "uneven": false
       },
@@ -69,8 +77,16 @@ npx plate-pool load barbell=175 dumbbells=40 --json
         "total": { "lb": 175.5, "kg": 79.6 },
         "hardware": [{ "id": "collar-clamp", "count": 2 }],
         "positions": [
-          { "name": "left", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, 1.25] },
-          { "name": "right", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, 1.25] }
+          {
+            "name": "left",
+            "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, 1.25],
+            "ids": ["ql-22.5", "ql-22.5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-2.5", "ql-micro"]
+          },
+          {
+            "name": "right",
+            "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, 1.25],
+            "ids": ["ql-22.5", "ql-22.5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-2.5", "ql-micro"]
+          }
         ],
         "uneven": false
       },
@@ -86,7 +102,10 @@ npx plate-pool load barbell=175 dumbbells=40 --json
       "loading": {
         "total": { "lb": 40, "kg": 18.1 },
         "hardware": [{ "id": "screw-standard", "count": 2 }],
-        "positions": [{ "name": "end-a", "plates": [5, 5, 5] }, { "name": "end-b", "plates": [5, 5, 5] }],
+        "positions": [
+          { "name": "a", "plates": [5, 5, 5], "ids": ["ql-5", "ql-5", "ql-5"] },
+          { "name": "b", "plates": [5, 5, 5], "ids": ["ql-5", "ql-5", "ql-5"] }
+        ],
         "uneven": false
       },
       "alternatives": [],
@@ -131,8 +150,16 @@ npx plate-pool load barbell=175 --from barbell --side 22.5,22.5,5,5,5,5,5,5,2.5 
         "total": { "lb": 173, "kg": 78.5 },
         "hardware": [{ "id": "collar-clamp", "count": 2 }],
         "positions": [
-          { "name": "left", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5] },
-          { "name": "right", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5] }
+          {
+            "name": "left",
+            "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5],
+            "ids": ["ql-22.5", "ql-22.5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-2.5"]
+          },
+          {
+            "name": "right",
+            "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5],
+            "ids": ["ql-22.5", "ql-22.5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-2.5"]
+          }
         ],
         "uneven": false,
         "changes": {
@@ -148,8 +175,16 @@ npx plate-pool load barbell=175 --from barbell --side 22.5,22.5,5,5,5,5,5,5,2.5 
         "total": { "lb": 175.5, "kg": 79.6 },
         "hardware": [{ "id": "collar-clamp", "count": 2 }],
         "positions": [
-          { "name": "left", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, 1.25] },
-          { "name": "right", "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, 1.25] }
+          {
+            "name": "left",
+            "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, 1.25],
+            "ids": ["ql-22.5", "ql-22.5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-2.5", "ql-micro"]
+          },
+          {
+            "name": "right",
+            "plates": [22.5, 22.5, 5, 5, 5, 5, 5, 5, 2.5, 1.25],
+            "ids": ["ql-22.5", "ql-22.5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-5", "ql-2.5", "ql-micro"]
+          }
         ],
         "uneven": false,
         "changes": {
@@ -200,13 +235,21 @@ npx plate-pool list barbell --from 100 --to 105 --json
         "total": { "lb": 100.5, "kg": 45.6 },
         "hardware": [{ "id": "collar-clamp", "count": 2 }],
         "positions": [
-          { "name": "left", "plates": [22.5, 5, 5, 5, 2.5, 1.25] },
-          { "name": "right", "plates": [22.5, 5, 5, 5, 2.5, 1.25] }
+          {
+            "name": "left",
+            "plates": [22.5, 5, 5, 5, 2.5, 1.25],
+            "ids": ["ql-22.5", "ql-5", "ql-5", "ql-5", "ql-2.5", "ql-micro"]
+          },
+          {
+            "name": "right",
+            "plates": [22.5, 5, 5, 5, 2.5, 1.25],
+            "ids": ["ql-22.5", "ql-5", "ql-5", "ql-5", "ql-2.5", "ql-micro"]
+          }
         ],
         "uneven": false
       },
       "uneven": false,
-      "micro": true
+      "smallest": true
     },
     {
       "total": { "lb": 103, "kg": 46.7 },
@@ -214,13 +257,13 @@ npx plate-pool list barbell --from 100 --to 105 --json
         "total": { "lb": 103, "kg": 46.7 },
         "hardware": [{ "id": "collar-clamp", "count": 2 }],
         "positions": [
-          { "name": "left", "plates": [22.5, 5, 5, 5, 5] },
-          { "name": "right", "plates": [22.5, 5, 5, 5, 5] }
+          { "name": "left", "plates": [22.5, 5, 5, 5, 5], "ids": ["ql-22.5", "ql-5", "ql-5", "ql-5", "ql-5"] },
+          { "name": "right", "plates": [22.5, 5, 5, 5, 5], "ids": ["ql-22.5", "ql-5", "ql-5", "ql-5", "ql-5"] }
         ],
         "uneven": false
       },
       "uneven": false,
-      "micro": false
+      "smallest": false
     }
   ],
   "warnings": [],
@@ -228,8 +271,7 @@ npx plate-pool list barbell --from 100 --to 105 --json
 }
 ```
 
-- Each row holds the recommended loading for that total. `micro` says it uses a micro plate.
-- Rows that use locking screws also hold `screw`: `screw-standard` or `screw-long`.
+- Each row holds the recommended loading for that total, with its hardware in `loading.hardware`. `smallest` says it uses the lightest plate the implement takes.
 
 ### reverse
 
@@ -245,9 +287,12 @@ npx plate-pool reverse dumbbell --end-a 5,5,5,2.5 --end-b 5,5,5 --json
   "pair": false,
   "total": { "lb": 42.5, "kg": 19.3 },
   "hardware": [{ "id": "screw-standard", "count": 2 }],
-  "positions": [{ "name": "end-a", "plates": [5, 5, 5, 2.5] }, { "name": "end-b", "plates": [5, 5, 5] }],
+  "positions": [
+    { "name": "a", "plates": [5, 5, 5, 2.5], "ids": ["ql-5", "ql-5", "ql-5", "ql-2.5"] },
+    { "name": "b", "plates": [5, 5, 5], "ids": ["ql-5", "ql-5", "ql-5"] }
+  ],
   "uneven": true,
-  "heavier": "end-a",
+  "heavier": "a",
   "warnings": [],
   "notes": [],
   "unverified": []
@@ -269,15 +314,19 @@ The output has four lists. This shows the first entry of each:
 
 ```json
 {
-  "plateTypes": [{ "id": "quick-lock", "name": "Ironmaster Quick-Lock", "unit": "lb" }],
+  "$schema": "./inventory.schema.json",
+  "format": 1,
+  "name": "Home gym",
+  "lengthUnit": "in",
+  "plateTypes": [{ "id": "quick-lock", "name": "Ironmaster Quick-Lock", "unit": "lb", "bore": "quick-lock" }],
   "plates": [
     {
       "id": "ql-22.5",
-      "name": "22.5 lb",
       "type": "quick-lock",
       "count": 5,
       "weight": { "listed": 22.5, "status": "verified" },
-      "stackLengthIn": { "listed": 1.875, "status": "unverified" },
+      "stackLength": { "listed": 1.875, "status": "unverified" },
+      "colour": "#c9353f",
       "shape": "square"
     }
   ],
@@ -289,13 +338,14 @@ The output has four lists. This shows the first entry of each:
       "count": 4,
       "unit": "lb",
       "weight": { "listed": 2.5, "status": "verified" },
-      "capacityIn": 3.25
+      "capacity": 3.25
     }
   ],
   "implements": [
     {
       "id": "barbell",
       "name": "Straight bar",
+      "kind": "bar",
       "count": 1,
       "unit": "lb",
       "base": {
@@ -303,16 +353,11 @@ The output has four lists. This shows the first entry of each:
         "status": "owner",
         "note": "Ironmaster states about 18 lb. The owner weighed it at 17.7 lb with its collars off and counts it as 18 lb. Collars are added."
       },
-      "positions": ["left", "right"],
-      "symmetric": true,
       "accepts": ["quick-lock"],
-      "hardware": {
-        "options": ["collar-clamp", "collar-spinlock", "none"],
-        "default": "collar-clamp",
-        "perPosition": 1
-      },
+      "hardware": { "options": ["collar-clamp", "collar-spinlock", "none"], "default": "collar-clamp", "perPosition": 1 },
       "maxPlateWeight": 210,
-      "positionLengthIn": { "listed": 11.5, "status": "verified", "note": "For plates and the collar" }
+      "maxPerPosition": { "ql-micro": 1 },
+      "positionLength": { "listed": 11.5, "status": "verified", "note": "For plates and the collar" }
     }
   ]
 }

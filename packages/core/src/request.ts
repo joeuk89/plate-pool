@@ -1,10 +1,12 @@
 import type { Resolved } from "./changes.js";
-import type { Implement, Inventory, Plate } from "./inventory.js";
-import { loadDumbbells } from "./dumbbells.js";
-import { loadBarbell, type Leftover, type LoadRequest, type LoadResponse, type LoadResult, type Outcome, type TargetRequest, type Usage } from "./load.js";
+import { loadHandle } from "./handle.js";
+import type { Implement, Inventory } from "./inventory.js";
+import type { Leftover, LoadRequest, LoadResponse, LoadResult, TargetRequest } from "./load.js";
+import { loadMirrored } from "./mirrored.js";
+import type { Outcome, Setting, Usage } from "./outcome.js";
+import { fittingFor, lower, NONE, pairOf, platesNamed, positionNames } from "./parts.js";
 import { RequestError } from "./request-error.js";
 import { reverse } from "./reverse.js";
-import { loadKettlebell, loadLeg } from "./stack.js";
 import { loadVest } from "./vest.js";
 import { display } from "./weight.js";
 
@@ -23,31 +25,40 @@ interface Branch {
   uneven: number;
 }
 
+/** Hardware an implement passed over while it was free, which must end the request short for the choice to stand. */
+interface Shortfall {
+  id: string;
+  pieces: number;
+}
+
+interface Variant {
+  outcome: Outcome;
+  shortfalls: Shortfall[];
+}
+
 const NO_LOADING = -1;
-const STANDARD_SCREW = "screw-standard";
 
 export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
   if (request.targets.length === 0) throw new RequestError("A request holds at least one target.");
   const implementsUsed = request.targets.map((target) => implementFor(inventory, target.implement));
-  checkImplementCounts(implementsUsed, request.targets);
+  const pairs = request.targets.map((target, index) => pairOf(implementsUsed[index]!, target));
+  checkImplementCounts(implementsUsed, pairs);
   const currents = request.targets.map((target, index) => resolved(inventory, implementsUsed[index]!, target));
+  const loadAt = (pool: Inventory, index: number, unavailable: string[] = []) =>
+    loadOne(withNoFree(pool, unavailable), implementsUsed[index]!, request.targets[index]!, pairs[index], request, currents[index]);
 
   const memo = new Map<string, Branch | undefined>();
-  const search = (pool: Inventory, index: number, standardScrewsMustRunOut: boolean): Branch | undefined => {
-    const target = request.targets[index];
-    if (!target) {
-      if (standardScrewsMustRunOut && hasFree(pool, STANDARD_SCREW)) return undefined;
+  const search = (pool: Inventory, index: number, shortfalls: Shortfall[]): Branch | undefined => {
+    if (index === request.targets.length) {
+      if (shortfalls.some(({ id, pieces }) => free(pool, id) >= pieces)) return undefined;
       return { picks: [], outcomes: [], closeness: [], changes: 0, plateCount: 0, uneven: 0 };
     }
-    const key = `${index}|${standardScrewsMustRunOut}|${poolKey(pool)}`;
+    const key = `${index}|${shortfalls.map(({ id, pieces }) => `${id}:${pieces}`).join()}|${poolKey(pool)}`;
     if (memo.has(key)) return memo.get(key);
 
-    const implement = implementsUsed[index]!;
-    const current = currents[index];
-    const options = [{ outcome: loadOne(pool, implement, target, request, current), standardScrewsMustRunOut }];
-    // A light kettlebell may take a long screw only if no standard screw is left free, for example because later dumbbells hold them all.
-    if (implement.id === "kettlebell" && hasFree(pool, STANDARD_SCREW)) {
-      options.push({ outcome: loadOne(withNoFree(pool, STANDARD_SCREW), implement, target, request, current), standardScrewsMustRunOut: true });
+    const variants: Variant[] = [{ outcome: loadAt(pool, index), shortfalls }];
+    for (const shortfall of passOvers(inventory, implementsUsed, pairs, index, pool, request)) {
+      variants.push({ outcome: loadAt(pool, index, [shortfall.id]), shortfalls: [...shortfalls, shortfall] });
     }
 
     let best: Branch | undefined;
@@ -64,33 +75,33 @@ export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
       if (!best || beats(branch, best)) best = branch;
     };
     const seen = new Set<string>();
-    for (const option of options) {
-      option.outcome.picks.forEach((usage, pick) => {
+    for (const variant of variants) {
+      variant.outcome.picks.forEach((usage, pick) => {
         const usageId = usageKey(usage);
         if (seen.has(usageId)) return;
         seen.add(usageId);
-        consider(option.outcome, pick, usage, search(without(pool, usage), index + 1, option.standardScrewsMustRunOut));
+        consider(variant.outcome, pick, usage, search(without(pool, usage), index + 1, variant.shortfalls));
       });
     }
-    if (!best) consider(options[0]!.outcome, NO_LOADING, undefined, search(pool, index + 1, standardScrewsMustRunOut));
+    if (!best) consider(variants[0]!.outcome, NO_LOADING, undefined, search(pool, index + 1, shortfalls));
     memo.set(key, best);
     return best;
   };
 
-  const chosen = search(inventory, 0, false)!;
+  const chosen = search(inventory, 0, [])!;
   const results: LoadResult[] = [];
-  const earlier: { label: string; usage: Usage | undefined }[] = [];
+  const earlier: { label: Label; usage: Usage | undefined }[] = [];
   let pool = inventory;
-  request.targets.forEach((target, index) => {
+  request.targets.forEach((_, index) => {
     const implement = implementsUsed[index]!;
     const outcome = chosen.outcomes[index]!;
     const pick = chosen.picks[index]!;
     const usage = outcome.picks[pick];
     const result = outcome.result(pick);
-    const label = labelOf(implement, target);
+    const label = labelOf(implement, pairs[index]);
     if (index > 0) {
-      const alone = loadOne(inventory, implement, target, request, currents[index]);
-      const miss = missWarning(implement, label, outcome, alone, pool, earlier);
+      const alone = loadAt(inventory, index);
+      const miss = missWarning(inventory, implement, label, outcome, alone, pool, earlier);
       if (miss) result.warnings.unshift(miss);
     }
     results.push(result);
@@ -98,6 +109,26 @@ export function load(inventory: Inventory, request: LoadRequest): LoadResponse {
     if (usage) pool = without(pool, usage);
   });
   return { results, leftover: leftover(pool, implementsUsed) };
+}
+
+/** Hardware this implement might leave for a later one: free now, and among a later implement's options. */
+function passOvers(
+  inventory: Inventory,
+  implementsUsed: Implement[],
+  pairs: (boolean | undefined)[],
+  index: number,
+  pool: Inventory,
+  request: LoadRequest,
+): Shortfall[] {
+  const implement = implementsUsed[index]!;
+  const choice = request.hardware?.[implement.id];
+  if (choice !== undefined || implement.kind === "vest") return [];
+  const later = new Set(implementsUsed.slice(index + 1).flatMap((each) => each.hardware?.options ?? []));
+  const copies = pairs[index] ? 2 : 1;
+  const pieces = (implement.hardware?.perPosition ?? 1) * positionNames(implement).length * copies;
+  return fittingFor(inventory, implement, undefined)
+    .options.filter((option) => option.id !== NONE && later.has(option.id) && free(pool, option.id) >= pieces)
+    .map((option) => ({ id: option.id, pieces }));
 }
 
 function beats(a: Branch, b: Branch): boolean {
@@ -122,11 +153,12 @@ function closenessOf(outcome: Outcome, usage?: Usage): Closeness {
 function resolved(inventory: Inventory, implement: Implement, target: TargetRequest): Resolved | undefined {
   if (!target.current) return undefined;
   const { positions, hardware } = reverse(inventory, { implement: implement.id, ...target.current });
-  const screw = hardware.find(({ id }) => inventory.hardware.find((item) => item.id === id)?.kind === "screw")?.id;
-  const screwOn = target.current.screwOn;
+  const item = inventory.hardware.find((each) => each.id === hardware[0]?.id);
+  const counted = item && (item.kind === "screw" || item.kind === "pin") ? item.id : undefined;
+  const on = target.current.hardwareOn;
   return {
-    plates: positions.map(({ plates }) => plates),
-    screws: positions.map(({ name }) => (screwOn === undefined || screwOn === name ? screw : undefined)),
+    ids: positions.map(({ ids }) => ids),
+    hardware: positions.map(({ name }) => (on === undefined || on === name ? counted : undefined)),
   };
 }
 
@@ -136,15 +168,14 @@ function implementFor(inventory: Inventory, id: string): Implement {
   return implement;
 }
 
-function checkImplementCounts(implementsUsed: Implement[], targets: TargetRequest[]): void {
+function checkImplementCounts(implementsUsed: Implement[], pairs: (boolean | undefined)[]): void {
   const needed = new Map<Implement, number>();
   implementsUsed.forEach((implement, index) => {
-    const count = implement.id === "dumbbell" && targets[index]!.pair !== false ? 2 : 1;
-    needed.set(implement, (needed.get(implement) ?? 0) + count);
+    needed.set(implement, (needed.get(implement) ?? 0) + (pairs[index] ? 2 : 1));
   });
   for (const [implement, count] of needed) {
     if (count > implement.count) {
-      throw new RequestError(`The request needs ${count} × ${nounFor(implement)}. The inventory holds ${implement.count}.`);
+      throw new RequestError(`The request needs ${count} × ${lower(implement.name)}. The inventory holds ${implement.count}.`);
     }
   }
 }
@@ -153,23 +184,33 @@ function loadOne(
   pool: Inventory,
   implement: Implement,
   target: TargetRequest,
+  pair: boolean | undefined,
   request: LoadRequest,
   current: Resolved | undefined,
 ): Outcome {
-  switch (implement.id) {
-    case "barbell":
-      return loadBarbell(pool, implement, target.target, request.collars, current);
-    case "dumbbell":
-      return loadDumbbells(pool, implement, target, request.uneven ?? true, current);
-    case "kettlebell":
-      return loadKettlebell(pool, implement, target.target, current);
-    case "leg":
-      return loadLeg(pool, implement, target.target, current);
+  const setting: Setting = {
+    inventory: pool,
+    implement,
+    target: target.target,
+    ...(pair !== undefined ? { pair } : {}),
+    copies: pair ? 2 : 1,
+    current,
+    warnings: [],
+  };
+  const choice = request.hardware?.[implement.id];
+  switch (implement.kind) {
+    case "bar":
+    case "stack":
+      return loadMirrored(setting, choice);
+    case "handle":
+      return loadHandle(setting, choice, request.uneven ?? true);
     case "vest":
-      return loadVest(pool, implement, target.target, current);
-    default:
-      throw new RequestError(`Load for the ${implement.name.toLowerCase()} is not built yet.`);
+      return loadVest(setting);
   }
+}
+
+function free(pool: Inventory, id: string): number {
+  return pool.hardware.find((item) => item.id === id)?.count ?? 0;
 }
 
 function without(pool: Inventory, usage: Usage): Inventory {
@@ -180,12 +221,9 @@ function without(pool: Inventory, usage: Usage): Inventory {
   };
 }
 
-function hasFree(pool: Inventory, hardwareId: string): boolean {
-  return (pool.hardware.find((item) => item.id === hardwareId)?.count ?? 0) > 0;
-}
-
-function withNoFree(pool: Inventory, hardwareId: string): Inventory {
-  return { ...pool, hardware: pool.hardware.map((item) => (item.id === hardwareId ? { ...item, count: 0 } : item)) };
+function withNoFree(pool: Inventory, ids: string[]): Inventory {
+  if (ids.length === 0) return pool;
+  return { ...pool, hardware: pool.hardware.map((item) => (ids.includes(item.id) ? { ...item, count: 0 } : item)) };
 }
 
 function poolKey(pool: Inventory): string {
@@ -205,22 +243,23 @@ function leftover(pool: Inventory, implementsUsed: Implement[]): Leftover {
   };
 }
 
-function labelOf(implement: Implement, target: TargetRequest): string {
-  if (implement.id === "dumbbell") return target.pair === false ? "dumbbell" : "dumbbells";
-  return nounFor(implement);
+interface Label {
+  name: string;
+  plural: boolean;
 }
 
-function nounFor(implement: Implement): string {
-  return implement.id === "leg" ? "leg attachment" : implement.id;
+function labelOf(implement: Implement, pair: boolean | undefined): Label {
+  return pair ? { name: `${lower(implement.name)}s`, plural: true } : { name: lower(implement.name), plural: false };
 }
 
 function missWarning(
+  inventory: Inventory,
   implement: Implement,
-  label: string,
+  label: Label,
   outcome: Outcome,
   alone: Outcome,
   pool: Inventory,
-  earlier: { label: string; usage: Usage | undefined }[],
+  earlier: { label: Label; usage: Usage | undefined }[],
 ): string | undefined {
   if (closenessOf(outcome).distance <= closenessOf(alone).distance) return undefined;
   const needed = alone.picks[0];
@@ -232,27 +271,28 @@ function missWarning(
   const uses = (usage: Usage | undefined, id: string) => (usage?.plates.get(id) ?? 0) + (usage?.hardware.get(id) ?? 0) > 0;
   const blamed = mergedLabels(earlier.filter(({ usage }) => shortIds.some((id) => uses(usage, id))).map((item) => item.label));
   const names = [
-    ...shortPlates.map((id) => pluralPlate(pool.plates.find((plate) => plate.id === id)!)),
-    ...shortHardware.map((id) => `${pool.hardware.find((item) => item.id === id)!.name.toLowerCase()}s`),
+    ...shortPlates.map((id) => platesNamed(inventory, inventory.plates.find((plate) => plate.id === id)!)),
+    ...shortHardware.map((id) => `${lower(inventory.hardware.find((item) => item.id === id)!.name)}s`),
   ];
 
-  const users = blamed.length === 0 ? "earlier implements" : joined(blamed.map((item) => `the ${item}`));
-  const plural = (subjects: string[]) => subjects.length !== 1 || subjects[0] === "dumbbells";
-  const cause = `${users} ${plural(blamed) ? "use" : "uses"} the ${names.length > 0 ? joined(names) : "plates"} the ${label} ${plural([label]) ? "need" : "needs"}`;
+  const users = blamed.length === 0 ? "earlier implements" : joined(blamed.map((item) => `the ${item.name}`));
+  const pluralUsers = blamed.length !== 1 || blamed[0]!.plural;
+  const cause = `${users} ${pluralUsers ? "use" : "uses"} the ${names.length > 0 ? joined(names) : "plates"} the ${label.name} ${label.plural ? "need" : "needs"}`;
   const target = `${display(outcome.target, implement.unit)[implement.unit]} ${implement.unit}`;
   return alone.total === alone.target
     ? `Not exact because ${cause} to reach ${target}.`
     : `Further from ${target} than it could be, because ${cause} to get closer.`;
 }
 
-function mergedLabels(labels: string[]): string[] {
-  const repeated = (label: string) => labels.indexOf(label) !== labels.lastIndexOf(label);
-  return [...new Set(labels)].map((label) => (label === "dumbbell" && repeated(label) ? "dumbbells" : label));
-}
-
-function pluralPlate(plate: Plate): string {
-  if (plate.shape === "block") return `${plate.name.toLowerCase()}s`;
-  return `${/^\d/.test(plate.name) ? plate.name : plate.name.toLowerCase()} plates`;
+function mergedLabels(labels: Label[]): Label[] {
+  const merged: Label[] = [];
+  for (const label of labels) {
+    const same = merged.find((each) => each.name === label.name || each.name === `${label.name}s` || `${each.name}s` === label.name);
+    if (!same) merged.push({ ...label });
+    else if (same.name === label.name && !label.plural) Object.assign(same, { name: `${label.name}s`, plural: true });
+    else if (label.plural) Object.assign(same, label);
+  }
+  return merged;
 }
 
 function joined(items: string[]): string {

@@ -1,6 +1,16 @@
-import type { CollarChoice } from "@plate-pool/core";
 import { useState } from "react";
 import { inventory } from "./inventory";
+
+export type CollarChoice = "clamp" | "spinlock" | "none";
+
+export function collarId(collars: CollarChoice): string {
+  return collars === "none" ? "none" : `collar-${collars}`;
+}
+
+/** The bar's hardware choice for a collar setting, as the library's Load takes it. */
+export function collarHardware(collars: CollarChoice): Record<string, string> {
+  return { barbell: collarId(collars) };
+}
 
 export interface Settings {
   implement: string;

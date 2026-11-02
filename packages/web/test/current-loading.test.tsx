@@ -156,7 +156,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
     expect(addedPlates(loadingCard("Above"))).toEqual(["1.25"]);
   });
 
-  it("example 19: dumbbells 70 lb to 80 lb swap to long screws and put on 1 × 5 per end, 12 changes", () => {
+  it("example 19 (revised in 17.11): dumbbells 70 lb to 80 lb keep standard screws and put on 1 × 5 per end, 4 changes", () => {
     render(<App />);
     openTab("Dumbbells");
     typeTarget("70");
@@ -164,7 +164,7 @@ describe("current loading: the changes block (spec 16.4 and 16.6)", () => {
     expect(text(strip()!)).toContain("each end 1 × 22.5, 1 × 5, 1 × 2.5");
     typeTarget("80");
     expect(text(changesOf(loadingCard("Exact"))!)).toBe(
-      "12 changes, 6 per dumbbell Each end put on 5 · swap standard screw for long screw",
+      "4 changes, 2 per dumbbell Each end put on 5",
     );
   });
 

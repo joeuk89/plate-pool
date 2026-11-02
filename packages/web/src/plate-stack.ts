@@ -152,7 +152,7 @@ export function stackLength(weights: number[], inventory: Inventory): number {
 }
 
 function plateLength(plate: Plate | undefined): number {
-  return plate?.stackLengthIn ? used(plate.stackLengthIn) : 0.5;
+  return plate?.stackLength ? used(plate.stackLength) : 0.5;
 }
 
 function plateFor(inventory: Inventory, weight: number): Plate | undefined {
@@ -174,7 +174,7 @@ export function screwFor(loading: Loading, inventory: Inventory): Hardware | und
 /** The longest stack any locking screw the implement takes can hold. */
 export function screwCapacity(implement: string, inventory: Inventory): number {
   const options = inventory.implements.find((item) => item.id === implement)?.hardware?.options ?? [];
-  return Math.max(0, ...options.map((id) => hardwareFor(id, inventory)?.capacityIn ?? 0));
+  return Math.max(0, ...options.map((id) => hardwareFor(id, inventory)?.capacity ?? 0));
 }
 
 export function used(value: Value): number {

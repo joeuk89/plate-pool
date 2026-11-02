@@ -1,6 +1,6 @@
-import { reverse, type CollarChoice, type Loading, type ReverseRequest, type ReverseResult, type Unit } from "@plate-pool/core";
+import { reverse, type Loading, type ReverseRequest, type ReverseResult, type Unit } from "@plate-pool/core";
 import { useState, type CSSProperties } from "react";
-import { pinnedFrom, type PinnedLoading } from "./current";
+import { pinnedFrom, positionNames as positionsOf, type PinnedLoading } from "./current";
 import { unevenNote, unverifiedList } from "./describe";
 import { inventory } from "./inventory";
 import { collarOptions, dumbbellOptions, Total, unitOf, type DumbbellChoice, type LoadChoice } from "./LoadScreen";
@@ -10,6 +10,7 @@ import { plateColour } from "./plate-colours";
 import { used } from "./plate-stack";
 import { Segmented } from "./Segmented";
 import { Switch } from "./Switch";
+import { collarId, type CollarChoice } from "./settings";
 
 type Positions = { name: string; plates: number[] }[];
 
@@ -28,8 +29,8 @@ interface ReverseScreenProps {
 }
 
 const positionWords: Record<string, { label: string; phrase: string }> = {
-  "end-a": { label: "End A", phrase: "end A" },
-  "end-b": { label: "End B", phrase: "end B" },
+  a: { label: "End A", phrase: "end A" },
+  b: { label: "End B", phrase: "end B" },
   stack: { label: "Stack", phrase: "the stack" },
   front: { label: "Front", phrase: "the front" },
   back: { label: "Back", phrase: "the back" },
@@ -41,7 +42,7 @@ const mirroredWords: Record<string, { label: string; phrase: string }> = {
 };
 
 function positionNames(implement: string): string[] {
-  return inventory.implements.find((item) => item.id === implement)?.positions ?? [];
+  return positionsOf(implement) ?? [];
 }
 
 function plateWeights(implement: string): { weight: number; shape: string }[] {
@@ -110,10 +111,10 @@ export function ReverseScreen({ implement, collars, onCollarsChange, uneven, onP
   const request: ReverseRequest = {
     implement,
     positions,
-    collars,
+    ...(implement === "barbell" ? { hardware: collarId(collars) } : {}),
     uneven,
     ...(implement === "dumbbell" ? { pair: dumbbells === "pair" } : {}),
-    ...(empty ? { screws: "none" } : {}),
+    ...(empty && implement !== "barbell" && implement !== "vest" ? { hardware: "none" } : {}),
   };
   const result = reverse(inventory, request);
 
