@@ -32,6 +32,10 @@ function addImplement(name: string) {
   fireEvent.click(within(screen.getByRole("group", { name: "Implement to add" })).getByRole("button", { name }));
 }
 
+function chooseSingle(priority: number) {
+  fireEvent.click(within(within(card(priority)).getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
+}
+
 function library(...targets: TargetRequest[]): LoadResponse {
   return load(owner, { targets });
 }
@@ -250,7 +254,7 @@ describe("several implements: the tab of an implement a lower card holds (spec 8
     render(<Calculator inventory={owner} />);
     typeTarget(1, "173");
     addImplement("Dumbbell pair");
-    fireEvent.click(within(within(card(2)).getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
+    chooseSingle(2);
     typeTarget(2, "12.5");
     fireEvent.click(screen.getByRole("tab", { name: "Dumbbell" }));
 
@@ -263,7 +267,7 @@ describe("several implements: the tab of an implement a lower card holds (spec 8
   it("moves the higher of two lower cards that hold one dumbbell each", () => {
     render(<Calculator inventory={owner} />);
     addImplement("Dumbbell pair");
-    fireEvent.click(within(within(card(2)).getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
+    chooseSingle(2);
     typeTarget(2, "12.5");
     addImplement("Dumbbell single");
     typeTarget(3, "15");
@@ -306,7 +310,7 @@ describe("several implements: the plate pool", () => {
   it("offers one dumbbell when the other is in use", () => {
     render(<Calculator inventory={owner} />);
     addImplement("Dumbbell pair");
-    fireEvent.click(within(within(card(2)).getByRole("radiogroup", { name: "Pair or single" })).getByRole("radio", { name: "Single" }));
+    chooseSingle(2);
     addImplement("Dumbbell single");
     expect(cards().map((item) => item.getAttribute("aria-label"))).toEqual(["1. Straight bar", "2. Dumbbell single", "3. Dumbbell single"]);
   });
