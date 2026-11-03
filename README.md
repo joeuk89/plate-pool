@@ -48,6 +48,6 @@ To release:
 1. Set `version` in `packages/cli/package.json` and merge it to the main branch.
 2. Tag that commit `v` plus the version, such as `v1.0.0`, and push the tag. The workflow stops if the tag and the version differ.
 
-The workflow reads an npm access token from the repo secret `NPM_TOKEN`.
+The workflow publishes through npm trusted publishing: npm trusts this repo's `release.yml` run by its GitHub identity, so no token is stored anywhere. Provenance is attached by default.
 
 The package bundles the library and the inventory schema, and no inventory. To check the package before a release, run `npm pack --workspace packages/cli` and install the file it writes into an empty directory.

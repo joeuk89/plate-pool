@@ -38,6 +38,8 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci
+      - name: Use an npm that supports trusted publishing
+        run: npm install -g npm@latest
       - name: Check the tag matches the package version
         run: |
           version="$(node -p "require('./packages/cli/package.json').version")"
@@ -45,6 +47,4 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME does not match the package version $version. Tag v$version instead."
             exit 1
           fi
-      - run: npm publish --workspace packages/cli --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm publish --workspace packages/cli --access public
