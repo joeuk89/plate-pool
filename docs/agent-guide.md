@@ -395,7 +395,7 @@ The output is always JSON. This shows the first row of the first table:
 ```json
 {
   "format": 1,
-  "plate_pool": "1.0.0",
+  "plate_pool": "1.0.1",
   "inventory_sha256": "d33b57cca41bdfd2c01c02bd25e0317c93146757ef2e708a869355a955fdba68",
   "name": "Home gym",
   "tables": [
