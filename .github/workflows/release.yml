@@ -45,6 +45,6 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME does not match the package version $version. Tag v$version instead."
             exit 1
           fi
-      - run: npm publish --workspace packages/cli --provenance
+      - run: npm publish --workspace packages/cli --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

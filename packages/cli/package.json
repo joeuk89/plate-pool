@@ -14,7 +14,7 @@
     "node": ">=22.12"
   },
   "bin": {
-    "plate-pool": "./dist/bin.js"
+    "plate-pool": "dist/bin.js"
   },
   "files": [
     "dist",
